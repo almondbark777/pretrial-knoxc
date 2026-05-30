@@ -355,7 +355,7 @@ def main():
         return row[bb_idx[key]] if key in bb_idx else None
 
     bb_rows = [list(r) for r in con.execute(
-        f'SELECT {",".join(f"\\"{h}\\"" for h in headers["raw_blue_book"])} FROM raw_blue_book'
+        f'SELECT {",".join(chr(34)+h+chr(34) for h in headers["raw_blue_book"])} FROM raw_blue_book'
     )]
 
     defendants: dict[int, dict] = {}
@@ -387,7 +387,7 @@ def main():
     # Master list (ALL sheet) - 8 columns.
     ml_cols = headers["raw_master_list"]
     ml_idx = {h: i for i, h in enumerate(ml_cols)}
-    for row in con.execute(f'SELECT {",".join(f"\\"{c}\\"" for c in ml_cols)} FROM raw_master_list'):
+    for row in con.execute(f'SELECT {",".join(chr(34)+c+chr(34) for c in ml_cols)} FROM raw_master_list'):
         idn = parse_int(row[ml_idx.get("idn", -1)] if "idn" in ml_idx else None)
         if idn is None:
             continue
@@ -436,7 +436,7 @@ def main():
     # Also split payments.case_number (they sometimes show multi-values).
     pay_cols = headers["raw_payments"]
     pay_idx = {h: i for i, h in enumerate(pay_cols)}
-    pay_rows = list(con.execute(f'SELECT {",".join(f"\\"{c}\\"" for c in pay_cols)} FROM raw_payments'))
+    pay_rows = list(con.execute(f'SELECT {",".join(chr(34)+c+chr(34) for c in pay_cols)} FROM raw_payments'))
     for row in pay_rows:
         idn = parse_int(row[pay_idx["idn"]]) if "idn" in pay_idx else None
         raw = row[pay_idx["case_number"]] if "case_number" in pay_idx else None
@@ -469,7 +469,7 @@ def main():
     # ---------- check_ins ----------
     ci_cols = headers["raw_check_ins"]
     ci_idx = {h: i for i, h in enumerate(ci_cols)}
-    ci_rows = list(con.execute(f'SELECT {",".join(f"\\"{c}\\"" for c in ci_cols)} FROM raw_check_ins'))
+    ci_rows = list(con.execute(f'SELECT {",".join(chr(34)+c+chr(34) for c in ci_cols)} FROM raw_check_ins'))
     con.executemany(
         "INSERT INTO check_ins (idn, case_number, defendant, check_in_date, "
         "type_of_check_in, supervising_officer, case_status, referral_date, pretrial_level) "
@@ -490,7 +490,7 @@ def main():
     # ---------- gps_events ----------
     gp_cols = headers["raw_gps_48_hours"]
     gp_idx = {h: i for i, h in enumerate(gp_cols)}
-    gp_rows = list(con.execute(f'SELECT {",".join(f"\\"{c}\\"" for c in gp_cols)} FROM raw_gps_48_hours'))
+    gp_rows = list(con.execute(f'SELECT {",".join(chr(34)+c+chr(34) for c in gp_cols)} FROM raw_gps_48_hours'))
     con.executemany(
         "INSERT INTO gps_events (idn, case_number, defendant, referral_date, gps_type, "
         "case_status, paid, victim, victim_idn, victim_time_48, victim_accept_deny_gps, "
