@@ -508,5 +508,5 @@ app.add_middleware(
     session_cookie="kh_sess",
     max_age=60 * 60 * 12,    # 12 hours
     same_site="lax",
-    https_only=False,         # Azure App Service terminates TLS upstream
+    https_only=False,         # Cloudflare Tunnel terminates TLS upstream
 )

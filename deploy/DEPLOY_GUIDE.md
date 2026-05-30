@@ -6,29 +6,28 @@ the office through a **Cloudflare Tunnel**, gated behind **Cloudflare Access**
 outbound connection to Cloudflare, and Cloudflare brings traffic back to it.
 
 ```
-Office staff ─▶ https://ptr.<yourdomain>  ─▶  Cloudflare Access (login gate)
-            ─▶ Cloudflare edge ─▶ Tunnel ─▶ cloudflared (on your server)
-            ─▶ http://127.0.0.1:8000 (uvicorn / FastAPI) ─▶ Azure SQL
+Office staff -> https://ptr.<yourdomain>  ->  Cloudflare Access (login gate)
+            -> Cloudflare edge -> Tunnel -> cloudflared (on your server)
+            -> http://127.0.0.1:8000 (uvicorn / FastAPI) -> SQLite (db/kh222.db)
 ```
 
 The app keeps its **own** login on top of Access, so there are two gates. That's
-intentional for now (defendant PII). You can collapse it to one later — see
+intentional for now (defendant PII). You can collapse it to one later -- see
 "Optional: single sign-on" at the end.
 
 ---
 
 ## What you need before starting
 
-- A Linux server (Debian/Ubuntu) that stays on — physical box, VM, or mini-PC in
+- A Linux server (Debian/Ubuntu) that stays on -- physical box, VM, or mini-PC in
   the office. 1 vCPU / 1 GB RAM is plenty.
 - `sudo` on that server.
-- Your Cloudflare account with the domain already added (you confirmed this).
-- The Azure SQL password (goes in `.env`, never committed).
+- Your Cloudflare account with the domain already added.
 - The deployment zip (`ptr-knoxc-deploy.zip`).
 
 ---
 
-## Part A — Get the app onto the server
+## Part A -- Get the app onto the server
 
 From your workstation:
 
@@ -39,18 +38,18 @@ unzip ptr-knoxc-deploy.zip -d ptr-knoxc-deploy
 cd ptr-knoxc-deploy
 ```
 
-## Part B — Run the installer
+## Part B -- Run the installer
 
 ```bash
 sudo bash deploy/setup.sh
 ```
 
-This installs Python, **FreeTDS** (required for pymssql → Azure SQL), and
-**cloudflared**; creates the `ptrapp` service user; copies the app to
-`/opt/ptr-knoxc`; builds the virtualenv; and registers the `ptr-webapp` systemd
-service. It does **not** start the app yet — it has no secrets.
+This installs Python and **cloudflared**; creates the `ptrapp` service user;
+copies the app to `/opt/ptr-knoxc`; builds the virtualenv; and registers the
+`ptr-webapp` systemd service. It does **not** start the app yet -- it has no
+secrets.
 
-## Part C — Fill in the secrets
+## Part C -- Fill in the secrets
 
 ```bash
 sudo nano /opt/ptr-knoxc/webapp/.env
@@ -60,42 +59,17 @@ Set these:
 
 | Key | What to put |
 |---|---|
-| `DB_SERVER` | `ptrknoxc.database.windows.net` (already set) |
-| `DB_NAME` | `PTR_databaseknoxc` (already set) |
-| `DB_USER` | `abentley777` (already set) |
-| `DB_PASSWORD` | your Azure SQL password |
 | `APP_PASSWORD` | the shared password office staff type at the app login |
-| `APP_SESSION_SECRET` | a random string — generate with `openssl rand -hex 32` |
+| `APP_SESSION_SECRET` | a random string -- generate with `openssl rand -hex 32` |
 
-Add the `APP_SESSION_SECRET` line if it isn't there. Then re-lock the file:
+Then re-lock the file:
 
 ```bash
 sudo chmod 600 /opt/ptr-knoxc/webapp/.env
 sudo chown ptrapp:ptrapp /opt/ptr-knoxc/webapp/.env
 ```
 
-## Part D — Allow the server through the Azure SQL firewall  ⚠️ easy to forget
-
-Azure SQL rejects connections from unknown IPs. Find the server's public IP and
-add it as a firewall rule.
-
-```bash
-curl -s https://ifconfig.me ; echo
-```
-
-Add that IP in the Azure portal: **SQL server `ptrknoxc` → Networking →
-Firewall rules → Add a rule** (or with the CLI):
-
-```bash
-az sql server firewall-rule create \
-  --resource-group <your-rg> --server ptrknoxc \
-  --name office-host --start-ip-address <IP> --end-ip-address <IP>
-```
-
-> If the office internet has a dynamic IP, you may need to update this when it
-> changes, or allow your IP range.
-
-## Part E — Start the app and smoke-test it locally
+## Part D -- Start the app and smoke-test it locally
 
 ```bash
 sudo systemctl start ptr-webapp
@@ -103,17 +77,14 @@ sudo systemctl status ptr-webapp --no-pager
 curl -s http://127.0.0.1:8000/health
 ```
 
-`/health` should return `{"ok": true, "db": "up"}`. If it says `db` is down,
-re-check `DB_PASSWORD` and the Azure firewall rule (Part D). The first request
-after the database has been idle can take 15–30s — Azure SQL serverless
-cold-starts; the app retries automatically.
+`/health` should return `{"ok": true, "db": "up"}`. If it returns an error,
+check that `db/kh222.db` exists and is readable by the `ptrapp` user. Logs:
+`journalctl -u ptr-webapp -f`
 
-Logs if you need them: `journalctl -u ptr-webapp -f`
-
-## Part F — Create the Cloudflare Tunnel
+## Part E -- Create the Cloudflare Tunnel
 
 ```bash
-cloudflared tunnel login           # opens/prints a URL — authorize your domain
+cloudflared tunnel login           # opens/prints a URL -- authorize your domain
 cloudflared tunnel create ptr-knoxc
 cloudflared tunnel route dns ptr-knoxc ptr.<yourdomain>
 ```
@@ -136,64 +107,44 @@ sudo systemctl restart cloudflared
 sudo systemctl status cloudflared --no-pager
 ```
 
-At this point `https://ptr.<yourdomain>` should reach the app's login page.
+At this point `https://ptr.<yourdomain>` should reach the app login page.
 
-## Part G — Lock it down with Cloudflare Access (login gate)  ⚠️ do this before sharing the URL
+## Part F -- Lock it down with Cloudflare Access  WARNING: do this before sharing the URL
 
 Until you add Access, anyone who learns the hostname can hit the app login.
 Put an identity gate in front:
 
-1. Cloudflare dashboard → **Zero Trust → Access → Applications → Add an
-   application → Self-hosted**.
+1. Cloudflare dashboard -> **Zero Trust -> Access -> Applications -> Add an
+   application -> Self-hosted**.
 2. **Application domain:** `ptr.<yourdomain>`.
-3. **Policy:** Action **Allow**, and add a rule that matches your staff — either:
-   - **Emails** — paste the office addresses (the same people in
-     `webapp/users.py`), or
-   - **Emails ending in** `@knoxsheriff.org` (whatever your office domain is).
+3. **Policy:** Action **Allow**, and add a rule that matches your staff -- either:
+   - **Emails** -- paste the office addresses (same people in `webapp/users.py`), or
+   - **Emails ending in** `@knoxsheriff.org` (your office domain).
 4. Choose a login method (one-time PIN to email works with zero extra setup;
    Google/Microsoft SSO is nicer if available).
 5. Save.
 
 Now staff hit Access first (verify email), then the app login.
 
-## Part H — End-to-end check
+## Part G -- End-to-end check
 
 From a machine that is **not** logged into Cloudflare:
 
-1. Visit `https://ptr.<yourdomain>` → you should get the Cloudflare Access login.
-2. Authenticate as an allowed user → you reach the app login.
-3. Log in with an allowed email + `APP_PASSWORD` → you're in.
-4. The PTR Client Lookup loads automatically at `/` and pulls live data from SQL — no CSV upload.
+1. Visit `https://ptr.<yourdomain>` -- you should get the Cloudflare Access login.
+2. Authenticate as an allowed user -> you reach the app login.
+3. Log in with an allowed email + `APP_PASSWORD` -> you're in.
 
 ---
 
-## Lookup-only deployment (what this is)
+## Data / database
 
-This package runs `app_lookup:app`, which serves ONLY the bundled PTR Client
-Lookup app at `/`, fed live from SQL via `/api/lookup_data`. Every other path
-redirects to `/`, so the dashboard, analytics, intake, etc. are not exposed. To
-run the full multi-page app instead, change the service `ExecStart` to
-`uvicorn app:app ...`.
+The app reads from a local SQLite file at `/opt/ptr-knoxc/db/kh222.db`.
+This file is kept current by the SharePoint import timer (`ptr-import.timer`),
+which polls a mailbox for CSV exports from Power Automate. See
+`SHAREPOINT_SYNC.md` for setup.
 
-The lookup app still keeps a manual CSV-upload screen as a fallback: if the
-server data fetch ever fails, officers can drop in SharePoint CSVs the old way.
-
-### Known data gap (GPS switch / notes)
-
-The current `raw_gps_48_hours` table does not carry the "Switched To",
-"Switched GPS Date", or "Notes" columns. So switch-aware GPS billing, GPS-relief
-freezing, and the yellow "GPS fees waived" banner won't show until those columns
-are added to the table and ETL. Everything else (profiles, check-ins, payments,
-GPS day/dollar math, rosters, calendars) works from live SQL.
-
-## Keeping data current
-
-Because this runs against **live Azure SQL**, the lookup is always current — no
-rebuilds needed. (This is the difference from the old self-contained
-"PTR Client Lookup" HTML file, which carried a frozen data snapshot.) Updating
-the *app itself* = redeploy: drop a new zip, re-run nothing but
-`sudo systemctl restart ptr-webapp` after copying changed files, or just re-run
-the relevant parts of `setup.sh`.
+To run the full multi-page app (dashboard, analytics, etc.) instead of the
+lookup-only build, change the service `ExecStart` to `uvicorn app:app ...`.
 
 ## Updating / restarting
 
@@ -206,28 +157,25 @@ journalctl -u cloudflared -f          # tunnel logs
 
 ## Security notes
 
-- The app listens on **127.0.0.1 only** — it is never directly reachable on the
-  LAN or internet; all access is through the tunnel.
-- `.env` holds the DB password — keep it `chmod 600`, owned by `ptrapp`, and
-  never commit it. (It's already gitignored.)
+- The app listens on **127.0.0.1 only** -- never directly reachable on the LAN
+  or internet; all access goes through the tunnel.
+- `.env` holds the app secrets -- keep it `chmod 600`, owned by `ptrapp`, never
+  commit it. (Already gitignored.)
 - This is defendant PII. Keep the Access policy tight and review who's on it.
-- Rotate `APP_PASSWORD` / `DB_PASSWORD` periodically; after rotating
-  `APP_PASSWORD`, set `APP_SESSION_SECRET` so existing sessions don't break
-  unexpectedly.
+- Rotate `APP_PASSWORD` periodically; set `APP_SESSION_SECRET` explicitly so
+  existing sessions don't break unexpectedly when the password rotates.
 
 ## Optional: single sign-on (collapse the two logins)
 
 Later, you can have the app trust Cloudflare Access instead of its own login:
 Access forwards a signed `Cf-Access-Authenticated-User-Email` header, which the
-app can read to identify the user, dropping the second password prompt. Ask me
-when you want this — it's a small change to `app.py`'s auth middleware.
+app can read to identify the user, dropping the second password prompt. Ask when
+you want this -- it's a small change to `app.py`'s auth middleware.
 
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
 |---|---|
-| `/health` shows `db` down | Wrong `DB_PASSWORD`, or server IP not in Azure SQL firewall (Part D). |
-| First load takes ~20s then works | Azure SQL serverless cold start — normal. |
-| `pymssql` install/connect errors | FreeTDS missing — `sudo apt-get install -y freetds-bin freetds-dev`, then rebuild venv. |
+| `/health` shows `db` down | `db/kh222.db` missing or not owned by `ptrapp`. Check path and permissions. |
 | Hostname won't resolve / 1033 error | `cloudflared tunnel route dns` not run, or config hostname mismatch. |
-| Anyone can reach the login page | Cloudflare Access app/policy not created yet (Part G). |
+| Anyone can reach the login page | Cloudflare Access app/policy not created yet (Part F). |

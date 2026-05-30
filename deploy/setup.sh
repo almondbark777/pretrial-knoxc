@@ -4,14 +4,13 @@
 # Debian/Ubuntu Linux server.
 #
 # What it does (the automatable parts):
-#   1. Installs OS packages: python venv/pip, FreeTDS (needed by pymssql), cloudflared
+#   1. Installs OS packages: python venv/pip, cloudflared
 #   2. Creates a dedicated service user `ptrapp`
 #   3. Copies the app to /opt/ptr-knoxc and builds a virtualenv
 #   4. Installs the systemd service (uvicorn bound to 127.0.0.1:8000)
 #
 # What it deliberately does NOT do (needs you / a browser):
 #   - Fill in webapp/.env secrets
-#   - Add the server's public IP to the Azure SQL firewall
 #   - `cloudflared tunnel login` / create / DNS route   (browser auth)
 #   - Create the Cloudflare Access policy
 #   See DEPLOY_GUIDE.md for those steps.
@@ -44,8 +43,7 @@ fi
 say "1/5  Installing OS packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-# freetds-* gives pymssql a working TDS/TLS stack against Azure SQL.
-apt-get install -y python3-venv python3-pip freetds-bin freetds-dev unzip curl ca-certificates lsb-release
+apt-get install -y python3-venv python3-pip unzip curl ca-certificates lsb-release
 
 say "2/5  Installing cloudflared (direct .deb — works on any Ubuntu/Debian)"
 if ! command -v cloudflared >/dev/null 2>&1; then
@@ -75,7 +73,7 @@ python3 -m venv "$APP_DIR/venv"
 # Seed .env from the example if it isn't there yet, and lock it down.
 if [[ ! -f "$APP_DIR/webapp/.env" ]]; then
   cp "$APP_DIR/webapp/.env.example" "$APP_DIR/webapp/.env"
-  warn ".env created from template — YOU MUST EDIT IT (DB_PASSWORD, APP_PASSWORD, APP_SESSION_SECRET)."
+  warn ".env created from template — YOU MUST EDIT IT (APP_PASSWORD, APP_SESSION_SECRET)."
 fi
 chmod 600 "$APP_DIR/webapp/.env"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
@@ -90,18 +88,15 @@ cat <<EOF
 Base install complete.  Next steps (see DEPLOY_GUIDE.md):
 
   1. Edit secrets:        sudo nano $APP_DIR/webapp/.env
-       - DB_PASSWORD          (Azure SQL password)
        - APP_PASSWORD         (shared office login password)
        - APP_SESSION_SECRET   (run: openssl rand -hex 32)
-  2. Allow this server's IP in the Azure SQL firewall:
-       curl -s https://ifconfig.me     # <- add THIS ip in Azure portal
-  3. Start the app:        sudo systemctl start ptr-webapp
+  2. Start the app:        sudo systemctl start ptr-webapp
        Verify locally:     curl -s http://127.0.0.1:$PORT/health
-  4. Set up the tunnel:    cloudflared tunnel login
+  3. Set up the tunnel:    cloudflared tunnel login
                            cloudflared tunnel create ptr-knoxc
                            cloudflared tunnel route dns ptr-knoxc ptr.<yourdomain>
        Put config at /etc/cloudflared/config.yml (see cloudflared-config.example.yml)
        then: sudo cloudflared service install && sudo systemctl start cloudflared
-  5. Lock it down with Cloudflare Access (login gate) — DEPLOY_GUIDE.md Part H.
+  4. Lock it down with Cloudflare Access (login gate) — DEPLOY_GUIDE.md Part G.
 
 EOF

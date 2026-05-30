@@ -1,19 +1,20 @@
 """
-queries.py — SQL queries against the Knox County Pre-Trial Azure SQL DB.
+queries.py — SQL queries for the Knox County Pre-Trial Services web app.
 
-All queries return Python dicts/lists ready for JSON serialization.  Kept
-dialect-neutral enough to work against both Azure SQL and the SQLite copy
-if ever needed.
+All queries return Python dicts/lists ready for JSON serialization.
+The database is a local SQLite file (db/kh222.db) kept current by the
+SharePoint import timer (sharepoint_import.py / ptr-import.timer).
 """
 from __future__ import annotations
 import os
 import re
 import time
 import threading
-import pymssql
 from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
+
+from sqlite_compat import connect as _sconnect, Connection
 
 # ─── Connection pool (just a single re-used connection, good enough here) ───
 
@@ -21,41 +22,15 @@ _lock = threading.Lock()
 _conn = None  # type: ignore[assignment]
 
 
-def _connect():
-    """Open a fresh connection. Honors DB_BACKEND=sqlite for local mode
-    (uses db/kh222.db); otherwise connects to Azure SQL via pymssql with
-    a serverless auto-resume retry."""
-    if os.environ.get("DB_BACKEND", "").lower() == "sqlite":
-        from sqlite_compat import connect as _sconnect
-        path = os.environ.get("SQLITE_DB_PATH") or str(
-            Path(__file__).parent.parent / "db" / "kh222.db"
-        )
-        return _sconnect(path)
-
-    last_err = None
-    for attempt in range(4):
-        try:
-            return pymssql.connect(
-                server=os.environ["DB_SERVER"],
-                user=os.environ["DB_USER"],
-                password=os.environ["DB_PASSWORD"],
-                database=os.environ["DB_NAME"],
-                tds_version="7.4",
-                charset="UTF-8",
-                login_timeout=int(os.environ.get("DB_LOGIN_TIMEOUT", "45")),
-                timeout=int(os.environ.get("DB_QUERY_TIMEOUT", "60")),
-            )
-        except pymssql.OperationalError as e:
-            last_err = e
-            # 40613 = serverless resuming; just wait and retry.
-            if "40613" in str(e) or "not currently available" in str(e):
-                time.sleep(5 * (attempt + 1))
-                continue
-            raise
-    raise last_err  # type: ignore
+def _connect() -> Connection:
+    """Open a fresh SQLite connection to db/kh222.db (or SQLITE_DB_PATH)."""
+    path = os.environ.get("SQLITE_DB_PATH") or str(
+        Path(__file__).parent.parent / "db" / "kh222.db"
+    )
+    return _sconnect(path)
 
 
-def get_conn() -> pymssql.Connection:
+def get_conn() -> Connection:
     global _conn
     with _lock:
         if _conn is None:
