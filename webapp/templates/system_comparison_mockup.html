@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-Trial Office — System Comparison: SharePoint vs. Database + Web App</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --sp-blue: #0078d4;
+    --sp-bg: #f3f2f1;
+    --sp-border: #edebe9;
+    --app-navy: #1a3a6b;
+    --app-accent: #2563eb;
+    --app-green: #16a34a;
+    --app-red: #dc2626;
+    --app-amber: #d97706;
+    --app-bg: #f0f4f8;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: #1e293b;
+    color: #1f2937;
+    min-height: 100vh;
+  }
+
+  .banner {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    color: white;
+    padding: 16px 32px;
+    text-align: center;
+  }
+  .banner h1 { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
+  .banner p { font-size: 12px; color: #93c5fd; }
+
+  .tab-bar {
+    background: #0f172a;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 16px;
+  }
+  .tab-btn {
+    padding: 11px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: #e2e8f0; }
+  .tab-btn.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+
+  .split-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: calc(100vh - 115px);
+  }
+  .panel { display: flex; flex-direction: column; overflow: hidden; }
+
+  .panel-label {
+    padding: 9px 18px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-label.sp { background: #0078d4; color: white; }
+  .panel-label.app { background: #16a34a; color: white; }
+  .panel-label .badge {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+  }
+
+  /* ── SHAREPOINT PANEL ── */
+  .sp-panel { background: var(--sp-bg); }
+  .sp-topbar {
+    background: #fff;
+    border-bottom: 1px solid #edebe9;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 46px;
+  }
+  .sp-logo { font-size: 20px; color: var(--sp-blue); }
+  .sp-site-name { font-size: 14px; font-weight: 600; color: #323130; }
+  .sp-site-sub { font-size: 11px; color: #605e5c; }
+  .sp-nav {
+    background: #fff;
+    border-bottom: 1px solid #edebe9;
+    padding: 0 14px;
+    display: flex;
+  }
+  .sp-nav-item {
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #323130;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sp-nav-item.active { border-bottom-color: var(--sp-blue); color: var(--sp-blue); font-weight: 600; }
+  .sp-content { padding: 14px; flex: 1; overflow-y: auto; }
+
+  .sp-command-bar {
+    background: #fff;
+    border: 1px solid #edebe9;
+    padding: 7px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .sp-cmd-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    border: 1px solid #8a8886;
+    background: #fff;
+    border-radius: 2px;
+    cursor: pointer;
+    color: #323130;
+    white-space: nowrap;
+  }
+  .sp-cmd-btn:hover { background: #f3f2f1; }
+  .sp-cmd-btn.primary { background: var(--sp-blue); color: white; border-color: var(--sp-blue); }
+  .sp-search-box {
+    margin-left: auto;
+    border: 1px solid #8a8886;
+    padding: 5px 8px;
+    font-size: 12px;
+    border-radius: 2px;
+    width: 170px;
+  }
+
+  .sp-list-header {
+    display: grid;
+    grid-template-columns: 16px 145px 85px 70px 80px 70px;
+    background: #fff;
+    border: 1px solid #edebe9;
+    border-bottom: none;
+    font-size: 11px;
+    font-weight: 600;
+    color: #323130;
+  }
+  .sp-list-cell {
+    padding: 7px 8px;
+    border-right: 1px solid #edebe9;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    overflow: hidden;
+  }
+  .sp-sort-icon { color: #8a8886; font-size: 9px; cursor: pointer; }
+  .sp-list-body { border: 1px solid #edebe9; }
+  .sp-list-row {
+    display: grid;
+    grid-template-columns: 16px 145px 85px 70px 80px 70px;
+    background: #fff;
+    border-bottom: 1px solid #edebe9;
+    font-size: 11px;
+    cursor: pointer;
+    align-items: center;
+  }
+  .sp-list-row:hover { background: #f3f2f1; }
+
+  .sp-status-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .sp-status-tag.open1 { background: #dff6dd; color: #107c10; }
+  .sp-status-tag.open2 { background: #c8f0c8; color: #107c10; }
+  .sp-status-tag.open3 { background: #e8f5e8; color: #107c10; border:1px solid #107c10; }
+
+  .sp-pain-box {
+    margin-top: 12px;
+    background: #fff4ce;
+    border: 1px solid #f7d55c;
+    border-radius: 2px;
+    padding: 11px;
+    font-size: 11px;
+  }
+  .sp-pain-box h4 { font-size: 11px; font-weight: 700; color: #8a6914; margin-bottom: 7px; }
+  .sp-pain-box ul { padding-left: 14px; color: #605e5c; line-height: 1.8; }
+
+  .sp-data-bug {
+    margin-top: 10px;
+    background: #fde7e9;
+    border: 1px solid #f4b8bc;
+    border-radius: 2px;
+    padding: 10px 11px;
+    font-size: 11px;
+  }
+  .sp-data-bug h4 { font-weight: 700; color: #a4262c; margin-bottom: 6px; font-size: 11px; }
+  .sp-data-bug .bug-item { margin-bottom: 6px; color: #323130; }
+  .sp-data-bug code { background: #fde7e9; border: 1px solid #f4b8bc; padding: 1px 5px; border-radius: 2px; font-size: 10px; color: #a4262c; }
+
+  /* ── WEB APP PANEL ── */
+  .app-panel { background: var(--app-bg); }
+  .app-topbar {
+    background: var(--app-navy);
+    color: white;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 12px;
+  }
+  .app-shield { font-size: 22px; }
+  .app-title { font-size: 14px; font-weight: 700; }
+  .app-user-chip {
+    margin-left: auto;
+    background: rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 4px 11px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .app-alert-dot {
+    width: 7px; height: 7px;
+    background: #ef4444;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .app-subnav {
+    background: #0f2548;
+    display: flex;
+    padding: 0 18px;
+    overflow-x: auto;
+  }
+  .app-nav-item {
+    padding: 9px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #93c5fd;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .app-nav-item:hover { color: white; }
+  .app-nav-item.active { color: white; border-bottom-color: #60a5fa; }
+  .app-badge {
+    display: inline-block;
+    background: #ef4444;
+    color: white;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    margin-left: 4px;
+  }
+  .app-content { padding: 14px; flex: 1; overflow-y: auto; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 10px 11px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border-left: 4px solid #e5e7eb;
+  }
+  .stat-card.green { border-left-color: var(--app-green); }
+  .stat-card.red { border-left-color: var(--app-red); }
+  .stat-card.amber { border-left-color: var(--app-amber); }
+  .stat-card.blue { border-left-color: var(--app-accent); }
+  .stat-number { font-size: 22px; font-weight: 800; color: #111827; line-height: 1; }
+  .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7280; margin-top: 3px; }
+  .stat-delta { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+
+  .app-search-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+  .app-search-wrap { flex: 1; position: relative; }
+  .app-search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 13px; }
+  .app-search {
+    width: 100%;
+    border: 1.5px solid #d1d5db;
+    border-radius: 7px;
+    padding: 8px 10px 8px 30px;
+    font-size: 12px;
+    background: white;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .app-search:focus { border-color: var(--app-accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .app-filter-btn {
+    padding: 7px 12px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 7px;
+    background: white;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #374151;
+    white-space: nowrap;
+  }
+  .app-filter-btn:hover { border-color: var(--app-accent); color: var(--app-accent); }
+  .app-add-btn {
+    padding: 7px 13px;
+    background: var(--app-accent);
+    color: white;
+    border: none;
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .app-add-btn:hover { background: #1d4ed8; }
+
+  .app-table-wrap {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .app-table-head {
+    display: grid;
+    grid-template-columns: 140px 80px 85px 75px 1fr;
+    background: #f9fafb;
+    border-bottom: 1.5px solid #e5e7eb;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #6b7280;
+  }
+  .app-th { padding: 9px 10px; cursor: pointer; }
+  .app-th:hover { color: var(--app-accent); }
+  .app-table-row {
+    display: grid;
+    grid-template-columns: 140px 80px 85px 75px 1fr;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.1s;
+    align-items: center;
+  }
+  .app-table-row:hover { background: #eff6ff; }
+  .app-td { padding: 8px 10px; }
+  .app-name { font-weight: 600; color: #111827; font-size: 11px; }
+  .app-name span { display: block; font-weight: 400; font-size: 10px; color: #6b7280; }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .status-pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .status-pill.compliant { background: #dcfce7; color: #15803d; }
+  .status-pill.alert { background: #fee2e2; color: #b91c1c; }
+  .status-pill.pending { background: #fef3c7; color: #92400e; }
+  .status-pill.inactive { background: #f3f4f6; color: #6b7280; }
+
+  .risk-bar-wrap { display: flex; align-items: center; gap: 5px; }
+  .risk-bar-bg { flex: 1; height: 4px; background: #e5e7eb; border-radius: 2px; }
+  .risk-bar-fill { height: 4px; border-radius: 2px; }
+  .risk-label { font-size: 10px; font-weight: 700; min-width: 20px; }
+  .risk-low .risk-bar-fill { background: #16a34a; } .risk-low .risk-label { color: #16a34a; }
+  .risk-med .risk-bar-fill { background: #d97706; } .risk-med .risk-label { color: #d97706; }
+  .risk-hi  .risk-bar-fill { background: #dc2626; } .risk-hi  .risk-label { color: #dc2626; }
+
+  .alert-panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .alert-panel-header {
+    padding: 9px 13px;
+    background: #fef2f2;
+    border-bottom: 1.5px solid #fecaca;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #991b1b;
+  }
+  .alert-item {
+    padding: 9px 13px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .alert-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .alert-text { flex: 1; }
+  .alert-text strong { display: block; color: #111827; }
+  .alert-text span { color: #6b7280; font-size: 10px; }
+  .alert-time { font-size: 10px; color: #9ca3af; white-space: nowrap; margin-top: 2px; }
+  .alert-action-btn {
+    padding: 4px 9px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #374151;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .alert-action-btn:hover { border-color: var(--app-accent); color: var(--app-accent); }
+
+  /* Advantage box */
+  .advantage-bar {
+    margin-top: 10px;
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+    border-radius: 8px;
+    padding: 10px 13px;
+    font-size: 11px;
+    color: #166534;
+  }
+  .advantage-bar h4 { font-size: 11px; font-weight: 700; margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+  .advantage-bar ul { padding-left: 16px; line-height: 1.9; }
+
+  /* Modals */
+  .sp-modal-overlay, .app-modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+  }
+  .sp-modal-overlay.open, .app-modal-overlay.open { display: flex; }
+
+  .sp-modal { background: white; width: 460px; border-radius: 2px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+  .sp-modal-header { background: var(--sp-blue); color: white; padding: 12px 16px; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .sp-modal-body { padding: 16px; }
+  .sp-modal-field { margin-bottom: 12px; }
+  .sp-modal-label { font-size: 11px; font-weight: 600; color: #323130; margin-bottom: 3px; }
+  .sp-modal-input { width: 100%; border: 1px solid #8a8886; padding: 6px 8px; font-size: 12px; border-radius: 2px; }
+  .sp-modal-footer { padding: 10px 16px; border-top: 1px solid #edebe9; display: flex; gap: 6px; justify-content: flex-end; }
+  .sp-warn { background:#fff4ce; border:1px solid #f7d55c; padding:8px; font-size:10px; color:#8a6914; border-radius:2px; margin-top:8px; line-height:1.5; }
+
+  .app-modal { background: white; width: 500px; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+  .app-modal-header { background: var(--app-navy); color: white; padding: 14px 18px; display: flex; align-items: center; gap: 8px; }
+  .app-modal-title { font-size: 14px; font-weight: 700; flex: 1; }
+  .app-modal-close { background: rgba(255,255,255,0.15); border: none; color: white; width: 26px; height: 26px; border-radius: 5px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .app-modal-body { padding: 18px; }
+  .app-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .app-detail-field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7280; display: block; margin-bottom: 2px; }
+  .app-detail-field .val { font-size: 12px; font-weight: 600; color: #111827; }
+  .app-timeline h4 { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 8px; }
+  .tl-item { display: flex; gap: 8px; margin-bottom: 6px; font-size: 11px; }
+  .tl-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+  .tl-dot.green { background: var(--app-green); }
+  .tl-dot.red   { background: var(--app-red); }
+  .tl-dot.amber { background: var(--app-amber); }
+  .tl-dot.blue  { background: var(--app-accent); }
+  .tl-line strong { display: block; color: #111827; }
+  .tl-line span { color: #6b7280; }
+  .app-modal-footer { padding: 12px 18px; border-top: 1px solid #e5e7eb; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .app-btn-secondary { padding: 7px 13px; border: 1.5px solid #d1d5db; border-radius: 7px; background: white; font-size: 12px; font-weight: 600; cursor: pointer; color: #374151; }
+  .app-btn-primary  { padding: 7px 13px; background: var(--app-accent); color: white; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .app-btn-danger   { padding: 7px 13px; background: var(--app-red); color: white; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+  /* ── TAB CONTENT PANELS ── */
+  .view-panel { display: none; }
+  .view-panel.active { display: grid; grid-template-columns: 1fr 1fr; }
+
+  .compare-content { display: none; padding: 24px; background: #1e293b; min-height: calc(100vh - 115px); }
+  .compare-content.active { display: block; }
+  .report-content { display: none; background: #1e293b; min-height: calc(100vh - 115px); }
+  .report-content.active { display: grid; grid-template-columns: 1fr 1fr; }
+
+  /* Compare table */
+  .compare-table-wrap { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
+  .compare-header { display: grid; grid-template-columns: 2fr 1fr 1fr; background: #0f172a; color: white; }
+  .compare-th { padding: 13px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .compare-th.sp-col { color: #93c5fd; border-left: 1px solid rgba(255,255,255,0.1); text-align: center; }
+  .compare-th.app-col { color: #86efac; border-left: 1px solid rgba(255,255,255,0.1); text-align: center; }
+  .compare-section-head { background: #f8fafc; padding: 9px 18px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; border-bottom: 1px solid #e2e8f0; }
+  .compare-row { display: grid; grid-template-columns: 2fr 1fr 1fr; border-bottom: 1px solid #f1f5f9; }
+  .compare-row:hover { background: #f8fafc; }
+  .compare-cell { padding: 11px 18px; font-size: 12px; }
+  .compare-feature { color: #1e293b; font-weight: 500; }
+  .compare-feature small { display: block; color: #94a3b8; font-size: 11px; margin-top: 1px; font-weight: 400; }
+  .compare-sp, .compare-app { text-align: center; border-left: 1px solid #f1f5f9; }
+  .check { color: #16a34a; font-size: 18px; }
+  .cross { color: #dc2626; font-size: 18px; }
+  .partial { color: #d97706; font-size: 14px; font-weight: 700; }
+
+  .bottom-cta { margin-top: 20px; background: linear-gradient(135deg, #1a3a6b, #2563eb); border-radius: 12px; padding: 22px; color: white; text-align: center; }
+  .bottom-cta h3 { font-size: 17px; font-weight: 700; margin-bottom: 7px; }
+  .bottom-cta p { font-size: 12px; color: #93c5fd; line-height: 1.6; max-width: 700px; margin: 0 auto; }
+
+  /* Report tab */
+  .sp-report, .app-report { padding: 14px; overflow-y: auto; }
+  .sp-report { background: var(--sp-bg); }
+  .app-report { background: var(--app-bg); }
+  .panel-label-inline { padding: 9px 14px; margin: -14px -14px 14px; font-size: 11px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .panel-label-inline.sp { background: #0078d4; color: white; }
+  .panel-label-inline.app { background: #16a34a; color: white; }
+  .panel-label-inline .badge { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+
+  .sp-report-header { font-size: 13px; font-weight: 700; color: #323130; margin-bottom: 10px; padding-bottom: 7px; border-bottom: 2px solid #0078d4; }
+  .sp-report-step { background: white; border: 1px solid #edebe9; border-radius: 2px; padding: 10px; margin-bottom: 8px; font-size: 11px; }
+  .sp-report-step h4 { font-weight: 700; margin-bottom: 5px; color: #323130; display: flex; align-items: center; gap: 5px; }
+  .sp-report-step p { color: #605e5c; line-height: 1.5; }
+  .sp-step-num { background: #0078d4; color: white; border-radius: 50%; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .sp-report-total { background: #fff4ce; border: 1px solid #f7d55c; border-radius: 2px; padding: 10px; font-size: 12px; color: #8a6914; text-align: center; font-weight: 600; margin-top: 10px; }
+
+  .app-report-header { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 10px; padding-bottom: 7px; border-bottom: 2px solid var(--app-accent); }
+  .app-chart-card { background: white; border-radius: 8px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .app-chart-card h4 { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 9px; }
+  .mini-chart { display: flex; align-items: flex-end; gap: 5px; height: 55px; }
+  .mini-bar { flex: 1; border-radius: 4px 4px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 3px; }
+  .mini-bar-val { font-size: 9px; font-weight: 700; color: white; }
+  .chart-x-labels { display: flex; gap: 5px; padding-top: 5px; }
+  .chart-x-label { flex: 1; text-align: center; font-size: 9px; color: #9ca3af; }
+
+  .officer-bars { display: flex; flex-direction: column; gap: 5px; }
+  .officer-bar-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .officer-name { width: 105px; color: #374151; font-weight: 500; font-size: 10px; }
+  .officer-bar-bg { flex: 1; height: 14px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+  .officer-bar-fill { height: 14px; background: linear-gradient(90deg, #2563eb, #60a5fa); border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 5px; }
+  .officer-bar-fill span { font-size: 9px; font-weight: 700; color: white; }
+
+  .pie-grid { display: flex; gap: 10px; align-items: center; }
+  .pie-mock { width: 70px; height: 70px; border-radius: 50%; flex-shrink: 0; }
+  .pie-legend { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+  .pie-legend-item { display: flex; align-items: center; gap: 5px; }
+  .pie-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .report-action-btn { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1.5px solid #e5e7eb; border-radius: 7px; margin-bottom: 5px; cursor: pointer; color: #374151; font-weight: 600; font-size: 11px; transition: all 0.15s; }
+  .report-action-btn:hover { border-color: var(--app-accent); color: var(--app-accent); background: #eff6ff; }
+
+  /* GPS tab */
+  .gps-type-row { display: flex; gap: 5px; margin-bottom: 10px; }
+  .gps-type-pill { flex: 1; text-align: center; background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 8px 5px; font-size: 10px; font-weight: 700; cursor: pointer; }
+  .gps-type-pill.active-pill { background: #eff6ff; border-color: var(--app-accent); color: var(--app-accent); }
+  .gps-type-pill .count { font-size: 18px; font-weight: 800; display: block; color: #111827; }
+  .gps-type-pill.in-custody .count { color: #dc2626; }
+  .gps-type-pill.allied .count { color: #d97706; }
+  .gps-type-pill.scram .count { color: #7c3aed; }
+
+  .scrollbar-thin::-webkit-scrollbar { width: 5px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+
+  <!-- KH-THEME-START — shared chrome injected by _patch_templates.py -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+</head>
+<body>
+
+<div class="banner">
+  <h1>🏛️ Knox County Pre-Trial Office — System Comparison</h1>
+  <p>Based on live exports: 3,437 defendant records · 1,692 check-ins · 1,682 payment records · 339 GPS cases</p>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('defendants')">📋 Defendant List</button>
+  <button class="tab-btn" onclick="switchTab('gps')">📡 GPS Monitoring</button>
+  <button class="tab-btn" onclick="switchTab('reports')">📊 Reporting</button>
+  <button class="tab-btn" onclick="switchTab('compare')">⚖️ Feature Comparison</button>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB 1: DEFENDANT LIST
+═══════════════════════════════════════ -->
+<div id="tab-defendants" class="view-panel active">
+
+  <!-- LEFT: SharePoint -->
+  <div class="panel sp-panel">
+    <div class="panel-label sp">📎 Current State <span class="badge">SharePoint List</span></div>
+    <div class="sp-topbar">
+      <div class="sp-logo">⬛</div>
+      <div>
+        <div class="sp-site-name">Pre-Trial · Blue Book</div>
+        <div class="sp-site-sub">SharePoint List · 3,437 items</div>
+      </div>
+    </div>
+    <div class="sp-nav">
+      <div class="sp-nav-item active">Blue Book</div>
+      <div class="sp-nav-item">Check Ins</div>
+      <div class="sp-nav-item">GPS 48 Hours</div>
+      <div class="sp-nav-item">Payments</div>
+    </div>
+    <div class="sp-content scrollbar-thin">
+      <div class="sp-command-bar">
+        <button class="sp-cmd-btn primary" onclick="openSpModal()">＋ New</button>
+        <button class="sp-cmd-btn">✎ Edit</button>
+        <button class="sp-cmd-btn">↗ Export to Excel</button>
+        <input class="sp-search-box" placeholder="Search this list..." type="text">
+      </div>
+
+      <div class="sp-list-header">
+        <div class="sp-list-cell"><input type="checkbox"></div>
+        <div class="sp-list-cell">Defendant <span class="sp-sort-icon">↕</span></div>
+        <div class="sp-list-cell">Case Status <span class="sp-sort-icon">↕</span></div>
+        <div class="sp-list-cell">Level</div>
+        <div class="sp-list-cell">Officer</div>
+        <div class="sp-list-cell">Modified</div>
+      </div>
+      <div class="sp-list-body">
+        <!-- Real data rows — notice the status inconsistency is visible! -->
+        <div class="sp-list-row" onclick="openSpModal()">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" title="Oliver, Milan Glen">OLIVER, MILAN GLEN</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open1">Open</span></div>
+          <div class="sp-list-cell">2</div>
+          <div class="sp-list-cell">(unassigned)</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+        <div class="sp-list-row">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell">HILL, MARTY DEWAYNE</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open2">OPEN</span></div>
+          <div class="sp-list-cell">2</div>
+          <div class="sp-list-cell">(unassigned)</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+        <div class="sp-list-row">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell">STONE, MEAGHAN ANNE</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open3">open</span></div>
+          <div class="sp-list-cell">—</div>
+          <div class="sp-list-cell">(unassigned)</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+        <div class="sp-list-row">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell">KING, TRISTAN JAQUANN</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open1">OPEN</span></div>
+          <div class="sp-list-cell">3</div>
+          <div class="sp-list-cell">Johnie Carter</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+        <div class="sp-list-row">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell">WHITING, DEONTAY R</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open2">OPEN</span></div>
+          <div class="sp-list-cell">3</div>
+          <div class="sp-list-cell">Will Torbett</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+        <div class="sp-list-row">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell">LAROCQUE, KRISTINA N</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open1">OPEN</span></div>
+          <div class="sp-list-cell">3</div>
+          <div class="sp-list-cell">Johnie Carter</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+        <div class="sp-list-row">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell">BRYANT, PHILLIP BOONE</div>
+          <div class="sp-list-cell"><span class="sp-status-tag open2">Open</span></div>
+          <div class="sp-list-cell">3</div>
+          <div class="sp-list-cell">Carla Kidwell</div>
+          <div class="sp-list-cell">4/17</div>
+        </div>
+      </div>
+
+      <div class="sp-data-bug">
+        <h4>🐛 Real Data Quality Problems Found in This Export</h4>
+        <div class="bug-item">
+          <strong>"Open" has 3 different spellings</strong> — <code>Open</code> (500 rows), <code>OPEN</code> (2,241 rows), <code>open</code> (2 rows). Filtering for one misses the others.
+        </div>
+        <div class="bug-item">
+          <strong>2,495 of 3,437 defendants have no Charge Type recorded</strong> — 72% of rows are blank. Any report on charges will be incomplete.
+        </div>
+        <div class="bug-item">
+          <strong>Check-In "Type" field has "rickman" as an entry</strong> — someone typed an officer name into the wrong field. No validation exists to catch this.
+        </div>
+        <div class="bug-item">
+          <strong>1,585 of 1,682 payments have no officer recorded</strong> — 94% of the Payments list is missing "Officer That Collected Payment."
+        </div>
+      </div>
+
+      <div class="sp-pain-box">
+        <h4>⚠️ Structural Limitations of SharePoint Lists</h4>
+        <ul>
+          <li>No live totals — must export to Excel to count anything</li>
+          <li>Four separate lists with no enforced relationship between them</li>
+          <li>No automatic violation flagging or overdue alerts</li>
+          <li>No role-based access — every officer sees every defendant</li>
+          <li>GPS 48 Hours list is completely disconnected from the Blue Book</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Web App -->
+  <div class="panel app-panel">
+    <div class="panel-label app">✅ Proposed System <span class="badge">SQL Database + Web App</span></div>
+    <div class="app-topbar">
+      <div class="app-shield">🏛️</div>
+      <div class="app-title">Pre-Trial Management System</div>
+      <div class="app-user-chip"><div class="app-alert-dot"></div>J. Carter · 5 alerts</div>
+    </div>
+    <div class="app-subnav">
+      <div class="app-nav-item active">Defendants</div>
+      <div class="app-nav-item">GPS <span class="app-badge">5</span></div>
+      <div class="app-nav-item">Check-Ins</div>
+      <div class="app-nav-item">Payments</div>
+      <div class="app-nav-item">Reports</div>
+    </div>
+    <div class="app-content scrollbar-thin">
+      <div class="stat-grid">
+        <div class="stat-card green">
+          <div class="stat-number">2,743</div>
+          <div class="stat-label">Open Cases</div>
+          <div class="stat-delta">Across all officers</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-number">339</div>
+          <div class="stat-label">GPS Active</div>
+          <div class="stat-delta">IN CUSTODY · ALLIED · SCRAM</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-number">1,692</div>
+          <div class="stat-label">Check-Ins Logged</div>
+          <div class="stat-delta">790 in-person · 900 phone</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-number">$369K</div>
+          <div class="stat-label">Fees Collected</div>
+          <div class="stat-delta">GPS + PTR + Drug Screen</div>
+        </div>
+      </div>
+
+      <div class="app-search-row">
+        <div class="app-search-wrap">
+          <span class="app-search-icon">🔍</span>
+          <input class="app-search" id="app-search" placeholder="Search name, IDN, case #, officer..." oninput="filterTable(this.value)">
+        </div>
+        <button class="app-filter-btn">⚙ Filter</button>
+        <button class="app-filter-btn">👤 My Cases</button>
+        <button class="app-add-btn" onclick="openAppModal()">＋ Add</button>
+      </div>
+
+      <div class="app-table-wrap">
+        <div class="app-table-head">
+          <div class="app-th">Defendant</div>
+          <div class="app-th">Status</div>
+          <div class="app-th">Officer</div>
+          <div class="app-th">Level</div>
+          <div class="app-th">Risk</div>
+        </div>
+        <div id="app-table-body">
+          <div class="app-table-row" onclick="openAppModal()">
+            <div class="app-td"><div class="app-name">Oliver, Milan G.<span>IDN 455117 · Misdemeanor</span></div></div>
+            <div class="app-td"><span class="status-pill compliant">Open</span></div>
+            <div class="app-td" style="font-size:11px;">W. Dunaway</div>
+            <div class="app-td" style="font-size:11px;font-weight:600;">2</div>
+            <div class="app-td"><div class="risk-bar-wrap risk-low"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:25%"></div></div><span class="risk-label">Low</span></div></div>
+          </div>
+          <div class="app-table-row" onclick="openAppModal()">
+            <div class="app-td"><div class="app-name">King, Tristan J.<span>IDN 1650015 · Level 3</span></div></div>
+            <div class="app-td"><span class="status-pill compliant">Open</span></div>
+            <div class="app-td" style="font-size:11px;">J. Carter</div>
+            <div class="app-td" style="font-size:11px;font-weight:600;">3</div>
+            <div class="app-td"><div class="risk-bar-wrap risk-med"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:55%"></div></div><span class="risk-label">Med</span></div></div>
+          </div>
+          <div class="app-table-row" onclick="openAppModal()">
+            <div class="app-td"><div class="app-name">Whiting, Deontay R.<span>IDN 1563937 · GPS</span></div></div>
+            <div class="app-td"><span class="status-pill compliant">Open</span></div>
+            <div class="app-td" style="font-size:11px;">W. Torbett</div>
+            <div class="app-td" style="font-size:11px;font-weight:600;">3</div>
+            <div class="app-td"><div class="risk-bar-wrap risk-low"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:30%"></div></div><span class="risk-label">Low</span></div></div>
+          </div>
+          <div class="app-table-row" onclick="openAppModal()">
+            <div class="app-td"><div class="app-name">Bryant, Phillip B.<span>IDN 1671696 · Felony</span></div></div>
+            <div class="app-td"><span class="status-pill compliant">Open</span></div>
+            <div class="app-td" style="font-size:11px;">C. Kidwell</div>
+            <div class="app-td" style="font-size:11px;font-weight:600;">3</div>
+            <div class="app-td"><div class="risk-bar-wrap risk-med"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:60%"></div></div><span class="risk-label">Med</span></div></div>
+          </div>
+          <div class="app-table-row" onclick="openAppModal()">
+            <div class="app-td"><div class="app-name">Hill, Marty D.<span>IDN 115611 · Felony</span></div></div>
+            <div class="app-td"><span class="status-pill pending">Pending</span></div>
+            <div class="app-td" style="font-size:11px;">W. Dunaway</div>
+            <div class="app-td" style="font-size:11px;font-weight:600;">2</div>
+            <div class="app-td"><div class="risk-bar-wrap risk-hi"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:80%"></div></div><span class="risk-label">Hi</span></div></div>
+          </div>
+          <div class="app-table-row" onclick="openAppModal()">
+            <div class="app-td"><div class="app-name">LaRocque, Kristina N.<span>IDN 1497849 · Level 3</span></div></div>
+            <div class="app-td"><span class="status-pill compliant">Open</span></div>
+            <div class="app-td" style="font-size:11px;">J. Carter</div>
+            <div class="app-td" style="font-size:11px;font-weight:600;">3</div>
+            <div class="app-td"><div class="risk-bar-wrap risk-low"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:20%"></div></div><span class="risk-label">Low</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="advantage-bar">
+        <h4>✅ What the Database Fixes Automatically</h4>
+        <ul>
+          <li>"Open" is a dropdown — only one spelling ever possible across all 2,743 records</li>
+          <li>Charge Type is required at intake — zero blank records allowed</li>
+          <li>Payment officer is pulled from the logged-in user — never blank again</li>
+          <li>Check-In type is a validated dropdown — "rickman" can't be entered</li>
+          <li>All four lists are <strong>one connected database</strong> — click a defendant to see their GPS, check-ins, and payments instantly</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB 2: GPS MONITORING
+═══════════════════════════════════════ -->
+<div id="tab-gps" class="view-panel">
+
+  <!-- LEFT: SharePoint GPS -->
+  <div class="panel sp-panel">
+    <div class="panel-label sp">📎 Current State <span class="badge">GPS 48 Hours List — Separate</span></div>
+    <div class="sp-topbar">
+      <div class="sp-logo">⬛</div>
+      <div>
+        <div class="sp-site-name">Pre-Trial · GPS 48 Hours</div>
+        <div class="sp-site-sub">339 active items · No link to Blue Book</div>
+      </div>
+    </div>
+    <div class="sp-content scrollbar-thin">
+      <div class="sp-command-bar">
+        <button class="sp-cmd-btn">↗ Export to Excel</button>
+        <button class="sp-cmd-btn primary">＋ New</button>
+        <input class="sp-search-box" placeholder="Search..." type="text">
+      </div>
+      <div class="sp-list-header" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+        <div class="sp-list-cell"><input type="checkbox"></div>
+        <div class="sp-list-cell">Defendant</div>
+        <div class="sp-list-cell">GPS Type</div>
+        <div class="sp-list-cell">Victim Accept</div>
+        <div class="sp-list-cell">DA Emailed</div>
+        <div class="sp-list-cell">Paid</div>
+      </div>
+      <div class="sp-list-body">
+        <div class="sp-list-row" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" style="font-size:10px;">FITZGIBBON, JOSEPH</div>
+          <div class="sp-list-cell"><span style="font-size:10px;color:#a4262c;font-weight:600;">In Custody</span></div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#605e5c;">—</div>
+        </div>
+        <div class="sp-list-row" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" style="font-size:10px;">BEELER, DILLON D</div>
+          <div class="sp-list-cell"><span style="font-size:10px;color:#a4262c;font-weight:600;">IN CUSTODY</span></div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#605e5c;">—</div>
+        </div>
+        <div class="sp-list-row" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" style="font-size:10px;">AGUILAR, ANGEL A</div>
+          <div class="sp-list-cell"><span style="font-size:10px;color:#a4262c;font-weight:600;">In Custody</span></div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#605e5c;">—</div>
+        </div>
+        <div class="sp-list-row" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" style="font-size:10px;">BRADY, ZANE MICHAEL</div>
+          <div class="sp-list-cell"><span style="font-size:10px;color:#a4262c;font-weight:600;">IN CUSTODY</span></div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#605e5c;">—</div>
+        </div>
+        <div class="sp-list-row" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" style="font-size:10px;">LIGON, DONTRAY A</div>
+          <div class="sp-list-cell"><span style="font-size:10px;color:#8a6914;font-weight:600;">ALLIED</span></div>
+          <div class="sp-list-cell" style="font-size:10px;color:#107c10;">True</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#107c10;">Paid</div>
+        </div>
+        <div class="sp-list-row" style="grid-template-columns:16px 130px 100px 80px 70px 70px;">
+          <div class="sp-list-cell"><input type="checkbox"></div>
+          <div class="sp-list-cell" style="font-size:10px;">BUCKNER, TAYLOR S</div>
+          <div class="sp-list-cell"><span style="font-size:10px;color:#a4262c;font-weight:600;">IN CUSTODY</span></div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#a4262c;">False</div>
+          <div class="sp-list-cell" style="font-size:10px;color:#605e5c;">—</div>
+        </div>
+      </div>
+
+      <div class="sp-data-bug" style="margin-top:12px;">
+        <h4>🐛 Critical Issues Found in the GPS 48 Hours List</h4>
+        <div class="bug-item"><strong>338 of 339 cases show DA Emailed = False</strong> — Only 1 case in the entire list has "DA Emailed: True." This is either a tracking failure or it's not actually happening.</div>
+        <div class="bug-item"><strong>GPS Type has 5 spellings</strong> — <code>IN CUSTODY</code>, <code>In Custody</code>, <code>in custody</code>, <code>ALLIED</code>, <code>SCRAM</code>. Filtering for victims or reporting by type gives wrong counts.</div>
+        <div class="bug-item"><strong>No link to the Blue Book</strong> — There's no connection between this list and the defendant's main record. Officers must look up the defendant separately in two lists.</div>
+        <div class="bug-item"><strong>No install date tracking</strong> — GPS Install Date column exists but is blank for most records. Can't track time-from-referral-to-install.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Web App GPS -->
+  <div class="panel app-panel">
+    <div class="panel-label app">✅ Proposed System <span class="badge">Integrated GPS Queue</span></div>
+    <div class="app-topbar">
+      <div class="app-shield">🏛️</div>
+      <div class="app-title">GPS Monitoring — 339 Active Cases</div>
+      <div class="app-user-chip"><div class="app-alert-dot"></div>5 need attention</div>
+    </div>
+    <div class="app-subnav">
+      <div class="app-nav-item">Defendants</div>
+      <div class="app-nav-item active">GPS <span class="app-badge">5</span></div>
+      <div class="app-nav-item">Check-Ins</div>
+      <div class="app-nav-item">Payments</div>
+    </div>
+    <div class="app-content scrollbar-thin">
+      <div class="stat-grid">
+        <div class="stat-card red">
+          <div class="stat-number">186</div>
+          <div class="stat-label">In Custody</div>
+          <div class="stat-delta">55% of GPS cases</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-number">107</div>
+          <div class="stat-label">ALLIED</div>
+          <div class="stat-delta">32% of GPS cases</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-number">40</div>
+          <div class="stat-label">SCRAM</div>
+          <div class="stat-delta">12% of GPS cases</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-number">338</div>
+          <div class="stat-label">DA Not Emailed</div>
+          <div class="stat-delta" style="color:#dc2626;font-weight:700;">⚠ 99.7% gap</div>
+        </div>
+      </div>
+
+      <!-- GPS Type Filter Pills -->
+      <div class="gps-type-row">
+        <div class="gps-type-pill active-pill">
+          <span class="count">339</span>All
+        </div>
+        <div class="gps-type-pill in-custody">
+          <span class="count">186</span>In Custody
+        </div>
+        <div class="gps-type-pill allied">
+          <span class="count">107</span>Allied
+        </div>
+        <div class="gps-type-pill scram">
+          <span class="count">40</span>SCRAM
+        </div>
+      </div>
+
+      <div class="alert-panel">
+        <div class="alert-panel-header" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">
+          🚨 Needs Action — DA Not Notified
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon">📧</div>
+          <div class="alert-text">
+            <strong>Fitzgibbon, Joseph — In Custody, Victim: Clark, Mary</strong>
+            <span>Referred 4/17 · Victim contacted 4/17 · DA not yet notified · Victim: Accept pending</span>
+          </div>
+          <div class="alert-time">Today</div>
+          <button class="alert-action-btn" style="border-color:#dc2626;color:#dc2626;">Email DA</button>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon">📧</div>
+          <div class="alert-text">
+            <strong>Beeler, Dillon D — In Custody, Victim: Boggs, Tabitha</strong>
+            <span>Referred 4/17 · Victim contacted 4/1 · DA not yet notified</span>
+          </div>
+          <div class="alert-time">Today</div>
+          <button class="alert-action-btn" style="border-color:#dc2626;color:#dc2626;">Email DA</button>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon">💳</div>
+          <div class="alert-text">
+            <strong>180 cases — Install fee / Bond payment not recorded</strong>
+            <span>GPS 48-Hour list has 180 cases with no payment status. May be paid but unlogged.</span>
+          </div>
+          <div class="alert-time">Ongoing</div>
+          <button class="alert-action-btn">Review</button>
+        </div>
+      </div>
+
+      <div class="alert-panel">
+        <div class="alert-panel-header" style="background:#f0fdf4;border-color:#86efac;color:#166534;">
+          ✅ Victim Accepted GPS — Ready for Install
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon">✔</div>
+          <div class="alert-text">
+            <strong>159 cases — Fully paid (Install Fee + Bond)</strong>
+            <span>Both install and bond payment confirmed in the system</span>
+          </div>
+          <div class="alert-time">Verified</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-icon">✔</div>
+          <div class="alert-text">
+            <strong>151 cases — Victim accepted GPS monitoring</strong>
+            <span>Victim contacted within 48 hours and consented</span>
+          </div>
+          <div class="alert-time">Logged</div>
+        </div>
+      </div>
+
+      <div class="advantage-bar">
+        <h4>✅ What This Fixes for GPS Tracking</h4>
+        <ul>
+          <li>GPS type is a dropdown — "IN CUSTODY," "In Custody," "in custody" all become the same value</li>
+          <li>System auto-flags cases where DA hasn't been emailed after referral deadline</li>
+          <li>Victim acceptance, DA email, payment — all tracked in <strong>one record</strong> linked to the defendant</li>
+          <li>Install date is required before a GPS case can be marked complete</li>
+          <li>Supervisor sees a real-time count of how many cases need action today</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB 3: REPORTING
+═══════════════════════════════════════ -->
+<div id="tab-reports" class="report-content">
+  <div class="sp-report scrollbar-thin">
+    <div class="panel-label-inline sp">📎 Current State <span class="badge">Manual Excel Reports</span></div>
+    <div class="sp-report-header">📊 How to Make the Monthly Supervision Report</div>
+    <div class="sp-report-step">
+      <h4><span class="sp-step-num">1</span> Export Each of the 4 Lists Separately</h4>
+      <p>Blue Book → Export to Excel. Check Ins → Export to Excel. Payments → Export to Excel. GPS 48 Hours → Export to Excel. That's 4 separate files to download and open.</p>
+    </div>
+    <div class="sp-report-step">
+      <h4><span class="sp-step-num">2</span> Clean the Status Column (Every Month)</h4>
+      <p>Find & Replace: "OPEN" → "Open," "open" → "Open." Same for Closed variants. Also fix GPS Type: "IN CUSTODY" → "In Custody." This is manual work every time because SharePoint doesn't validate text fields.</p>
+    </div>
+    <div class="sp-report-step">
+      <h4><span class="sp-step-num">3</span> Build Pivot Tables for Each List</h4>
+      <p>Count open/closed cases by officer. Count check-in types (In Person vs. Phone). Sum payments by type (GPS vs. PTR). None of these cross-reference automatically.</p>
+    </div>
+    <div class="sp-report-step">
+      <h4><span class="sp-step-num">4</span> Manually Match GPS Cases to Blue Book</h4>
+      <p>VLOOKUP by defendant name or IDN to merge GPS status into the Blue Book sheet. Risky — name spellings vary, some IDNs are missing, and the merge can silently fail.</p>
+    </div>
+    <div class="sp-report-step">
+      <h4><span class="sp-step-num">5</span> Flag the 1,585 Payment Records Missing Officer</h4>
+      <p>94% of payment rows have no officer recorded. Before presenting the report, either investigate each one or note the data gap — which means the "collected by officer" analysis is essentially unusable.</p>
+    </div>
+    <div class="sp-report-total">⏱ Estimated time per report: <strong>3–5 hours</strong> · Multiple error-prone manual steps · Data gaps make results unreliable</div>
+  </div>
+
+  <div class="app-report scrollbar-thin">
+    <div class="panel-label-inline app">✅ Proposed System <span class="badge">Live Dashboard + Instant Export</span></div>
+    <div class="app-report-header">📊 Supervision Summary — Powered by Live Database</div>
+
+    <div class="app-chart-card">
+      <h4>Officer Caseloads — Open Cases</h4>
+      <div class="officer-bars">
+        <div class="officer-bar-row"><span class="officer-name">Kathy Jones</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:100%;"><span>368</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">R. Burleson</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:97%;"><span>357</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">T. Rickman</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:95%;"><span>349</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">N. Akers</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:86%;"><span>317</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">C. Kidwell</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:80%;"><span>296</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">N. Loveless</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:77%;"><span>284</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">J. Carter</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:77%;"><span>282</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">W. Torbett</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:70%;"><span>259</span></div></div></div>
+        <div class="officer-bar-row"><span class="officer-name">J. Webber</span><div class="officer-bar-bg"><div class="officer-bar-fill" style="width:61%;"><span>223</span></div></div></div>
+      </div>
+    </div>
+
+    <div class="app-chart-card">
+      <h4>Check-In Type Split — 1,692 Total</h4>
+      <div class="pie-grid">
+        <div class="pie-mock" style="background: conic-gradient(#2563eb 0deg 169deg, #60a5fa 169deg 360deg);"></div>
+        <div class="pie-legend">
+          <div class="pie-legend-item"><div class="pie-dot" style="background:#2563eb"></div>Phone: 900 (53%)</div>
+          <div class="pie-legend-item"><div class="pie-dot" style="background:#60a5fa"></div>In Person: 790 (47%)</div>
+          <div style="margin-top:8px;font-size:10px;color:#6b7280;">Breakdown by officer available with one click</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-chart-card">
+      <h4>Payments — $369,668 Collected</h4>
+      <div class="mini-chart">
+        <div class="mini-bar" style="height:100%;background:#2563eb;"><span class="mini-bar-val">GPS</span></div>
+        <div class="mini-bar" style="height:8%;background:#60a5fa;"><span class="mini-bar-val" style="color:#374151;">PTR</span></div>
+        <div class="mini-bar" style="height:1%;background:#93c5fd;"><span class="mini-bar-val" style="color:#374151;">Drug</span></div>
+      </div>
+      <div style="font-size:10px;color:#6b7280;margin-top:18px;">GPS fees dominate (1,617 of 1,682 records). In a database, every payment is automatically tied to the logged-in officer — no more 94% blank collector fields.</div>
+    </div>
+
+    <div class="app-report-actions">
+      <h4>📤 Export & Schedule — No Manual Work</h4>
+      <div class="report-action-btn"><span>📄</span> Download Monthly Report PDF — runs live query</div>
+      <div class="report-action-btn"><span>📊</span> Export Full Dataset to Excel</div>
+      <div class="report-action-btn"><span>📧</span> Email Summary to Supervisor</div>
+      <div class="report-action-btn"><span>⏰</span> Schedule: Auto-send 1st of every month</div>
+      <div style="margin-top:10px;font-size:10px;color:#6b7280;">⏱ Total time: <strong style="color:#16a34a;">Under 2 minutes.</strong> All four lists are one database — no exporting, no VLOOKUP, no cleanup needed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB 4: FEATURE COMPARISON
+═══════════════════════════════════════ -->
+<div id="tab-compare" class="compare-content">
+  <div class="compare-table-wrap">
+    <div class="compare-header">
+      <div class="compare-th">Feature / Capability</div>
+      <div class="compare-th sp-col">📎 Current SharePoint</div>
+      <div class="compare-th app-col">✅ SQL + Web App</div>
+    </div>
+
+    <div class="compare-section-head">📋 Data Quality — Issues Found in the Real Export</div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Consistent case status values<small>Real export has 6 variants: Open, OPEN, open, Closed, CLOSED, closed</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span><br><span style="font-size:10px;color:#16a34a;">Enforced dropdown</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Charge Type always recorded<small>2,495 of 3,437 defendants (72%) have blank Charge Type</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span><br><span style="font-size:10px;color:#16a34a;">Required field at intake</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Payment officer always recorded<small>1,585 of 1,682 payments (94%) have no officer recorded</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span><br><span style="font-size:10px;color:#16a34a;">Auto-filled from login</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">GPS Type consistent spelling<small>5 variants: IN CUSTODY, In Custody, in custody, ALLIED, SCRAM</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span><br><span style="font-size:10px;color:#16a34a;">Enforced dropdown</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Validated check-in type field<small>Real data has "rickman" as a check-in type (officer name typed in wrong field)</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+
+    <div class="compare-section-head">📡 GPS Tracking</div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Auto-alert when DA hasn't been emailed<small>338 of 339 GPS cases show DA Emailed = False — system should flag these</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">GPS record linked to defendant Blue Book record<small>Currently two completely separate SharePoint lists</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Track time from referral to GPS install<small>Install Date field mostly blank — can't measure this currently</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Queue of victim contacts still pending<small>188 victims have not accepted GPS — no automatic follow-up list</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+
+    <div class="compare-section-head">📊 Reporting</div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Live officer caseload view (no export)<small>Real caseloads: Jones 368, Burleson 357, Rickman 349...</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Cross-list reporting (GPS + Check-Ins + Payments)<small>Currently requires 4 exports and manual VLOOKUP merge</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Check-in method analysis (phone vs. in-person by officer)<small>1,692 check-ins — 53% phone, 47% in person — buried in exports</small></div>
+      <div class="compare-cell compare-sp"><span class="partial">~</span><br><span style="font-size:10px;color:#d97706;">Manual pivot table</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span><br><span style="font-size:10px;color:#16a34a;">Instant, live</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Payment totals by officer and type<small>$369,668 total — but 94% of records missing collector name</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span><br><span style="font-size:10px;color:#dc2626;">Data too incomplete</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Scheduled auto-reports emailed to supervisor</div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+
+    <div class="compare-section-head">🔧 Access &amp; Operations</div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Officer sees only their own caseload by default<small>Currently all staff see all 3,437 records</small></div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Audit trail — who changed what and when</div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">Mobile-friendly for field use</div>
+      <div class="compare-cell compare-sp"><span class="partial">~</span><br><span style="font-size:10px;color:#d97706;">Limited</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-cell compare-feature">No Microsoft 365 license required per user</div>
+      <div class="compare-cell compare-sp"><span class="cross">✗</span><br><span style="font-size:10px;color:#dc2626;">Per-seat licensing cost</span></div>
+      <div class="compare-cell compare-app"><span class="check">✓</span></div>
+    </div>
+  </div>
+
+  <div class="bottom-cta">
+    <h3>What Would It Actually Take to Build This?</h3>
+    <p>A system like this is a standard relational web application. The four SharePoint lists become four database tables (Defendants, CheckIns, Payments, GPS) linked by IDN and Case Number — relationships that already exist in your data but can't be enforced in SharePoint. The data from these four exports could seed the initial database directly. The front-end would be a web application accessible from any browser, including mobile, without requiring Microsoft 365 licenses. A local developer or small firm could build and host this for the county — it does not require an enterprise vendor contract.</p>
+  </div>
+</div>
+
+<!-- SHAREPOINT MODAL -->
+<div class="sp-modal-overlay" id="sp-modal">
+  <div class="sp-modal">
+    <div class="sp-modal-header">
+      WHITING, DEONTAY R — Edit Item
+      <button onclick="closeSpModal()" style="background:none;border:none;color:white;font-size:16px;cursor:pointer;">✕</button>
+    </div>
+    <div class="sp-modal-body">
+      <div class="sp-modal-field">
+        <div class="sp-modal-label">Defendant Name</div>
+        <input class="sp-modal-input" value="WHITING, DEONTAY R">
+      </div>
+      <div class="sp-modal-field">
+        <div class="sp-modal-label">Case Number</div>
+        <input class="sp-modal-input" value="@1542840">
+      </div>
+      <div class="sp-modal-field">
+        <div class="sp-modal-label">Case Status — type manually (no validation)</div>
+        <input class="sp-modal-input" value="OPEN" placeholder="OPEN, Open, open, CLOSED, Closed...">
+      </div>
+      <div class="sp-modal-field">
+        <div class="sp-modal-label">Pretrial Level</div>
+        <input class="sp-modal-input" value="3">
+      </div>
+      <div class="sp-modal-field">
+        <div class="sp-modal-label">Supervising Officer</div>
+        <input class="sp-modal-input" value="Will Torbett">
+      </div>
+      <div class="sp-modal-field">
+        <div class="sp-modal-label">Charge Type (blank for 72% of defendants)</div>
+        <input class="sp-modal-input" placeholder="No value entered">
+      </div>
+      <div class="sp-warn">⚠ GPS status, check-in history, and payments are in separate lists. You cannot see them from this view. There is no audit trail of who changed this record or when.</div>
+    </div>
+    <div class="sp-modal-footer">
+      <button class="sp-cmd-btn" onclick="closeSpModal()">Cancel</button>
+      <button class="sp-cmd-btn primary" onclick="closeSpModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP MODAL -->
+<div class="app-modal-overlay" id="app-modal">
+  <div class="app-modal">
+    <div class="app-modal-header">
+      <div style="font-size:18px;">👤</div>
+      <div class="app-modal-title">Whiting, Deontay R. — IDN 1563937</div>
+      <button class="app-modal-close" onclick="closeAppModal()">✕</button>
+    </div>
+    <div class="app-modal-body">
+      <div class="app-detail-grid">
+        <div class="app-detail-field"><label>Status</label><div class="val"><span class="status-pill compliant">Open</span></div></div>
+        <div class="app-detail-field"><label>Pretrial Level</label><div class="val">3</div></div>
+        <div class="app-detail-field"><label>Officer</label><div class="val">W. Torbett</div></div>
+        <div class="app-detail-field"><label>Charge Type</label><div class="val">Felony</div></div>
+        <div class="app-detail-field"><label>GPS Unit</label><div class="val">ALLIED 🟢 Active</div></div>
+        <div class="app-detail-field"><label>Case #</label><div class="val">@1542840</div></div>
+        <div class="app-detail-field"><label>Referral Date</label><div class="val">Jul 1, 2024</div></div>
+        <div class="app-detail-field"><label>Fees Paid</label><div class="val" style="color:#16a34a;">$120 ✓ (GPS + PTR)</div></div>
+      </div>
+      <div class="app-timeline">
+        <h4>📋 Activity Log — All Four Lists, One View</h4>
+        <div class="tl-item"><div class="tl-dot green"></div><div class="tl-line"><strong>Check-In — In Person</strong><span>4/17/2026 · 3:20 PM · Logged by W. Torbett</span></div></div>
+        <div class="tl-item"><div class="tl-dot blue"></div><div class="tl-line"><strong>Payment Received — $20 PTR + $100 GPS</strong><span>4/17/2026 · 3:20 PM · Collected by J. Carter</span></div></div>
+        <div class="tl-item"><div class="tl-dot green"></div><div class="tl-line"><strong>Check-In — Phone</strong><span>Prior check-in · Logged by W. Torbett</span></div></div>
+        <div class="tl-item"><div class="tl-dot amber"></div><div class="tl-line"><strong>GPS — Low Battery Warning</strong><span>Auto-flagged · Acknowledged by Torbett · Resolved</span></div></div>
+      </div>
+    </div>
+    <div class="app-modal-footer">
+      <button class="app-btn-secondary" onclick="closeAppModal()">Close</button>
+      <button class="app-btn-secondary">📄 Print Form</button>
+      <button class="app-btn-danger">⚠ Flag Violation</button>
+      <button class="app-btn-primary">✎ Edit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchTab(tab) {
+    document.querySelectorAll('.view-panel, .compare-content, .report-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    const tabMap = { defendants: 0, gps: 1, reports: 2, compare: 3 };
+    document.querySelectorAll('.tab-btn')[tabMap[tab]].classList.add('active');
+    if (tab === 'defendants') document.getElementById('tab-defendants').classList.add('active');
+    else if (tab === 'gps') document.getElementById('tab-gps').classList.add('active');
+    else if (tab === 'reports') document.getElementById('tab-reports').classList.add('active');
+    else if (tab === 'compare') document.getElementById('tab-compare').classList.add('active');
+  }
+
+  function openSpModal()  { document.getElementById('sp-modal').classList.add('open'); }
+  function closeSpModal() { document.getElementById('sp-modal').classList.remove('open'); }
+  function openAppModal()  { document.getElementById('app-modal').classList.add('open'); }
+  function closeAppModal() { document.getElementById('app-modal').classList.remove('open'); }
+
+  document.getElementById('sp-modal').addEventListener('click', e => { if(e.target===document.getElementById('sp-modal')) closeSpModal(); });
+  document.getElementById('app-modal').addEventListener('click', e => { if(e.target===document.getElementById('app-modal')) closeAppModal(); });
+
+  function filterTable(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('#app-table-body .app-table-row').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+
+  document.querySelectorAll('.gps-type-pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('.gps-type-pill').forEach(x => x.classList.remove('active-pill'));
+      p.classList.add('active-pill');
+    });
+  });
+</script>
+</body>
+</html>

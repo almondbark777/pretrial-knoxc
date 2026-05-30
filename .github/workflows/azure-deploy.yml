@@ -1,0 +1,60 @@
+# Azure App Service auto-deploy on push to main.
+# Rename to `azure-deploy.yml` when you're ready to use it.
+#
+# Prereqs:
+#   1. Azure Web App created (Linux, Python 3.11).
+#   2. In the App Service, download the publish profile (Overview → "Get publish profile").
+#   3. In GitHub repo → Settings → Secrets and variables → Actions → add:
+#        AZURE_WEBAPP_NAME          = <your-app-name>
+#        AZURE_WEBAPP_PUBLISH_PROFILE = <paste the contents of the .PublishSettings file>
+#      Then also add these as App Service → Configuration → Application settings (NOT GitHub secrets):
+#        DB_SERVER, DB_NAME, DB_USER, DB_PASSWORD, APP_PASSWORD
+
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd webapp
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Optional smoke test — fails the deploy if the app can't import
+      - name: Smoke import
+        run: |
+          cd webapp
+          source .venv/bin/activate
+          python -c "import app; print('app imports ok')"
+
+      - name: Zip webapp for deploy
+        run: |
+          cd webapp
+          zip -r ../webapp.zip . -x '.venv/*' '__pycache__/*' '*.pyc' '.env'
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: webapp.zip
+
+# Startup command to set in Azure App Service → Configuration → General settings:
+#   python -m uvicorn app:app --host 0.0.0.0 --port 8000

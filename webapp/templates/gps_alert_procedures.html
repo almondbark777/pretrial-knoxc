@@ -1,0 +1,2744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pre-Trial Office — Staff Reference | Knox County Sheriff</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #eef1f5;
+      color: #1f2937;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ───────────────────────────────────────────────────── */
+    .site-header {
+      background: #1a3a6b;
+      color: white;
+      padding: 14px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    }
+    .header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-shield {
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+    .header-text { flex: 1; min-width: 0; }
+    .header-agency {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #93c5fd;
+      margin-bottom: 2px;
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .header-meta {
+      font-size: 11px;
+      color: #93c5fd;
+      margin-top: 1px;
+    }
+    .header-restart {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: white;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .header-restart:hover { background: rgba(255,255,255,0.22); }
+    .header-db-btn {
+      flex-shrink: 0;
+      background: #2563eb;
+      border: 1px solid #3b82f6;
+      color: white;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-db-btn:hover { background: #1d4ed8; }
+
+    /* ── REFERENCE BAR ───────────────────────────────────────────── */
+    .ref-bar-wrap {
+      background: #1a3a6b;
+      border-bottom: 3px solid #0f2548;
+    }
+    .ref-bar-toggle {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      height: 34px;
+    }
+    .ref-bar-toggle-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #93c5fd;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ref-bar-toggle-arrow {
+      font-size: 11px;
+      color: #93c5fd;
+      transition: transform 0.2s;
+    }
+    .ref-bar-toggle-arrow.open { transform: rotate(180deg); }
+
+    .ref-bar {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 16px 14px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+    .ref-bar.hidden { display: none; }
+
+    .ref-section {
+      padding: 12px 16px 0;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    .ref-section:last-child { border-right: none; }
+    .ref-section:first-child { padding-left: 0; }
+
+    .ref-section-title {
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #93c5fd;
+      margin-bottom: 7px;
+    }
+
+    /* Phone numbers */
+    .phone-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px 10px;
+    }
+    .phone-row {
+      display: flex;
+      flex-direction: column;
+    }
+    .phone-name { font-size: 11px; font-weight: 600; color: #cbd5e1; line-height: 1.3; }
+    .phone-num  { font-size: 12px; font-weight: 800; color: #7dd3fc; font-family: 'Courier New', monospace; }
+
+    /* Never Do */
+    .never-item {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-left: 3px solid #ef4444;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fca5a5;
+      margin-bottom: 5px;
+      line-height: 1.4;
+    }
+    .never-item:last-child { margin-bottom: 0; }
+
+    /* Resolution tips */
+    .res-tip {
+      font-size: 11px;
+      color: #cbd5e1;
+      line-height: 1.4;
+      margin-bottom: 4px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .res-tip:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .res-tip strong { color: #e2e8f0; }
+
+    /* Abbreviations */
+    .abbr-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+    }
+    .abbr-item { }
+    .abbr-term { font-size: 11px; font-weight: 800; color: #e2e8f0; }
+    .abbr-def  { font-size: 10.5px; color: #94a3b8; line-height: 1.3; }
+
+    @media (max-width: 900px) {
+      .ref-bar { grid-template-columns: 1fr 1fr; }
+      .ref-section { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 2px; }
+    }
+    @media (max-width: 500px) {
+      .ref-bar { grid-template-columns: 1fr; }
+    }
+
+    /* ── LAYOUT ───────────────────────────────────────────────────── */
+    .layout {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+
+    /* ── BREADCRUMB ───────────────────────────────────────────────── */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 14px;
+      font-size: 12.5px;
+      min-height: 20px;
+    }
+    .bc-link {
+      color: #4b6fa5;
+      cursor: pointer;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+    .bc-link:hover { background: #dbeafe; color: #1e3a8a; }
+    .bc-sep { color: #c0c9d4; font-size: 14px; }
+    .bc-current { color: #374151; font-weight: 600; }
+
+    /* ── CARDS ────────────────────────────────────────────────────── */
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.06);
+      overflow: hidden;
+      margin-bottom: 0;
+    }
+    .card-header {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid #f0f1f3;
+    }
+    .alert-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+    .badge-allied   { background: #dbeafe; color: #1d4ed8; }
+    .badge-scramnet { background: #ede9fe; color: #5b21b6; }
+    .badge-info     { background: #d1fae5; color: #065f46; }
+
+    .card-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.3;
+    }
+    .card-subtitle {
+      font-size: 13.5px;
+      color: #6b7280;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+    .card-body { padding: 18px 22px; }
+
+    /* ── TRIGGER BOX ──────────────────────────────────────────────── */
+    .trigger-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #3b82f6;
+      border-radius: 6px;
+      padding: 11px 14px;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: #1e40af;
+      line-height: 1.5;
+    }
+    .trigger-box strong { font-weight: 800; }
+    .trigger-box.urgent {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      border-left-color: #e11d48;
+      color: #9f1239;
+    }
+
+    /* ── WARNING BOXES ────────────────────────────────────────────── */
+    .warn-box {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-left: 4px solid #f59e0b;
+      border-radius: 6px;
+      padding: 11px 14px;
+      margin: 16px 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: #78350f;
+      line-height: 1.5;
+    }
+    .warn-box.critical {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      border-left-color: #e11d48;
+      color: #881337;
+    }
+    .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── STEPS ────────────────────────────────────────────────────── */
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .step-item {
+      display: flex;
+      gap: 14px;
+      padding: 14px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+    .step-item.resolution {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #1a3a6b;
+      color: white;
+      font-size: 13px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-item.resolution .step-num { background: #16a34a; }
+    .step-content { flex: 1; min-width: 0; }
+    .step-title {
+      font-weight: 800;
+      font-size: 13.5px;
+      color: #111827;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    .step-bullets {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .step-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      font-size: 13.5px;
+      color: #374151;
+      line-height: 1.5;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 1px 4px;
+      transition: background 0.1s;
+    }
+    .step-bullets li:hover { background: #f3f4f6; }
+    .step-bullets li::before {
+      content: '•';
+      color: #9ca3af;
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-size: 12px;
+    }
+    .step-bullets li.sub { padding-left: 20px; }
+    .step-bullets li.sub::before { content: '–'; }
+    .step-bullets li.highlight::before { content: '→'; color: #dc2626; font-weight: 700; }
+    .step-bullets li.done {
+      text-decoration: line-through;
+      color: #9ca3af;
+    }
+    .step-bullets li.done::before { color: #d1d5db; }
+
+    /* ── URGENT CALL (victim / dispatch) ─────────────────────────── */
+    .step-bullets li.call-urgent {
+      color: #dc2626;
+      font-weight: 800;
+      text-decoration: underline;
+      text-decoration-color: #dc2626;
+    }
+    .step-bullets li.call-urgent::before { content: '→'; color: #dc2626; font-weight: 900; }
+    .step-bullets li.call-urgent.done { color: #fca5a5; text-decoration: line-through; }
+
+    .check-hint {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    /* ── CHOICE CARDS (start / type-select) ──────────────────────── */
+    .choice-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .choice-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.14s;
+      background: white;
+      text-align: left;
+      width: 100%;
+    }
+    .choice-card:hover {
+      border-color: #1a3a6b;
+      box-shadow: 0 4px 14px rgba(26,58,107,0.14);
+      transform: translateY(-1px);
+    }
+    .choice-card.urgent-card:hover {
+      border-color: #dc2626;
+      box-shadow: 0 4px 14px rgba(220,38,38,0.14);
+    }
+    .choice-icon { font-size: 22px; flex-shrink: 0; }
+    .choice-text { flex: 1; min-width: 0; }
+    .choice-label { font-size: 14.5px; font-weight: 700; color: #0f172a; line-height: 1.3; }
+    .choice-desc  { font-size: 12px; color: #6b7280; margin-top: 2px; line-height: 1.4; }
+    .choice-arrow { color: #9ca3af; font-size: 20px; flex-shrink: 0; }
+
+    /* ── ACTION BUTTONS (step outcomes) ──────────────────────────── */
+    .actions-section {
+      padding: 16px 22px;
+      border-top: 1px solid #f0f1f3;
+      background: #f9fafb;
+    }
+    .actions-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #9ca3af;
+      margin-bottom: 10px;
+    }
+    .actions-grid { display: flex; flex-direction: column; gap: 8px; }
+    .action-btn {
+      display: block;
+      width: 100%;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.14s;
+      line-height: 1.4;
+    }
+    .action-btn.primary  { background: #1a3a6b; color: white; }
+    .action-btn.primary:hover  { background: #1e40af; }
+    .action-btn.urgent   { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    .action-btn.urgent:hover   { background: #fee2e2; }
+    .action-btn.neutral  { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+    .action-btn.neutral:hover  { background: #e5e7eb; }
+    .action-btn.back     { background: transparent; color: #6b7280; border: 1px solid #e5e7eb; }
+    .action-btn.back:hover     { background: #f9fafb; color: #374151; }
+
+    /* ── INFO BOX ─────────────────────────────────────────────────── */
+    .info-content {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 4px;
+    }
+    .info-content p { font-size: 14px; color: #166534; margin-bottom: 10px; font-weight: 600; }
+    .info-bullets { list-style: none; }
+    .info-bullets li { padding: 4px 0; font-size: 14px; color: #166534; }
+    .info-bullets li::before { content: '• '; }
+
+    /* old sidebar styles removed — replaced by .ref-bar-* above */
+
+    /* ── HOME SCREEN ─────────────────────────────────────────────── */
+    .home-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 4px;
+    }
+    @media (max-width: 600px) { .home-grid { grid-template-columns: 1fr; } }
+    .home-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 28px 24px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: white;
+      text-align: left;
+      width: 100%;
+    }
+    .home-tile:hover {
+      border-color: #1a3a6b;
+      box-shadow: 0 6px 20px rgba(26,58,107,0.15);
+      transform: translateY(-2px);
+    }
+    .home-tile-icon { font-size: 36px; }
+    .home-tile-label { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .home-tile-desc  { font-size: 13.5px; color: #6b7280; line-height: 1.5; }
+    .home-tile-cta {
+      margin-top: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a3a6b;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .home-intro {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    /* ── GUIDE / ACCORDION ───────────────────────────────────────── */
+    .guide-intro {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #1a3a6b;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      color: #334155;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .guide-sections { display: flex; flex-direction: column; gap: 10px; }
+    .guide-section {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .guide-section-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      gap: 10px;
+      transition: background 0.12s;
+    }
+    .guide-section-hdr:hover { background: #f1f5f9; }
+    .guide-chevron { font-size: 12px; color: #9ca3af; transition: transform 0.2s; flex-shrink: 0; }
+    .guide-chevron.open { transform: rotate(180deg); }
+    .guide-section-body {
+      padding: 14px 16px;
+      border-top: 1px solid #e5e7eb;
+      display: none;
+    }
+    .guide-section-body.open { display: block; }
+
+    .guide-subsection { margin-bottom: 14px; }
+    .guide-subsection:last-child { margin-bottom: 0; }
+    .guide-sub-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+      margin-bottom: 7px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .guide-bullets { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+    .guide-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13.5px;
+      color: #374151;
+      line-height: 1.5;
+    }
+    .guide-bullets li::before { content: '•'; color: #94a3b8; flex-shrink: 0; margin-top: 2px; }
+    .guide-code {
+      display: block;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-family: 'Courier New', monospace;
+      font-size: 12.5px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin: 8px 0;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .guide-code .code-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .guide-code .code-value { color: #7dd3fc; font-weight: 700; }
+    .guide-code .code-example { color: #86efac; }
+    .guide-note {
+      background: #fefce8;
+      border: 1px solid #fde047;
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #713f12;
+      margin-top: 8px;
+      line-height: 1.5;
+      font-style: italic;
+    }
+    .guide-warning {
+      background: #fef2f2;
+      border: 1px solid #fecdd3;
+      border-left: 3px solid #ef4444;
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #991b1b;
+      font-weight: 700;
+      margin: 8px 0;
+    }
+    /* ── TRAINING BADGE ─────────────────────────────────────────── */
+    .badge-training { background: #4f46e5; color: #fff; }
+
+    /* ── GUIDE TABLE ─────────────────────────────────────────────── */
+    .guide-table-wrap { overflow-x: auto; margin: 8px 0 4px; }
+    .guide-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .guide-table th {
+      background: #1e3a5f;
+      color: #fff;
+      text-align: left;
+      padding: 7px 10px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .guide-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+      line-height: 1.45;
+    }
+    .guide-table tr:nth-child(even) td { background: #f8fafc; }
+    .guide-blockquote {
+      background: #f1f5f9;
+      border-left: 3px solid #4f46e5;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #334155;
+      margin: 8px 0;
+      border-radius: 0 4px 4px 0;
+      line-height: 1.5;
+      font-style: italic;
+    }
+  </style>
+
+  <!-- KH-THEME-START — shared chrome injected by _patch_templates.py -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-shield">🛡️</div>
+      <div class="header-text">
+        <div class="header-agency">Knox County Sheriff's Office — Pre-Trial</div>
+        <div class="header-title">Staff Reference</div>
+        <div class="header-meta" id="header-meta">GPS Procedures &amp; Site Guide</div>
+      </div>
+      <a class="header-db-btn" href="pretrial_app.html" target="_blank">🗄️ Mock Database</a>
+      <button class="header-restart" onclick="restart()">↺ Start Over</button>
+    </div>
+  </header>
+
+  <!-- ── REFERENCE BAR ──────────────────────────────────────────── -->
+  <div class="ref-bar-wrap">
+    <div class="ref-bar-toggle" onclick="toggleRefBar()" id="ref-toggle">
+      <span class="ref-bar-toggle-label">📋 Quick Reference</span>
+      <span class="ref-bar-toggle-arrow open" id="ref-arrow">▲</span>
+    </div>
+    <div class="ref-bar" id="ref-bar">
+
+      <!-- Phone Numbers -->
+      <div class="ref-section">
+        <div class="ref-section-title">📞 Phone Numbers</div>
+        <div class="phone-grid">
+          <div class="phone-row"><span class="phone-name">LEIDS (Dispatch)</span><span class="phone-num">865-215-2442</span></div>
+          <div class="phone-row"><span class="phone-name">Keith Harris</span><span class="phone-num">865-250-5573</span></div>
+          <div class="phone-row"><span class="phone-name">Renee Russell</span><span class="phone-num">865-548-3323</span></div>
+          <div class="phone-row"><span class="phone-name">Stoney Gentry</span><span class="phone-num">865-224-4630</span></div>
+          <div class="phone-row"><span class="phone-name">Justin Webber</span><span class="phone-num">865-684-7506</span></div>
+        </div>
+      </div>
+
+      <!-- Never Do -->
+      <div class="ref-section">
+        <div class="ref-section-title">⛔ Never Do</div>
+        <div class="never-item">Never tell the victim where the defendant is — or the defendant where the victim is</div>
+        <div class="never-item">Never tell the defendant what their battery percentage is</div>
+      </div>
+
+      <!-- Resolution Emails -->
+      <div class="ref-section">
+        <div class="ref-section-title">✉️ Resolution Emails</div>
+        <div class="res-tip"><strong>Forward</strong> the original alert email showing the violation clearing</div>
+        <div class="res-tip"><strong>List every call</strong> — time and who you spoke to</div>
+        <div class="res-tip"><strong>Attach a screenshot</strong> of the map</div>
+        <div class="res-tip"><strong>Email DA</strong> only if defendant ran away AND supervisor approves</div>
+        <div class="res-tip"><strong>Arrest (off-hours/weekends):</strong> Email EM with charges, booking time, bond amount, fee arrearage</div>
+      </div>
+
+      <!-- Abbreviations -->
+      <div class="ref-section">
+        <div class="ref-section-title">📖 Abbreviations</div>
+        <div class="abbr-grid">
+          <div class="abbr-item"><div class="abbr-term">EM</div><div class="abbr-def">Electronic Monitoring email group</div></div>
+          <div class="abbr-item"><div class="abbr-term">DA</div><div class="abbr-def">District Attorney — ag.dviolence@knoxcounty.org</div></div>
+          <div class="abbr-item"><div class="abbr-term">Dispatch</div><div class="abbr-def">Police — 865-215-2442 (LEIDS)</div></div>
+          <div class="abbr-item"><div class="abbr-term">Pursuit Mode</div><div class="abbr-def">Pings device more often — ON when anything is wrong</div></div>
+          <div class="abbr-item"><div class="abbr-term">Locate Now</div><div class="abbr-def">Button to get device's GPS location immediately</div></div>
+          <div class="abbr-item"><div class="abbr-term">Inclusion Zone</div><div class="abbr-def">Where defendant MUST stay (usually home)</div></div>
+          <div class="abbr-item"><div class="abbr-term">Exclusion Zone</div><div class="abbr-def">Where defendant is FORBIDDEN (e.g., victim's home)</div></div>
+          <div class="abbr-item"><div class="abbr-term">Emerg. Contacts</div><div class="abbr-def">Extra numbers in file — try all if unreachable</div></div>
+        </div>
+      </div>
+
+    </div><!-- /ref-bar -->
+  </div><!-- /ref-bar-wrap -->
+
+  <div class="layout">
+    <nav class="breadcrumb" id="breadcrumb"></nav>
+    <div id="content"></div>
+  </div>
+
+  <script>
+  // ═══════════════════════════════════════════════════════════════════
+  //  DATA
+  // ═══════════════════════════════════════════════════════════════════
+
+  const TREE = {
+
+    // ── HOME LANDING ───────────────────────────────────────────────
+    home: {
+      type: 'home',
+      title: 'What do you need?',
+      intro: 'Knox County Sheriff\'s Office — Pre-Trial. Select a section below.',
+      tiles: [
+        {
+          icon: '⚡',
+          label: 'GPS Alert Procedures',
+          desc: 'Step-by-step response guides for Allied and SCRAMnet alerts — battery, strap/tamper, zone violations, panic button, domestic standby, and more.',
+          cta: 'Start GPS Procedures →',
+          next: 'start'
+        },
+        {
+          icon: '🏛️',
+          label: 'Pretrial SharePoint Site Guide',
+          desc: 'Standard operating procedures for Blue Book, file management, 48-hour GPS, check-ins, fee payments, and general site rules.',
+          cta: 'Open Site Guide →',
+          next: 'site_guide'
+        },
+        {
+          icon: '📋',
+          label: 'Pretrial Risk Assessment Guide',
+          desc: 'Full training guide — NCA/FTA scoring, exclusions, identity confirmation, JIMS workflow, assessment entry, and filing.',
+          cta: 'Open Training Guide →',
+          next: 'training'
+        }
+      ]
+    },
+
+    // ── SITE GUIDE ─────────────────────────────────────────────────
+    site_guide: {
+      type: 'guide',
+      badge: 'Pretrial Site Guide', badgeClass: 'badge-info',
+      title: 'SharePoint Site Guide',
+      subtitle: 'Standard Operating Procedures & Reference',
+      intro: 'This guide outlines how to use and maintain the SharePoint site consistently. With over 20 staff members working in the site simultaneously, uniform formatting, filing, and data entry practices are essential. When in doubt about anything on the site, contact Mr. Bentley.',
+      sections: [
+        {
+          id: 'blue_book',
+          title: '📋 Blue Book',
+          open: true,
+          subsections: [
+            {
+              title: 'Opening a Case',
+              bullets: [
+                'Name must be entered exactly as it appears on the Client\'s tab or Current Inmates tab.',
+                'IDN and all charges the defendant is on pretrial for must be included.',
+                'Start date must be entered with the correct time.',
+                'If GPS is applicable, the GPS box must be checked and status set to In Custody.',
+                'If a defendant cannot be entered, check the IDN and Names List for an existing entry. There must be a valid IDN present to link to the Blue Book entry.',
+                'Duplicates are prevented by the system — case/docket numbers are unique. Entering the correct case number will prevent duplication.'
+              ]
+            },
+            {
+              title: 'Closing a Case',
+              bullets: [
+                'Status must be changed to Closed and a closed date must be entered.',
+                'Closing a GPS case in Blue Book will also close it on the GPS list.'
+              ]
+            },
+            {
+              title: 'Multiple Referrals & Re-Referrals',
+              bullets: [
+                'Defendants with multiple referral dates will appear open multiple times in Blue Book and on the CT tab, as each referral is unique. Close each referral individually when the case is closed.',
+                'If a person is re-referred on the same docket, an "X" will appear in front of the docket number.'
+              ],
+              note: 'Example: John Doe is on PTR for DUI @123455, completes the case, and it is closed. A week later he is on WR GPS for the same charge. This opens as a new case with a new docket number: X@12345.'
+            },
+            {
+              title: 'Searching',
+              bullets: [
+                'Databases are searchable by name, IDN, or docket number.'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'gps_48',
+          title: '📡 48 Hour GPS',
+          open: true,
+          bullets: [
+            'Cases are automatically imported from Blue Book when GPS is marked.',
+            'Officer documents whether the device is paid for, bond is paid, and order has been received.',
+            'Officer changes the GPS type from IC to Allied or SCRAM once the device is fitted.'
+          ]
+        },
+        {
+          id: 'fees',
+          title: '💳 Fee Payments',
+          bullets: [
+            'Use Allied/SCRAM, Install Fee, PTR, or DS to indicate the fee type.'
+          ]
+        },
+        {
+          id: 'checkins',
+          title: '✅ Check-Ins',
+          bullets: [
+            'Check-ins are logged by Mickey or the Officer to indicate the type of contact made.'
+          ]
+        },
+        {
+          id: 'files',
+          title: '📁 Files',
+          open: true,
+          subsections: [
+            {
+              title: 'Folder Structure',
+              bullets: [
+                'All documents are saved within the following folder path:'
+              ],
+              code: {
+                label: 'Path',
+                value: 'Supervision Website Folder → Defendants → Letter (A–Z) → Last Name, First Name Middle (IDN) → Case # → Relevant Subfolder'
+              }
+            },
+            {
+              title: 'File Naming Convention',
+              bullets: [
+                'All files must follow this naming format:'
+              ],
+              code: {
+                label: 'Format',
+                value: 'IDN# DOCUMENT TYPE DATE',
+                example: 'Example: 464543 PTR ORDER 17APR26'
+              }
+            },
+            {
+              title: 'File Management Rules',
+              warning: 'Do not delete any files from the site. Do not rename existing folders. Do not create new folders without first checking with Mr. Bentley.',
+              bullets: [
+                'Do not delete any files from the site.',
+                'Do not rename existing folders.',
+                'Do not create new folders without first checking with Mr. Bentley.',
+                'If you are unsure where a file belongs, contact Mr. Bentley before filing it.'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'data',
+          title: '📊 Data Collection',
+          bullets: [
+            'The site tracks supervision data including active case counts, supervision types, and fee records.',
+            'Keeping all Blue Book entries accurate and up to date is what ensures the integrity of the data captured across the site.',
+            'Consistent entry practices by all staff directly affect the reliability of any reports or summaries pulled from this data.'
+          ]
+        },
+        {
+          id: 'web_links',
+          title: '🔗 Web Links',
+          bullets: [
+            'The Web Links section of the SharePoint site serves as a centralized collection of frequently used external websites.',
+            'Rather than searching for commonly needed sites each time, staff can access them quickly from one location.'
+          ]
+        },
+        {
+          id: 'reminders',
+          title: '📌 General Reminders',
+          open: true,
+          bullets: [
+            'Always use consistent date formatting: DDMMMYY (e.g., 17APR26).',
+            'Use standard abbreviations consistently across all entries: PTR, GPS, WR, IC, DS, etc.',
+            'With 20+ staff accessing the site at the same time, consistency in how entries and files are formatted makes the site reliable for everyone.',
+            'If you have any questions about where something belongs, whether something can be deleted, or anything else site-related — contact Mr. Bentley.'
+          ]
+        }
+      ],
+      actions: [{ label: '← Back to Home', next: 'home', style: 'back' }]
+    },
+
+    // ── START ──────────────────────────────────────────────────────
+    start: {
+      type: 'start',
+      title: 'Which system generated the alert?',
+      subtitle: 'Select the monitoring system to begin the step-by-step procedure.',
+      choices: [
+        { icon: '⚡', label: 'Allied GPS Alert',
+          desc: 'Battery, strap/tamper, exclusion zone, inclusion zone, thrown points',
+          next: 'allied_type' },
+        { icon: '📡', label: 'SCRAMnet Alert',
+          desc: 'Panic button, battery, strap/tamper, zone violations, domestic standby',
+          next: 'scramnet_type' },
+        { icon: '🔇', label: 'Non-Actionable Alert',
+          desc: 'Push Notifications Disabled · Location Services Disabled — no response required',
+          next: 'non_actionable' }
+      ]
+    },
+
+    non_actionable: {
+      type: 'info',
+      title: 'Non-Actionable Alerts — No Response Required',
+      content: 'These alerts require NO response from you. Just ignore them:',
+      bullets: [
+        'Push Notifications Disabled',
+        'Location Services Disabled'
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── ALLIED TYPE SELECT ─────────────────────────────────────────
+    allied_type: {
+      type: 'type-select',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Which Allied alert did you receive?',
+      choices: [
+        { icon: '🔋', label: 'Battery Violation Alert',
+          desc: 'Battery is getting low — roughly 20 minutes before device dies',
+          next: 'allied_battery' },
+        { icon: '⚠️', label: 'Critical Battery Violation Alert',
+          desc: 'Device has ~10 minutes of battery left — about to die',
+          next: 'allied_critical_battery' },
+        { icon: '✂️', label: 'Strap / Tamper Alert',
+          desc: 'Ankle monitor strap may have been cut or damaged',
+          next: 'allied_strap' },
+        { icon: '🚫', label: 'Exclusion Zone Violation Alert',
+          desc: 'Defendant came within 1,000 ft of a forbidden location',
+          next: 'allied_exclusion' },
+        { icon: '🏠', label: 'Inclusion Zone Violation Alert',
+          desc: 'Defendant left their required location without permission',
+          next: 'allied_inclusion' },
+        { icon: '📍', label: 'Thrown Points',
+          desc: 'Possible GPS glitch — defendant may appear outside zone but it might not be real',
+          next: 'allied_thrown' },
+        { icon: '📵', label: 'No Motion GPS',
+          desc: 'Device appears stationary — monitor and follow up if it doesn\'t clear within a few hours',
+          next: 'allied_monitor_alert' },
+        { icon: '🛡️', label: 'Shielding',
+          desc: 'GPS signal may be blocked — monitor and follow up if it doesn\'t clear within a few hours',
+          next: 'allied_monitor_alert' },
+        { icon: '🔌', label: 'Unable to Connect',
+          desc: 'System cannot establish a connection with the defendant\'s device',
+          next: 'allied_monitor_alert' }
+      ]
+    },
+
+    // ── ALLIED: BATTERY VIOLATION ──────────────────────────────────
+    allied_battery: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Battery Violation Alert',
+      trigger: 'The device battery is getting low. You have roughly <strong>20 minutes</strong> before it dies and a critical violation occurs.',
+      steps: [
+        { num: 1, title: 'Download Data & Find Them on the Map', bullets: [
+          { text: 'Download all data points for any violations' },
+          { text: 'Open the map and find where the defendant is right now' }
+        ]},
+        { num: 2, title: 'Call the Defendant', bullets: [
+          { text: 'Send multiple alerts to the device' },
+          { text: '"You need to plug in your ankle monitor RIGHT NOW."' },
+          { text: "If they haven't started charging within a few minutes — call again" }
+        ]},
+        { num: 3, title: "If You Can't Reach Them", bullets: [
+          { text: 'Keep sending alerts' },
+          { text: 'Call ALL emergency contacts in their file. Keep calling until someone responds.' }
+        ]}
+      ],
+      warning: '⚠ IF THE BATTERY IS NOT CHARGED — A CRITICAL BATTERY ALERT WILL FOLLOW IN APPROXIMATELY 10 MINUTES.',
+      actionsLabel: 'What happened?',
+      actions: [
+        { label: '🔴 Battery still not charging → Go to Critical Battery Violation Alert', next: 'allied_critical_battery', style: 'urgent' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    // ── ALLIED: CRITICAL BATTERY ───────────────────────────────────
+    allied_critical_battery: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Critical Battery Violation Alert',
+      trigger: 'Device has about <strong>10 minutes</strong> of battery left. It is about to die.',
+      steps: [
+        { num: 4, title: 'Device Is About to Die — Do ALL of the Following', bullets: [
+          { text: 'Keep calling the defendant' },
+          { text: 'Keep sending alerts' },
+          { text: 'Is there a victim listed on this case? → CALL THE VICTIM NOW', cls: 'highlight' },
+          { text: "Can't reach the victim? → CALL DISPATCH (865-215-2442) and give them the defendant's last known location from the map", cls: 'highlight' },
+          { text: 'Write down every call: the time, who you talked to, and what was said' }
+        ]},
+        { num: 5, title: 'Keep Watching', bullets: [
+          { text: 'Do not stop monitoring until the battery is charging or the situation is resolved' }
+        ]},
+        { num: 6, title: 'Send the Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, send an email to EM' },
+          { text: "State: whether the battery died, and whether the defendant's location is known or unknown" }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── ALLIED: STRAP / TAMPER ─────────────────────────────────────
+    allied_strap: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Strap / Tamper Alert',
+      criticalWarn: '⚠ YOU MUST REPLACE THE STRAP FOR ALL STRAP OR TAMPER ALERTS. TAKE BEFORE AND AFTER PHOTOS OF ANY DEVICE OR STRAP REPLACEMENT.',
+      trigger: 'The system detected that the ankle monitor strap may have been cut or damaged.',
+      steps: [
+        { num: 1, title: 'Download Data & Find Them on the Map', bullets: [
+          { text: 'Download all data points for any violations' },
+          { text: 'Open the map and find where the defendant is right now' }
+        ]},
+        { num: 2, title: 'Turn On Pursuit Mode', bullets: [
+          { text: 'In the system: View GPS Points → select "Enable Pursuit Mode" → Submit' }
+        ]},
+        { num: 3, title: 'Call the Defendant', bullets: [
+          { text: 'Send multiple alerts' },
+          { text: '"Is the strap actually cut, or does it just look damaged?"' },
+          { text: '"You need to come to the Pre-Trial Office right now so we can inspect the device and replace the strap."' }
+        ]},
+        { num: 4, title: "If There Is a Victim and You Can't Reach the Defendant", bullets: [
+          { text: 'Call the victim — let them know there is a device issue and to stay alert until further notice' }
+        ]}
+      ],
+      actionsLabel: 'What is the situation?',
+      actions: [
+        { label: '🔴 Strap CONFIRMED CUT and defendant cannot be found', next: 'allied_strap_cut', style: 'urgent' },
+        { label: '✅ Issue resolved — send resolution email to EM', next: 'allied_strap_resolution', style: 'neutral' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    allied_strap_cut: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Strap Confirmed Cut — Defendant Missing',
+      steps: [
+        { num: 5, title: 'Strap Is Cut and Defendant Is Missing', bullets: [
+          { text: 'Call the victim AND dispatch IMMEDIATELY' },
+          { text: 'Write down everyone you call: time, who answered, and what was said' },
+          { text: 'Keep sending alerts, downloading data points, and calling all emergency contacts' }
+        ]},
+        { num: 6, title: 'Still No Contact With Anyone?', bullets: [
+          { text: 'Call a supervisor IMMEDIATELY' }
+        ]},
+        { num: 7, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' },
+          { text: 'Email the DA ONLY if the defendant has run away AND your supervisor approves first' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    allied_strap_resolution: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Resolution — Strap / Tamper',
+      steps: [
+        { num: 7, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Email EM once resolved' },
+          { text: 'Email the DA ONLY if the defendant ran away AND supervisor approves' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── ALLIED: EXCLUSION ZONE ─────────────────────────────────────
+    allied_exclusion: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Exclusion Zone Violation Alert',
+      trigger: "The defendant came within 1,000 feet of a place they are FORBIDDEN to be (e.g., the victim's home, workplace, or a family member's address). The defendant has already been given maps showing these restricted areas.",
+      steps: [
+        { num: 1, title: 'Download Data & Find Them on the Map', bullets: [
+          { text: 'Download all data points' },
+          { text: 'Open the map and see exactly where they are' }
+        ]},
+        { num: 2, title: 'Turn On Pursuit Mode', bullets: [
+          { text: 'In the system: View GPS Points → select "Enable Pursuit Mode" → Submit' }
+        ]},
+        { num: 3, title: "Figure Out What's Happening", bullets: [
+          { text: 'Are they just passing through the area, or are they stopped and lingering there?' },
+          { text: 'Use your judgment — this matters before deciding your next step' }
+        ]},
+        { num: 4, title: 'Call the Defendant', bullets: [
+          { text: 'Send multiple alerts immediately' },
+          { text: '"You need to leave that area RIGHT NOW. You are not allowed to be there."' }
+        ]}
+      ],
+      actionsLabel: 'What is the defendant doing?',
+      actions: [
+        { label: '🔴 Defendant is STOPPED at the restricted location (not just passing through)', next: 'allied_exclusion_stopped', style: 'urgent' },
+        { label: '🟡 Defendant is passing through — continue monitoring', next: 'allied_exclusion_monitoring', style: 'neutral' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    allied_exclusion_stopped: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Defendant Is IN the Exclusion Zone',
+      steps: [
+        { num: 5, title: 'Defendant Is Actually In the Zone', bullets: [
+          { text: 'Call the victim IMMEDIATELY — check on their safety and tell them to stay alert' },
+          { text: "Can't reach the victim? → Call dispatch right away and request a welfare check at the victim's address", cls: 'highlight' }
+        ]},
+        { num: 6, title: "Can't Reach the Defendant or the Victim?", bullets: [
+          { text: 'Email your supervisor about the situation' }
+        ]},
+        { num: 7, title: 'Keep Trying', bullets: [
+          { text: 'Keep sending alerts, calling the defendant, calling the victim, and calling all emergency contacts until this is resolved' }
+        ]},
+        { num: 8, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    allied_exclusion_monitoring: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Defendant Passing Through — Keep Monitoring',
+      steps: [
+        { num: 7, title: 'Keep Trying Until Resolved', bullets: [
+          { text: 'Keep sending alerts, calling the defendant, calling the victim, and calling all emergency contacts until this is resolved' }
+        ]},
+        { num: 8, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [
+        { label: '🔴 Situation escalated — defendant is now STOPPED at location', next: 'allied_exclusion_stopped', style: 'urgent' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    // ── ALLIED: INCLUSION ZONE ─────────────────────────────────────
+    allied_inclusion: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Inclusion Zone Violation Alert',
+      trigger: 'The defendant left their required location (usually their home) without permission, violating house arrest or curfew.',
+      steps: [
+        { num: 1, title: 'Download Data & Check Their Schedule', bullets: [
+          { text: 'Download all data points for any violations' },
+          { text: 'Open the map and see where they went' },
+          { text: '⚑ CHECK their schedule first — are they supposed to be somewhere right now (work, appointment)? If yes, this may NOT be a real violation.' }
+        ]},
+        { num: 2, title: 'Turn On Pursuit Mode', bullets: [
+          { text: 'In the system: View GPS Points → select "Enable Pursuit Mode" → Submit' }
+        ]},
+        { num: 3, title: 'Call the Defendant', bullets: [
+          { text: 'Send alerts' },
+          { text: '"You need to go home right now. You do not have permission to be out."' },
+          { text: '(Unless an officer approved it — if so, note it and continue monitoring)' }
+        ]},
+        { num: 4, title: "If You Can't Reach Them", bullets: [
+          { text: 'Keep sending alerts' },
+          { text: 'Call all emergency contacts in their file — keep trying until resolved' }
+        ]},
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── ALLIED: THROWN POINTS ──────────────────────────────────────
+    allied_thrown: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'Thrown Points',
+      trigger: "The system shows the defendant outside their inclusion zone — but it might just be a GPS glitch, not a real violation. This happens when the signal bounces off buildings or gets interference.",
+      steps: [
+        { num: 1, title: 'Download Data & Look at the Map', bullets: [
+          { text: 'Download all data points' },
+          { text: 'Look at the map — does the location make sense, or does it look like a random jump?' }
+        ]},
+        { num: 2, title: 'Call the Defendant', bullets: [
+          { text: 'Send an alert' },
+          { text: '"Can you step outside for a minute? It will help your GPS signal."' }
+        ]},
+        { num: 3, title: 'Verify Their Location', bullets: [
+          { text: 'Turn on Pursuit Mode for 5 minutes — watch to see if the location corrects itself' },
+          { text: 'OR: Ask the defendant to put the device on the charger — this helps confirm they are actually at home' }
+        ]},
+        { num: 4, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once the GPS data stabilizes and the issue is resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── ALLIED: NO MOTION / SHIELDING / UNABLE TO CONNECT ─────────
+    allied_monitor_alert: {
+      type: 'steps',
+      badge: 'Allied GPS Alert', badgeClass: 'badge-allied',
+      title: 'No Motion GPS / Shielding / Unable to Connect',
+      trigger: 'The device appears stationary, the GPS signal may be blocked, or the system cannot connect to the device. These alerts do not require an immediate emergency response — but they must be monitored and followed up on if they do not resolve on their own. This is a documentation and compliance measure.',
+      steps: [
+        { num: 1, title: 'Monitor the Alert', bullets: [
+          { text: 'Watch to see if the alert clears on its own' },
+          { text: 'No immediate action is required at this stage — give it some time' }
+        ]},
+        { num: 2, title: 'If the Alert Does Not Clear After a Few Hours', bullets: [
+          { text: 'Download all data points for the defendant' },
+          { text: 'Contact the defendant and ask them to step outside for a few minutes — this helps re-establish the GPS signal and confirms their location' },
+          { text: 'If you cannot reach the defendant, work through all emergency contacts in their file' }
+        ]},
+        { num: 3, title: 'Document Everything', resolution: true, bullets: [
+          { text: 'Note the time the alert came in and how long it remained unresolved' },
+          { text: 'Log every contact attempt — time, who you reached, and what was said' },
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET TYPE SELECT ───────────────────────────────────────
+    scramnet_type: {
+      type: 'type-select',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Which SCRAMnet alert did you receive?',
+      choices: [
+        { icon: '🆘', label: 'Panic Button Pressed',
+          desc: 'Victim pressed the panic button — may be in danger RIGHT NOW',
+          next: 'scramnet_panic', urgent: true },
+        { icon: '🔋', label: 'Critical Battery Alert',
+          desc: 'SCRAM device battery has fallen below 20%',
+          next: 'scramnet_battery' },
+        { icon: '✂️', label: 'Strap / Tamper Alert',
+          desc: 'Strap has been cut or damaged — replacement required',
+          next: 'scramnet_strap' },
+        { icon: '🚫', label: 'Exclusion Zone Violation Alert',
+          desc: "Defendant entered or came near a court-ordered restricted location",
+          next: 'scramnet_exclusion' },
+        { icon: '⚠️', label: 'Victim Zone Buffer Alert',
+          desc: 'NOT a violation — defendant within 2,500 ft of victim (warning only)',
+          next: 'scramnet_buffer' },
+        { icon: '🎯', label: 'Victim Zone Violation Alert',
+          desc: 'Defendant within 1,000 ft of the actual victim',
+          next: 'scramnet_victim_zone' },
+        { icon: '✅', label: 'Domestic Standby — With Prior Approval',
+          desc: 'Defendant called ahead and received approval to enter restricted area',
+          next: 'scramnet_standby_approved' },
+        { icon: '🚨', label: 'Domestic Standby — No Prior Approval',
+          desc: 'Defendant showed up near victim without calling first — treat as serious violation',
+          next: 'scramnet_standby_no_approval', urgent: true }
+      ]
+    },
+
+    // ── SCRAMNET: PANIC BUTTON ─────────────────────────────────────
+    scramnet_panic: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Panic Button Pressed Alert',
+      trigger: 'The VICTIM manually pressed the panic button in their phone app. <strong>This means the victim may be in danger RIGHT NOW.</strong>',
+      triggerUrgent: true,
+      steps: [
+        { num: 1, title: 'Call the Victim IMMEDIATELY', bullets: [
+          { text: 'Use the number shown in the alert or open the victim\'s profile screen in the system' },
+          { text: 'Check on them: are they safe?' }
+        ]},
+        { num: 2, title: 'Locate the Victim & Turn On Pursuit Mode', bullets: [
+          { text: 'Click the victim\'s name in the system → press "Locate Now"' },
+          { text: 'Open the map and find their last known location' },
+          { text: 'Enable Pursuit Mode immediately' }
+        ]},
+        { num: 3, title: "If You Can't Reach the Victim", bullets: [
+          { text: 'Call dispatch IMMEDIATELY — request a welfare check at the victim\'s current location', cls: 'highlight' },
+          { text: 'Still no contact with anyone? → Email your supervisor' }
+        ]},
+        { num: 4, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET: CRITICAL BATTERY ─────────────────────────────────
+    scramnet_battery: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Critical Battery Alert',
+      trigger: 'The SCRAM device battery has fallen below 20%.',
+      steps: [
+        { num: 1, title: 'Locate & Turn On Pursuit Mode', bullets: [
+          { text: 'Click the defendant\'s name in the system → press "Locate Now"' },
+          { text: 'Open the map and find their last known location' },
+          { text: 'Enable Pursuit Mode immediately' }
+        ]},
+        { num: 2, title: 'Call the Defendant', bullets: [
+          { text: 'Send multiple alerts (vibrate and audible)' },
+          { text: '"Plug in your device right now."' }
+        ]},
+        { num: 3, title: "If You Can't Reach Them", bullets: [
+          { text: 'Keep sending alerts' },
+          { text: 'Call ALL emergency contacts in the file — keep calling until someone responds' }
+        ]}
+      ],
+      warning: '⚠ IF THE BATTERY DIES AND THE DEFENDANT HAS STILL NOT RESPONDED — CONTINUE TO STEP 4',
+      actionsLabel: 'What happened?',
+      actions: [
+        { label: '🔴 Battery died — defendant still not responding', next: 'scramnet_battery_dead', style: 'urgent' },
+        { label: '✅ Defendant is now charging — situation resolved', next: 'scramnet_battery_resolution', style: 'neutral' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    scramnet_battery_dead: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Battery Is Dead — SCRAMnet',
+      steps: [
+        { num: 4, title: 'Battery Is Dead', bullets: [
+          { text: 'Keep calling the defendant and sending alerts' },
+          { text: 'Is there a victim on this case? → CALL THE VICTIM NOW', cls: 'highlight' },
+          { text: "Can't reach the victim? → Call dispatch — give them the last known location", cls: 'highlight' },
+          { text: 'Write down every call: time, who you spoke to, what was said' }
+        ]},
+        { num: 5, title: 'Still No Contact With Anyone?', bullets: [
+          { text: 'Email your supervisor' }
+        ]},
+        { num: 6, title: 'Resolution Email', resolution: true, bullets: [
+          { text: "Once resolved, email EM — state whether the battery died and whether the defendant's location is known or unknown" }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    scramnet_battery_resolution: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Resolution — SCRAMnet Critical Battery',
+      steps: [
+        { num: 6, title: 'Resolution Email', resolution: true, bullets: [
+          { text: "Email EM — state whether the battery died and whether the defendant's location is known or unknown" }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET: STRAP / TAMPER ───────────────────────────────────
+    scramnet_strap: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Strap / Tamper Alert',
+      criticalWarn: '⚠ STRAP REPLACEMENT REQUIRED — TAKE BEFORE AND AFTER PHOTOS OF ANY DEVICE REPLACEMENT',
+      trigger: 'The strap has been cut or damaged.',
+      steps: [
+        { num: 1, title: 'Locate & Turn On Pursuit Mode', bullets: [
+          { text: 'Click the defendant\'s name → press "Locate Now"' },
+          { text: 'Open the map → Enable Pursuit Mode' }
+        ]},
+        { num: 2, title: 'Call the Defendant', bullets: [
+          { text: 'Send multiple alerts (vibrate and audible)' },
+          { text: 'Call the defendant — find out: is the strap actually cut, or just damaged?' },
+          { text: 'Tell them to come to the Pre-Trial Office immediately to have the device inspected and strap replaced' }
+        ]}
+      ],
+      actionsLabel: 'What is the situation?',
+      actions: [
+        { label: '🔴 Strap CONFIRMED CUT and defendant cannot be found', next: 'scramnet_strap_cut', style: 'urgent' },
+        { label: '✅ Issue resolved — send resolution email', next: 'scramnet_strap_resolution', style: 'neutral' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    scramnet_strap_cut: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Strap Confirmed Cut — Defendant Missing',
+      steps: [
+        { num: 3, title: 'Strap Is Cut and Defendant Is Missing', bullets: [
+          { text: 'Call the victim IMMEDIATELY' },
+          { text: 'Call dispatch IMMEDIATELY' },
+          { text: 'Keep sending alerts and pressing "Locate Now"' },
+          { text: 'Keep calling the defendant and all emergency contacts' }
+        ]},
+        { num: 4, title: "Can't Reach Anyone?", bullets: [
+          { text: 'Contact a supervisor' }
+        ]},
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Email EM once resolved' },
+          { text: 'Email the DA ONLY if defendant ran away AND supervisor approves' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    scramnet_strap_resolution: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Resolution — SCRAMnet Strap / Tamper',
+      steps: [
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Email EM once resolved' },
+          { text: 'Email the DA ONLY if defendant ran away AND supervisor approves' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET: EXCLUSION ZONE ───────────────────────────────────
+    scramnet_exclusion: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Exclusion Zone Violation Alert',
+      trigger: "The defendant has entered or come near a court-ordered restricted location such as the victim's home, workplace, or family's residence. Note: The victim may or may not be there. The defendant already has maps of all areas to avoid.",
+      steps: [
+        { num: 1, title: 'Locate & Turn On Pursuit Mode', bullets: [
+          { text: 'Select defendant\'s name → press "Locate Now"' },
+          { text: 'Open the map and find their last known location' },
+          { text: 'Turn on Pursuit Mode' },
+          { text: 'Send device alerts (vibrate or audible)' }
+        ]},
+        { num: 2, title: 'Assess the Situation & Call the Defendant', bullets: [
+          { text: 'Are the defendant and victim physically close to each other right now?' },
+          { text: '"Leave that area right now and do not go back."' },
+          { text: 'If the defendant appears to be right AT the restricted location — skip directly to Step 3 right now', cls: 'highlight' }
+        ]}
+      ],
+      actionsLabel: 'Where is the defendant?',
+      actions: [
+        { label: '🔴 Defendant is AT the restricted location', next: 'scramnet_exclusion_at', style: 'urgent' },
+        { label: '🟡 Defendant is passing through / leaving', next: 'scramnet_exclusion_monitoring', style: 'neutral' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    scramnet_exclusion_at: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Defendant Is AT the Restricted Location',
+      steps: [
+        { num: 3, title: 'Call Dispatch & Victim IMMEDIATELY', bullets: [
+          { text: 'Call dispatch IMMEDIATELY and request patrol to that location', cls: 'highlight' },
+          { text: 'Call the victim — let them know to be aware of their surroundings and that dispatch has been notified' },
+          { text: 'Write down the name and time of every person you speak to' },
+          { text: 'Keep monitoring the situation' }
+        ]},
+        { num: 4, title: 'Dispatch Involved But No One Is Answering', bullets: [
+          { text: 'Keep sending alerts' },
+          { text: 'Keep calling the defendant' },
+          { text: 'Keep calling the victim' }
+        ]},
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    scramnet_exclusion_monitoring: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Defendant Passing Through — Keep Monitoring',
+      steps: [
+        { num: 4, title: 'Keep Trying Until Resolved', bullets: [
+          { text: 'Keep sending alerts' },
+          { text: 'Keep calling the defendant' },
+          { text: 'Keep calling the victim' }
+        ]},
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [
+        { label: '🔴 Situation escalated — defendant is now AT the location', next: 'scramnet_exclusion_at', style: 'urgent' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    // ── SCRAMNET: VICTIM ZONE BUFFER ───────────────────────────────
+    scramnet_buffer: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Victim Zone Buffer Alert',
+      trigger: "<strong>NOT A VIOLATION.</strong> This is a warning that the defendant is getting within 2,500 feet of the victim. They haven't done anything wrong yet — but watch this closely.",
+      steps: [
+        { num: 1, title: 'Locate & Turn On Pursuit Mode', bullets: [
+          { text: 'Click the defendant\'s name → press "Locate Now"' },
+          { text: 'Open the map → Enable Pursuit Mode' }
+        ]},
+        { num: 2, title: "Figure Out What's Happening", bullets: [
+          { text: 'Is the defendant moving through the area, or are they stopped near the victim?' },
+          { text: 'Is the victim possibly moving toward a place where the defendant already was?' },
+          { text: 'If the defendant is lingering (sitting still near the victim): send alerts AND call them to leave the area' }
+        ]},
+        { num: 3, title: "If You Can't Reach the Defendant", bullets: [
+          { text: 'Watch the map closely — are they moving toward the victim or away?' }
+        ]}
+      ],
+      actionsLabel: 'What is happening?',
+      actions: [
+        { label: '🔴 Real threat identified — defendant deliberately approaching victim', next: 'scramnet_buffer_threat', style: 'urgent' },
+        { label: '✅ Situation resolved — send resolution email', next: 'scramnet_buffer_resolution', style: 'neutral' },
+        { label: '← Start Over', next: 'start', style: 'back' }
+      ]
+    },
+
+    scramnet_buffer_threat: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Real Threat — Victim Zone Buffer',
+      steps: [
+        { num: 4, title: 'Real Threat Identified — Do All of the Following', bullets: [
+          { text: 'Keep sending alerts' },
+          { text: 'Keep calling the defendant' },
+          { text: 'Call the victim' },
+          { text: 'Call all emergency contacts for the defendant' }
+        ]},
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    scramnet_buffer_resolution: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Resolution — Victim Zone Buffer',
+      steps: [
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET: VICTIM ZONE VIOLATION ───────────────────────────
+    scramnet_victim_zone: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Victim Zone Violation Alert',
+      trigger: 'The defendant is within 1,000 feet of the VICTIM (the actual person, not just a location). This may or may not be intentional — use context and judgment.',
+      steps: [
+        { num: 1, title: 'Locate & Turn On Pursuit Mode', bullets: [
+          { text: 'Click defendant\'s name → press "Locate Now"' },
+          { text: 'Open the map → Enable Pursuit Mode' }
+        ]},
+        { num: 2, title: "Figure Out What's Happening", bullets: [
+          { text: 'Is the defendant moving toward the victim, or just passing through the area?' },
+          { text: 'Is the victim moving toward a location the defendant was already at?' },
+          { text: 'If the defendant appears to be deliberately approaching the victim: send alerts and call them to leave immediately' }
+        ]},
+        { num: 3, title: "If You Can't Reach the Defendant — Call the Victim", bullets: [
+          { text: 'If it looks like the defendant is deliberately making contact: call the victim and check on their safety' },
+          { text: "Can't reach the victim? → Call dispatch — request a welfare check at the victim's address", cls: 'highlight' }
+        ]},
+        { num: 4, title: 'Keep Trying', bullets: [
+          { text: 'Keep sending alerts, calling the defendant, calling the victim, and calling all emergency contacts' }
+        ]},
+        { num: 5, title: 'Resolution Email', resolution: true, bullets: [
+          { text: 'Once resolved, email EM' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET: DOMESTIC STANDBY (APPROVED) ─────────────────────
+    scramnet_standby_approved: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Domestic Standby — With Prior Approval',
+      trigger: "The defendant called ahead and received approval to enter a restricted area (usually to pick up belongings, etc.). This is planned and permitted.",
+      steps: [
+        { num: 1, title: 'BEFORE the Standby Happens', bullets: [
+          { text: 'The defendant MUST call the office before entering any restricted zone' },
+          { text: 'Tell them to wait outside the buffer zone until law enforcement arrives' },
+          { text: 'Confirm ALL of the following with the defendant:' },
+          { text: "Defendant's name", cls: 'sub' },
+          { text: "Victim's name", cls: 'sub' },
+          { text: 'Full address of the standby (include the county if outside Knox County)', cls: 'sub' },
+          { text: 'How long they expect it to take', cls: 'sub' },
+          { text: 'Tell the defendant you will call them back once a violation alert comes in to confirm their safety with the officer on scene' },
+          { text: "Get the officer's department, name, and unit number" }
+        ]},
+        { num: 2, title: 'AFTER the Standby Is Complete', resolution: true, bullets: [
+          { text: 'Email EM to document that the standby happened and is now complete' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── SCRAMNET: DOMESTIC STANDBY (NO APPROVAL) ──────────────────
+    scramnet_standby_no_approval: {
+      type: 'steps',
+      badge: 'SCRAMnet Alert', badgeClass: 'badge-scramnet',
+      title: 'Domestic Standby — No Prior Approval',
+      criticalWarn: '⚠ TREAT THIS AS A POTENTIAL SERIOUS VIOLATION — The defendant showed up near the victim without calling first.',
+      trigger: 'You will receive an Inclusion Zone Violation (Allied) and/or a Victim Zone Buffer or Violation Alert (SCRAMnet) at the same time. The defendant is at or near the victim\'s location without permission.',
+      triggerUrgent: true,
+      steps: [
+        { num: 1, title: 'When You Get the Alert', bullets: [
+          { text: 'Download all data points IMMEDIATELY' },
+          { text: 'Send alerts IMMEDIATELY' },
+          { text: 'Open the map' },
+          { text: "Call the defendant IMMEDIATELY — they are at or near the victim's residence", cls: 'highlight' }
+        ]},
+        { num: 2, title: 'If the Defendant Does Not Answer', bullets: [
+          { text: 'Call the victim immediately' },
+          { text: 'Neither answers? → Call dispatch IMMEDIATELY for a welfare check at that location', cls: 'highlight' },
+          { text: 'Keep sending alerts and calling all contacts until the situation is resolved' }
+        ]},
+        { num: 3, title: 'Once You Make Contact', bullets: [
+          { text: 'Ask to speak to the law enforcement officer on scene' },
+          { text: "Get their department, name, and unit number" },
+          { text: 'No officer on scene? → Tell the defendant to leave immediately. Then call dispatch for a welfare check. Then call the victim to verify they are safe.', cls: 'highlight' }
+        ]},
+        { num: 4, title: "After It's Resolved", resolution: true, bullets: [
+          { text: 'Email EM to document that the standby happened and is complete' }
+        ]}
+      ],
+      actions: [{ label: '← Start Over', next: 'start', style: 'back' }]
+    },
+
+    // ── TRAINING ──────────────────────────────────────────────────
+    training: {
+      type: 'guide',
+      badge: 'Pretrial Assessment', badgeClass: 'badge-training',
+      title: 'Pretrial Risk Assessment Training Guide',
+      subtitle: 'Consolidated from the 2024 Training Guide and JIMS Reference (Rev. 03/26/2025)',
+      intro: 'Full workflow guide for completing Pretrial Risk Assessments in Knox County. Use the expandable sections below to find guidance on any step — from identity confirmation and exclusion checks to assessment entry and filing.',
+      sections: [
+        {
+          id: 'tr_about',
+          title: '1. About Knox County Pretrial Services',
+          bullets: [
+            'Knox County Sheriff\'s Pretrial Services uses a data-driven risk assessment plus supervision ordered by the judiciary to enhance public safety and improve court appearance rates. The unit also manages Knox County\'s DUI and Traffic Schools.',
+            'The RA produces two independent risk scores: <strong>NCA</strong> (likelihood of a New Criminal Arrest pending disposition) and <strong>FTA</strong> (likelihood of a Failure to Appear).',
+            'The RA is completed before the release decision and sent to the Magistrate or Judge, who uses it alongside other information to decide release conditions.',
+            '<strong>Every defendant physically arrested in Knox County on a misdemeanor or felony receives an RA</strong> unless an exclusion applies.',
+            'Data sources: adult electronic records only. Juvenile and national records are NOT used to score the RA, though they may inform the release decision.'
+          ]
+        },
+        {
+          id: 'tr_nca',
+          title: '2. NCA Scale — New Criminal Arrest (0–6)',
+          open: true,
+          subsections: [
+            {
+              title: 'Scoring Factors (all scored from JIMS)',
+              table: {
+                headers: ['#', 'Factor', 'Scoring'],
+                rows: [
+                  ['1', 'Age at first adult arrest', '22+ = 0 · 21 or younger = 1'],
+                  ['2', 'Any pending case (not counting the current one)', 'None = 0 · One or more = 2'],
+                  ['3', 'Prior conviction in past 2 years', 'None = 0 · One or more = 1'],
+                  ['4', 'Prior property conviction in past 2 yrs (TN Title 39, Ch. 14)', 'None = 0 · One or more = 1'],
+                  ['5', 'Additional risk factors (see Assessment History PDF)', '0–1']
+                ]
+              }
+            },
+            {
+              title: 'Risk Levels',
+              table: {
+                headers: ['Score', 'Risk Level'],
+                rows: [
+                  ['0–2', 'Low'],
+                  ['3–4', 'Moderate'],
+                  ['5–6', 'Elevated']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_fta',
+          title: '3. FTA Scale — Failure to Appear (0–6)',
+          open: true,
+          subsections: [
+            {
+              title: 'Scoring Factors (all scored from JIMS)',
+              table: {
+                headers: ['#', 'Factor', 'Scoring'],
+                rows: [
+                  ['1', 'Prior FTA warrants/attachments (lifetime)', 'None = 0 · One = 1 · Two+ = 2'],
+                  ['2', 'Prior FTAs in past 3 years', 'None = 0 · One = 1 · Two+ = 2'],
+                  ['3', 'Prior FTA in past year AND age 21 or younger at first arrest', 'No = 0 · Yes = 1'],
+                  ['4', 'Prior property conviction in past 2 years', 'None = 0 · One or more = 1']
+                ]
+              }
+            },
+            {
+              title: 'Risk Levels',
+              table: {
+                headers: ['Score', 'Risk Level'],
+                rows: [
+                  ['0–2', 'Low'],
+                  ['3–4', 'Moderate'],
+                  ['5–6', 'Elevated']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_supervision',
+          title: '4. Supervision Levels',
+          subsections: [
+            {
+              title: 'Supervision Levels at a Glance',
+              table: {
+                headers: ['Level', 'Reporting', 'Contact'],
+                rows: [
+                  ['I', 'None beyond release', 'Court reminders only'],
+                  ['II', 'Monthly in-person + monthly phone call', 'Pretrial fee; special conditions as ordered'],
+                  ['III', 'Weekly in-person + weekly phone call', 'Pretrial fee; special conditions as ordered']
+                ]
+              }
+            },
+            {
+              title: 'Conditions That Apply to All Active Supervision (Levels II + III)',
+              bullets: [
+                'Report within 3 business days after release',
+                'Do not violate any law of the United States',
+                'Attend all court appearances',
+                'No contact with victims or witnesses',
+                'Report any change of address, employment, or phone number',
+                'GPS Monitoring fee: $50 + $8/day, if applicable',
+                'SCRAM Monitoring fee: $50 + $8.05/day, if applicable'
+              ],
+              note: 'All three levels require the defendant to provide contact information, sign the pretrial release agreement, and receive call/text court reminders.'
+            }
+          ]
+        },
+        {
+          id: 'tr_exclusions',
+          title: '5. When NOT to Run an RA — Exclusions & Exceptions',
+          open: true,
+          subsections: [
+            {
+              title: 'Exclusions — Do NOT complete an RA',
+              bullets: [
+                'Attach Upon Forfeiture',
+                'Jail Mitt',
+                'Attachment (FTA)',
+                'Contempt of Court (GSC/CRC)',
+                'Capias / NIA Capias',
+                'Rebook',
+                'Fugitive from Justice',
+                'Violation of Probation (VOP)',
+                'Parole Violation',
+                'U.S. Marshall / ICE / Active Detainer',
+                'Any sex-offender registration/monitoring/violation, community-supervision or workplace violations',
+                'Prison/TDOC (including falsifying drug screen or tampering with electronic monitoring)',
+                'CRC hold, CRC transcript, CRC bond condition, Mittimus (CRC)',
+                'Violation of Protective Order',
+                'Violation of Conditional Release',
+                'Bond Source / Bond Source Order'
+              ]
+            },
+            {
+              title: 'Exceptions — DO complete an RA',
+              note: 'These warrants normally look like exclusions but require an RA if accompanied by a new criminal charge originating in Knox County.',
+              bullets: [
+                'Juv Capias',
+                'Instanter Attachment',
+                'Juv Instanter Attachment',
+                'Failure to Obey Court Orders',
+                'Contempt of Court (civil)'
+              ]
+            },
+            {
+              title: 'Where to Find Exclusions in JIMS',
+              bullets: [
+                '<strong>Current Inmates → Warrant Summary tab</strong> — shows issued & served exclusions ("TBS" = To Be Set)',
+                '<strong>Current Inmates → Exclusion columns</strong> — exclusions may not appear here until the defendant is booked',
+                '<strong>Menu Bar → Warrants to Be Approved → Warrants Awaiting Approval</strong> — keep this as one of your main pages; shows warrants submitted by other agencies awaiting magistrate approval'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'tr_checklist',
+          title: '6. The 4-Step Pre-RA Checklist',
+          open: true,
+          subsections: [
+            {
+              title: 'Before starting, confirm each step:',
+              table: {
+                headers: ['Step', 'Question', 'Action'],
+                rows: [
+                  ['1', 'Does the defendant have any exclusions?', 'Yes → RA not needed (unless it\'s an exception, see §5). No → continue'],
+                  ['2', 'When was the last exclusion served?', 'Served during prior booking → RA needed · Served during current booking → RA not needed'],
+                  ['3', 'Is there already an RA on file?', 'Over 48 hrs old → click Add New · Less than 48 hrs old → update existing RA if needed'],
+                  ['4', 'Is the defendant\'s identity confirmed?', 'Confirm identity & IDN before starting · No identifiers → delay RA']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_identity',
+          title: '7. Confirming Identity & Locating the IDN',
+          open: true,
+          subsections: [
+            {
+              title: 'Search Order',
+              bullets: [
+                '<strong>JIMS</strong> — search by name, IDN, or identifier',
+                '<strong>Arrest report via RMS</strong> (by name or date) or <strong>Watson</strong> (by date)'
+              ],
+              note: 'Confirm the match using name, date of birth, OLN, and/or SSN. One person may have multiple IDNs, names, or spelling variations. Re-confirm every time you change screens — it\'s easy to drift onto the wrong person.'
+            },
+            {
+              title: 'Required Identifiers',
+              bullets: [
+                'Name',
+                'Date of birth',
+                'Social Security Number',
+                'OLN — note in comments if out of state',
+                'Address — note in comments if out of state',
+                'Homelessness — note in comments',
+                'Check the <strong>Alias tab</strong> for other names the defendant uses'
+              ]
+            },
+            {
+              title: 'Caution When Pulling Identifiers',
+              bullets: [
+                'Compare the <strong>Details tab</strong> against the <strong>Identifiers tab</strong>',
+                'Watch for multiple SSNs, different DOBs, or any contradictory information'
+              ]
+            },
+            {
+              title: 'If the Arrestee Cannot Be Located',
+              warning: 'Do NOT start the assessment until the suspect\'s name is imported into JIMS. When searching by identifier, use 2–3 identifiers — not everyone has a driver\'s license or SSN, and not all identifiers are entered into JIMS.',
+              bullets: []
+            }
+          ]
+        },
+        {
+          id: 'tr_custody',
+          title: '8. Custody Status',
+          bullets: [
+            'Check <strong>Current Inmates</strong> for a booking number.',
+            '<strong>Booking number present</strong> → in custody → click Current Charges to verify. Note: current charges upload to Warrant Summary before Current Charges.',
+            '<strong>No booking number</strong> → not in custody → insert a comment "NOT IN CUSTODY", complete the RA, and finalize. The comment should stay until the defendant is in custody.'
+          ]
+        },
+        {
+          id: 'tr_starting',
+          title: '9. Starting the RA',
+          open: true,
+          subsections: [
+            {
+              title: 'On the Pretrial Home Screen',
+              bullets: [
+                '<strong>Highlighted name</strong> = never been assessed → double-click to begin a New Assessment',
+                '<strong>Not highlighted</strong> = previously assessed → double-click then click <strong>Add New</strong> (because the old RA is over 48 hrs old)'
+              ],
+              note: 'Add New retains previous comments (still update them with current info) but does NOT retain the supervision dropdown or NCA/FTA scores — you\'ll re-enter both.'
+            },
+            {
+              title: 'Pulling NCA & FTA Scores',
+              bullets: [
+                '<strong>Never-assessed defendant</strong> → click History',
+                '<strong>Previously-assessed defendant</strong> → click Add New',
+                'Both paths open the Assessment History PDF, which shows the scale risk factors and computed scores to enter on the Assessment Entry screen.'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'tr_pending',
+          title: '10. Pending Cases (NCA #2)',
+          open: true,
+          subsections: [
+            {
+              title: 'Comment on How the Pending Case Was Released',
+              bullets: [
+                'ROR',
+                'Appearance bond',
+                'Pretrial supervision',
+                'Combination',
+                'Disposition unclear'
+              ],
+              blockquote: '<strong>Judges\' Detention Order (10.26.23):</strong> A defendant is not eligible for pretrial if they are currently on pretrial release or ROR release. Always reference in the RA comment section whether the defendant is currently out on pretrial, ROR, appearance bond, or a combination.'
+            },
+            {
+              title: 'Verifying a Pending Case',
+              bullets: [
+                'Note the date of the listed pending case in the Assessment History PDF.',
+                'Go to <strong>Case Summary</strong> → locate the docket number → open the case detail.',
+                'No disposition date + "Enter Sentence" tab empty → case is pending. Check <strong>Activities</strong> for the latest court action.',
+                'Cases that transfer from General Sessions to Criminal Court get a <strong>new docket number</strong> — you must check both.'
+              ]
+            },
+            {
+              title: 'Confirming Defendant Is Currently on Pretrial',
+              bullets: [
+                'Go to <strong>Clients tab</strong> — all current pretrial clients are listed. Highlighted = in custody.',
+                'Double-click the name to open the Pretrial Record.',
+                'Type codes: <strong>M</strong> = Magistrate created digital order · <strong>P</strong> = Pretrial Officer entered handwritten order · <strong>J</strong> = Pretrial created digital order from court',
+                'The Pretrial Record shows type of release, supervision level, notes, conditions, and start date.'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'tr_boundover',
+          title: '11. Bound-Over Cases — Override NCA #2',
+          subsections: [
+            {
+              title: 'How to Identify Bound-Over Cases',
+              bullets: [
+                'Bound-over cases show <strong>"Closed"</strong> in Case Summary but are actually pending.',
+                '<strong>Case Activities is the reliable indicator</strong> — it will state the case was bound over or dismissed.'
+              ]
+            },
+            {
+              title: 'When to Override NCA #2',
+              table: {
+                headers: ['Situation', 'Override', 'Example Documentation'],
+                rows: [
+                  ['NCA #2 shows no pending cases, but you found bound-over cases', '(0) → (2)', '"Changed NCA #2 from (0) to (2) due to pending charges of (@1264169) Agg Assault & (@1264170) Evading Arrest bound over to the grand jury."'],
+                  ['NCA #2 shows pending cases, but activities show they\'re complete, closed, or dead-filed', '(2) → (0)', '"Changed NCA #2 from (2) to (0) because (57506I) listed as dead file from 1997 and (@485966) listed as time served."']
+                ]
+              },
+              warning: 'Document every override in the comments. Document, document, document.'
+            }
+          ]
+        },
+        {
+          id: 'tr_probation',
+          title: '12. Probation Status',
+          subsections: [
+            {
+              title: 'KCPO (Knox County Probation Office) — from JIMS',
+              bullets: [
+                'Check cases with a <strong>Disposition of Conviction</strong>. These show the Display Sentence tab.',
+                'Display Sentence contains: Start date · Sentence length · Supervised probation checkbox · Unsupervised (checkbox NOT marked) · Consecutive or concurrent sentences.',
+                'Always check <strong>Activities</strong> — probation can be amended there. Printing Case History from Case Summary helps with consecutive vs. concurrent sentences.',
+                'Document: length of sentence, start date, supervised or unsupervised.'
+              ]
+            },
+            {
+              title: 'State Probation/Parole — from TOMIS',
+              bullets: [
+                'TOMIS = Tennessee Offender Management Information System, accessed via the Criminal Justice Portal.',
+                'See Section 13 for full TOMIS search instructions.'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'tr_portal',
+          title: '13. External Resources — Criminal Justice Portal',
+          open: true,
+          subsections: [
+            {
+              title: 'Access & Search Order',
+              bullets: [
+                'Access at the <strong>Tennessee Criminal Justice Portal</strong>.',
+                'Search <strong>"All Database" first</strong>, then "AES".',
+                'Search order: 1) TN OLN · 2) SSN (no hyphens) · 3) Name + DOB via Optional Criteria.',
+                'If one search returns nothing, try other identifiers until the search is exhausted.'
+              ]
+            },
+            {
+              title: 'TOMIS — Tennessee Offender Management Information System',
+              bullets: [
+                'The 8-digit TOMIS ID identifies the offender at the state level. A TOMIS ID implies a TDOC ID, which implies one or more felony convictions.',
+                'Documentation on felonies: county & state of conviction, year. Click <strong>Date</strong> to sort from oldest to newest.'
+              ],
+              table: {
+                headers: ['Status', 'Meaning', 'Document?'],
+                rows: [
+                  ['Active', 'On state probation or parole', 'Yes — county/state + offenses'],
+                  ['Inactive', 'Not on supervision (often = incarcerated)', 'No comment needed'],
+                  ['Absconded', 'Failed to report to parole/probation/community correction', 'Yes — still on state probation/parole (use supervision dropdown)']
+                ]
+              },
+              note: 'If TOMIS shows an offender but no felony convictions are listed: may be diverted/expunged, or a recent judgment may not be entered yet.'
+            },
+            {
+              title: 'SOR — TN Sex Offender Registry',
+              bullets: [
+                'Per Tenn. Code Ann. § 40-39-202, anyone convicted of a listed offense must register.',
+                '<strong>Sexual Offender</strong> — reports annually · <strong>Violent Sexual Offender</strong> — reports quarterly.',
+                'When in doubt about current supervision, <strong>default to supervised</strong> (err on the side of public safety).',
+                'Status auto-changes to Inactive when incarcerated. BOPP/Supervision listed = currently on state probation.'
+              ]
+            },
+            {
+              title: 'AES — Arrest Event System (out-of-county arrests only)',
+              bullets: [
+                'Click <strong>AES Search</strong> → sort by <strong>Arrest Date</strong> (oldest first).',
+                'Double-click an entry to open the booking record.',
+                'Entries with the <strong>same date AND same county</strong> are duplicates — only open one.',
+                'Results capped at <strong>150 entries</strong>; to see more: note the last entry\'s date → click Refine Results → enter that date in "From" and today in "To" → search again.',
+                'Documentation format: <em>"Arrests of (01/11) Tampering with Evidence, (01/11) Unlaw Poss of Weapon out of Chester County."</em>'
+              ],
+              warning: 'Skip TDOC prison entries: if an AES entry has a prison code or ORI ending in "C" — do not list it. It\'s already covered by felony convictions on TOMIS.'
+            },
+            {
+              title: 'TWP & Other Databases',
+              table: {
+                headers: ['Source', 'What It Covers'],
+                rows: [
+                  ['TWP (TN Wanted Person)', 'Check if the arrestee is wanted, for what, and from which county'],
+                  ['RMS', 'KCSO arrest reports; real-time booking'],
+                  ['Watson', 'KPD arrest reports; real-time arrests'],
+                  ['Elder Abuse Registry (TN Dept. of Health)', 'Anyone convicted of abuse, neglect, exploitation, or misappropriation of a vulnerable person\'s property'],
+                  ['NCIC', 'Wanted, SOR, respondent to protection order, gang member']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_entry',
+          title: '14. Completing the Assessment Entry Screen',
+          open: true,
+          subsections: [
+            {
+              title: 'Fields and Data Sources',
+              table: {
+                headers: ['Field', 'Source', 'What to Enter'],
+                rows: [
+                  ['NCA score', 'JIMS Assessment History PDF', 'Score (0–6)'],
+                  ['FTA score', 'JIMS Assessment History PDF', 'Score (0–6)'],
+                  ['Supervised By (dropdown)', 'JIMS Clients tab · Case Summary Activities · TOMIS', 'KC Pretrial · KCPO Supervised/Unsupervised · State Probation/Parole'],
+                  ['Sex Offender checkbox', 'TOMIS / SOR', 'Check when verified'],
+                  ['Elder Abuse checkbox', 'Elder Abuse Registry website', 'Check when verified'],
+                  ['NCIC Warrants checkbox', 'NCIC', 'Check when verified'],
+                  ['Comments', 'Multiple sources', 'See below']
+                ]
+              }
+            },
+            {
+              title: 'What to Put in Comments',
+              bullets: [
+                'Current probation status',
+                'Handgun permit',
+                'Out-of-state address or OLN',
+                'Pending cases and how they were released, with court date',
+                'Cases bound over to grand jury',
+                'Any NCA or FTA score override and the reason',
+                'NCIC hits',
+                'Elder Abuse Registry listing and/or SOR classification & status'
+              ]
+            },
+            {
+              title: 'Finalizing',
+              bullets: [
+                'Once all information is entered, click <strong>Finalize</strong>.'
+              ]
+            }
+          ]
+        },
+        {
+          id: 'tr_narratives',
+          title: '15. Assessment Narrative Examples',
+          subsections: [
+            {
+              title: 'NCA Narrative Example',
+              blockquote: 'Prior out-of-county arrests of (08/12) VOP from McMinn County & (08/12) Attachment for Contempt, (08/10) Attachment for Contempt, (08/10) DORL/DOSL, (07/10) DORL/DOSL from Blount County.'
+            },
+            {
+              title: 'FTA Narrative Example',
+              blockquote: 'FTA: Blount (10/14).'
+            },
+            {
+              title: 'Comments Narrative Example',
+              blockquote: 'Currently on KC Pretrial L1 starting 02/11/25 for (@1605835) Simple Poss/Casual Exchange, (@1605836) Meth Poss or Casual Exchange & ROR for (@1605837) PV with a court date 02/22/25. Defendant is currently on state probation out of Knox County, previously on NC. Pretrial & acquired a new charge while on pretrial release.',
+              note: 'Style guide: abbreviations allowed · dates in MM/DD/YY or MM/YY · docket numbers in @###### form · charges listed clearly · status/release info always up front.'
+            }
+          ]
+        },
+        {
+          id: 'tr_prior',
+          title: '16. Previously on Pretrial?',
+          bullets: [
+            'Check the <strong>History tab</strong> (search by last name).',
+            'Note for the RA: how many times the defendant has been on pretrial, when, and whether they picked up new charges or FTAs while on supervision.',
+            'You cannot view the prior pretrial digital order.',
+            '<strong>No comments required if the defendant was successful in pretrial.</strong>'
+          ]
+        },
+        {
+          id: 'tr_special',
+          title: '17. Special Cases at a Glance',
+          subsections: [
+            {
+              title: 'Quick Reference',
+              table: {
+                headers: ['Scenario', 'RA?'],
+                rows: [
+                  ['NIA Capias', 'Exclusion — no RA'],
+                  ['Juvenile Mitt only', 'Exclusion — no RA'],
+                  ['Warrant + Juv Mitt / Juv Pet together', 'Follow exception rule (§5)'],
+                  ['BHUCC', 'Check case-by-case'],
+                  ['Misdemeanor Citation only', 'No RA — citation charges don\'t show on the RA'],
+                  ['Misdemeanor Citation with new arrest', 'RA as normal'],
+                  ['Pending cases bound over to grand jury', 'RA required; NCA #2 override may apply'],
+                  ['Defendant not in custody', 'Complete RA with "NOT IN CUSTODY" comment']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_filing',
+          title: '18. File/Folder Organization',
+          subsections: [
+            {
+              title: 'Color-Coded Folders by Supervision Level',
+              table: {
+                headers: ['Folder', 'Color', 'Contents'],
+                rows: [
+                  ['Level 1', 'Manila', 'Risk assess & bond conditions; DL, state probation, or SOR info with picture'],
+                  ['Level 2', 'Green', 'Level 1 contents + calendar + pretrial agreement'],
+                  ['Level 3', 'Yellow', 'Level 2 contents (calendar + pretrial agreement required)'],
+                  ['Allied GPS Blue/Red (Hilltop only)', 'No folder', 'Warrant copy; charges; same as Level 3'],
+                  ['SCRAM GPS Blue/Red (Hilltop only)', 'No folder', 'Warrant copy; charges; same as Level 3']
+                ]
+              }
+            },
+            {
+              title: 'Bond-Condition Variants (post-it with condition on top)',
+              bullets: [
+                'Bond Cond #5 DUI — Level 1 Manila',
+                'Bond Cond #5 & #7 — Level 3 Yellow',
+                'Bond Cond #7 DUI — Level 3 Yellow',
+                'Bond Cond #7 & #11 — level specified by magistrate',
+                'Bond Cond #4 & #7 — no folder; same as Level 3; post-it with cond/SCRAM',
+                'NIA Capias or Criminal Court — Level 3 if not noted on court order; otherwise level specified'
+              ]
+            },
+            {
+              title: 'Handwritten Process',
+              bullets: [
+                'Fax the handwritten order to release',
+                'Note it in the Clients tab',
+                'Note "Handwritten faxed" in CT',
+                'Note "Handwritten" in the Blue Book'
+              ],
+              warning: 'Always add to the Blue Book.'
+            }
+          ]
+        },
+        {
+          id: 'tr_tools',
+          title: '19. Research Tools Reference',
+          bullets: [
+            'E-Agent search (MASA, QR, FQ, QWA, QH, TOMIS, SOQ, QXS)',
+            'TN Sex Offender Registry search',
+            'TN Elder Abuse Registry search',
+            'TDOC FOIL search',
+            'TN Criminal Justice Portal search',
+            'Knox Co JIMS Case Summary search'
+          ]
+        },
+        {
+          id: 'tr_jims',
+          title: '20. JIMS Screen Quick Reference',
+          subsections: [
+            {
+              title: 'Main Screens',
+              table: {
+                headers: ['Screen', 'Purpose'],
+                rows: [
+                  ['Current Inmates', 'Lists all arrestees + status (BKD, PND, APPR, booked, pretrial score, etc.)'],
+                  ['Assessment Entry', 'Where new assessments are input'],
+                  ['All Assessments', 'All assessments in-progress or completed'],
+                  ['Clients', 'All clients currently assigned to pretrial'],
+                  ['History', 'Historical listing of all clients']
+                ]
+              }
+            },
+            {
+              title: 'Current Inmates — Tabs Overview',
+              bullets: [
+                '<strong>Current Charges</strong> — in custody only; current served warrants',
+                '<strong>Warrant Summary</strong> — all served & issued warrants; all exclusions; voided & canceled; out-of-county',
+                '<strong>Case Summary</strong> — case disposition, conviction status, probation status, pending cases',
+                '<strong>Exit</strong> — close the current screen view'
+              ]
+            },
+            {
+              title: 'Status Codes',
+              table: {
+                headers: ['Code', 'Meaning'],
+                rows: [
+                  ['BKD', 'Incarcerated'],
+                  ['PND', 'Pending arrest'],
+                  ['APPR', 'Warrant approved'],
+                  ['Highlighted defendant', 'Never been assessed'],
+                  ['No booking number', 'Not in custody']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_terms',
+          title: '21. Terminology',
+          subsections: [
+            {
+              title: 'Key Terms',
+              table: {
+                headers: ['Term', 'Definition'],
+                rows: [
+                  ['Absconded', 'Failure to report to parole, probation, or community correction officer'],
+                  ['AES', 'Arrest Event System — TBI arrest repository on the Criminal Justice Portal'],
+                  ['Arrest', 'Taken into custody and temporarily held'],
+                  ['Attach Upon Forfeiture', 'Failure to appear'],
+                  ['Attachment', 'Legal process by which a court designates property of a debtor to be transferred for the creditor\'s benefit'],
+                  ['BOPP', 'Tennessee Board of Probation & Parole'],
+                  ['Bond Copy', 'Technically a FTA, but a bondsman will transport/pick up the defendant and turn them in'],
+                  ['CAPP', 'KCSO Community Supervision — Alternative to Prison Program'],
+                  ['Capias', 'Bench warrant issued by a judge; same as an FTA'],
+                  ['Charge', 'Formal allegation of an offense'],
+                  ['Community Corrections', 'Community-based alternative to incarceration in lieu of a state institution, local jail, or workhouse'],
+                  ['Concurrent', 'Sentences served at the same time'],
+                  ['Consecutive', 'Sentences served back-to-back, one after another'],
+                  ['Conviction', 'Found guilty by a court, or a plea of guilty'],
+                  ['CRC', 'Criminal Court'],
+                  ['Detainer', 'A HOLD on a defendant; defendant cannot be released even if bond is paid'],
+                  ['Determinate Release', 'Special type of probation (TCA 40-35-501); offenders with 1–2 yr felony sentences eligible after serving 30%'],
+                  ['Disposition Date', 'Date of the latest disposition for all charges from the current arrest'],
+                  ['Diversion', 'Supervised or unsupervised program as an alternative to prosecution; charges typically dropped on completion'],
+                  ['FTA', 'Failure to Appear — defendant does not appear in court; bench warrant and/or attachment issued'],
+                  ['Furlough', 'Temporary pass'],
+                  ['Hold', 'Outstanding warrant from another agency or jurisdiction'],
+                  ['ICE', 'Immigration & Customs Enforcement'],
+                  ['Jail Mittimus', 'Arrest warrant authorizing law enforcement to take a suspect into custody; offender is not considered guilty'],
+                  ['JIMS', 'Justice Information Management System'],
+                  ['Magistrate', 'Handles smaller matters; fewer/limited powers than a judge'],
+                  ['Mittimus', 'Latin for "we send"; court-ordered warrant directing the sheriff to arrest a convicted offender'],
+                  ['NCA', 'New Criminal Arrest pending case disposition'],
+                  ['NIA Capias', 'Grand jury indictment'],
+                  ['Pretrial Period', 'Time between the current arrest date and the disposition date'],
+                  ['Prior Arrest', 'Citation or physical arrest before the current arrest — disposition not considered for this factor'],
+                  ['Prior Conviction', 'Conviction before the current arrest — arrests not considered'],
+                  ['Rebook', 'Released to another agency before charges are disposed; re-booked on the original charge on return'],
+                  ['RMS', 'KCSO arrest report database'],
+                  ['SOR', 'Sex Offender Registry'],
+                  ['TOMIS', 'Tennessee Offender Management Information System (Criminal Justice Portal)'],
+                  ['TWP', 'Tennessee Wanted Person (Criminal Justice Portal)'],
+                  ['VOP', 'Violation of Probation'],
+                  ['Watson', 'KPD arrest database']
+                ]
+              }
+            }
+          ]
+        },
+        {
+          id: 'tr_workflow',
+          title: '22. Full Workflow Quick-Reference',
+          open: true,
+          bullets: [
+            '<strong>1.</strong> Identify defendant — confirm name, DOB, OLN/SSN; grab IDN (§7)',
+            '<strong>2.</strong> Check exclusions — Warrant Summary, Exclusion columns, Warrants Awaiting Approval (§5)',
+            '<strong>3.</strong> Run 4-step checklist — exclusions · last-served date · RA age · identity confirmed (§6)',
+            '<strong>4.</strong> Determine custody status — booking number = in custody (§8)',
+            '<strong>5.</strong> Pull scores — Assessment History PDF (§9)',
+            '<strong>6.</strong> Verify pending cases — Case Summary + Activities; note how released (§10)',
+            '<strong>7.</strong> Check bound-over cases — override NCA #2 if needed (§11)',
+            '<strong>8.</strong> Check probation — JIMS Display Sentence (KCPO) + TOMIS (state) (§12)',
+            '<strong>9.</strong> Check portal records — TOMIS, SOR, TWP, AES (§13)',
+            '<strong>10.</strong> Check registries — NCIC, Elder Abuse (§14)',
+            '<strong>11.</strong> Enter scores + comments on Assessment Entry screen (§14–15)',
+            '<strong>12.</strong> Click Finalize and file to correct folder color (§18)'
+          ]
+        }
+      ],
+      actions: [{ label: '← Back to Home', next: 'home', style: 'back' }]
+    }
+
+  }; // end TREE
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  STATE
+  // ═══════════════════════════════════════════════════════════════════
+  let current = 'start';
+  let history  = [];   // array of node IDs
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  NAVIGATION
+  // ═══════════════════════════════════════════════════════════════════
+  function go(nodeId) {
+    history.push(current);
+    current = nodeId;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function back() {
+    if (!history.length) return;
+    current = history.pop();
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function jumpTo(idx) {
+    current = history[idx];
+    history = history.slice(0, idx);
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function restart() {
+    current = 'home';
+    history = [];
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toggleBullet(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('done');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  RENDER
+  // ═══════════════════════════════════════════════════════════════════
+  function render() {
+    renderBreadcrumb();
+    const node = TREE[current];
+    if (!node) return;
+    const el = document.getElementById('content');
+
+    switch (node.type) {
+      case 'home':        el.innerHTML = renderHome(node);        break;
+      case 'start':       el.innerHTML = renderStart(node);       break;
+      case 'type-select': el.innerHTML = renderTypeSelect(node);  break;
+      case 'steps':       el.innerHTML = renderSteps(node);       break;
+      case 'info':        el.innerHTML = renderInfo(node);        break;
+      case 'guide':       el.innerHTML = renderGuide(node);       break;
+    }
+    // Update header subtitle
+    const meta = document.getElementById('header-meta');
+    if (meta) {
+      if (current === 'home') meta.textContent = 'GPS Procedures & Site Guide';
+      else if (current === 'training' || history.includes('training')) meta.textContent = 'Pretrial Assessment Training Guide';
+      else if (current === 'site_guide' || history.includes('site_guide')) meta.textContent = 'Pretrial SharePoint Site Guide';
+      else meta.textContent = 'GPS Monitoring — Alert Procedures';
+    }
+  }
+
+  function renderBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    if (!history.length) { bc.innerHTML = ''; return; }
+    let html = '';
+    history.forEach((id, idx) => {
+      const title = TREE[id] ? TREE[id].title : id;
+      const short = title.length > 30 ? title.slice(0, 28) + '…' : title;
+      html += `<span class="bc-link" onclick="jumpTo(${idx})">${short}</span>`;
+      html += '<span class="bc-sep">›</span>';
+    });
+    const cur = TREE[current];
+    if (cur) {
+      const ct = cur.title.length > 35 ? cur.title.slice(0, 33) + '…' : cur.title;
+      html += `<span class="bc-current">${ct}</span>`;
+    }
+    bc.innerHTML = html;
+  }
+
+  // ── Home node ────────────────────────────────────────────────────
+  function renderHome(node) {
+    let html = `<div class="card">
+      <div class="card-header">
+        <div class="card-title">${node.title}</div>
+        <div class="card-subtitle">${node.intro}</div>
+      </div>
+      <div class="card-body">
+        <div class="home-grid">`;
+    node.tiles.forEach(t => {
+      html += `<button class="home-tile" onclick="go('${t.next}')">
+        <span class="home-tile-icon">${t.icon}</span>
+        <div class="home-tile-label">${t.label}</div>
+        <div class="home-tile-desc">${t.desc}</div>
+        <div class="home-tile-cta">${t.cta}</div>
+      </button>`;
+    });
+    html += `</div></div></div>`;
+    return html;
+  }
+
+  // ── Guide node ───────────────────────────────────────────────────
+  function renderGuide(node) {
+    let html = `<div class="card">
+      <div class="card-header">
+        <span class="alert-badge ${node.badgeClass}">${node.badge}</span>
+        <div class="card-title">${node.title}</div>
+        <div class="card-subtitle">${node.subtitle}</div>
+      </div>
+      <div class="card-body">
+        <div class="guide-intro">${node.intro}</div>
+        <div class="guide-sections">`;
+
+    node.sections.forEach(sec => {
+      const isOpen = sec.open ? ' open' : '';
+      html += `<div class="guide-section">
+        <div class="guide-section-hdr" onclick="toggleSection('${sec.id}')">
+          <span>${sec.title}</span>
+          <span class="guide-chevron${isOpen}" id="chev-${sec.id}">▼</span>
+        </div>
+        <div class="guide-section-body${isOpen}" id="sec-${sec.id}">`;
+
+      if (sec.subsections) {
+        sec.subsections.forEach(sub => {
+          html += `<div class="guide-subsection">
+            <div class="guide-sub-title">${sub.title}</div>`;
+          if (sub.warning) {
+            html += `<div class="guide-warning">⚠ ${sub.warning}</div>`;
+          }
+          if (sub.bullets && sub.bullets.length) {
+            html += `<ul class="guide-bullets">`;
+            sub.bullets.forEach(b => { html += `<li>${b}</li>`; });
+            html += `</ul>`;
+          }
+          if (sub.code) {
+            html += `<div class="guide-code">`;
+            if (sub.code.label) html += `<span class="code-label">${sub.code.label}</span>`;
+            html += `<span class="code-value">${sub.code.value}</span>`;
+            if (sub.code.example) html += `\n<span class="code-example">${sub.code.example}</span>`;
+            html += `</div>`;
+          }
+          if (sub.table) {
+            html += `<div class="guide-table-wrap"><table class="guide-table">`;
+            if (sub.table.headers) {
+              html += `<thead><tr>`;
+              sub.table.headers.forEach(h => { html += `<th>${h}</th>`; });
+              html += `</tr></thead>`;
+            }
+            html += `<tbody>`;
+            sub.table.rows.forEach(row => {
+              html += `<tr>`;
+              row.forEach(cell => { html += `<td>${cell}</td>`; });
+              html += `</tr>`;
+            });
+            html += `</tbody></table></div>`;
+          }
+          if (sub.blockquote) {
+            html += `<div class="guide-blockquote">${sub.blockquote}</div>`;
+          }
+          if (sub.note) {
+            html += `<div class="guide-note">${sub.note}</div>`;
+          }
+          html += `</div>`;
+        });
+      } else {
+        if (sec.warning) {
+          html += `<div class="guide-warning">⚠ ${sec.warning}</div>`;
+        }
+        if (sec.bullets && sec.bullets.length) {
+          html += `<ul class="guide-bullets">`;
+          sec.bullets.forEach(b => { html += `<li>${b}</li>`; });
+          html += `</ul>`;
+        }
+        if (sec.table) {
+          html += `<div class="guide-table-wrap"><table class="guide-table">`;
+          if (sec.table.headers) {
+            html += `<thead><tr>`;
+            sec.table.headers.forEach(h => { html += `<th>${h}</th>`; });
+            html += `</tr></thead>`;
+          }
+          html += `<tbody>`;
+          sec.table.rows.forEach(row => {
+            html += `<tr>`;
+            row.forEach(cell => { html += `<td>${cell}</td>`; });
+            html += `</tr>`;
+          });
+          html += `</tbody></table></div>`;
+        }
+        if (sec.blockquote) {
+          html += `<div class="guide-blockquote">${sec.blockquote}</div>`;
+        }
+        if (sec.note) {
+          html += `<div class="guide-note">${sec.note}</div>`;
+        }
+      }
+
+      html += `</div></div>`; // section-body, section
+    });
+
+    html += `</div>`; // guide-sections
+    html += `<p class="check-hint" style="margin-top:16px;">Click any section header to expand or collapse it.</p>`;
+    html += `</div>`; // card-body
+
+    if (node.actions && node.actions.length) {
+      html += `<div class="actions-section"><div class="actions-grid">`;
+      node.actions.forEach(a => {
+        html += `<button class="action-btn ${a.style || 'primary'}" onclick="go('${a.next}')">${a.label}</button>`;
+      });
+      html += `</div></div>`;
+    }
+    html += `</div>`; // card
+    return html;
+  }
+
+  function toggleSection(id) {
+    const body = document.getElementById('sec-' + id);
+    const chev = document.getElementById('chev-' + id);
+    if (!body) return;
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+  }
+
+  // ── Start node ───────────────────────────────────────────────────
+  function renderStart(node) {
+    let html = `<div class="card">
+      <div class="card-header">
+        <div class="card-title">${node.title}</div>
+        <div class="card-subtitle">${node.subtitle}</div>
+      </div>
+      <div class="card-body">
+        <div class="choice-grid">`;
+
+    node.choices.forEach(c => {
+      html += `<button class="choice-card" onclick="go('${c.next}')">
+        <span class="choice-icon">${c.icon}</span>
+        <div class="choice-text">
+          <div class="choice-label">${c.label}</div>
+          <div class="choice-desc">${c.desc}</div>
+        </div>
+        <span class="choice-arrow">›</span>
+      </button>`;
+    });
+
+    html += `</div></div></div>`;
+    return html;
+  }
+
+  // ── Type-select node ─────────────────────────────────────────────
+  function renderTypeSelect(node) {
+    let html = `<div class="card">
+      <div class="card-header">
+        <span class="alert-badge ${node.badgeClass}">${node.badge}</span>
+        <div class="card-title">${node.title}</div>
+      </div>
+      <div class="card-body">
+        <div class="choice-grid">`;
+
+    node.choices.forEach(c => {
+      const urgCls = c.urgent ? ' urgent-card' : '';
+      html += `<button class="choice-card${urgCls}" onclick="go('${c.next}')">
+        <span class="choice-icon">${c.icon}</span>
+        <div class="choice-text">
+          <div class="choice-label">${c.label}</div>
+          <div class="choice-desc">${c.desc}</div>
+        </div>
+        <span class="choice-arrow">›</span>
+      </button>`;
+    });
+
+    html += `</div></div>
+      <div class="actions-section">
+        <div class="actions-grid">
+          <button class="action-btn back" onclick="back()">← Back</button>
+        </div>
+      </div>
+    </div>`;
+    return html;
+  }
+
+  // ── Steps node ───────────────────────────────────────────────────
+  function renderSteps(node) {
+    let html = `<div class="card"><div class="card-header">`;
+
+    if (node.badge) html += `<span class="alert-badge ${node.badgeClass}">${node.badge}</span>`;
+    html += `<div class="card-title">${node.title}</div>`;
+    if (node.subtitle) html += `<div class="card-subtitle">${node.subtitle}</div>`;
+    html += `</div><div class="card-body">`;
+
+    // Critical warning (before trigger)
+    if (node.criticalWarn) {
+      html += `<div class="warn-box critical"><span class="warn-icon">⚠️</span>${node.criticalWarn}</div>`;
+    }
+
+    // Trigger box
+    if (node.trigger) {
+      const urg = node.triggerUrgent ? ' urgent' : '';
+      html += `<div class="trigger-box${urg}"><strong>WHAT TRIGGERED THIS:</strong> ${node.trigger}</div>`;
+    }
+
+    // Steps
+    html += `<div class="steps-list">`;
+    node.steps.forEach((step, si) => {
+      const resCls = step.resolution ? ' resolution' : '';
+      html += `<div class="step-item${resCls}">
+        <div class="step-num">${step.num}</div>
+        <div class="step-content">
+          <div class="step-title">${step.title}</div>
+          <ul class="step-bullets">`;
+
+      step.bullets.forEach((b, bi) => {
+        const id = `bl_${current}_${si}_${bi}`;
+        let cls = b.cls || '';
+        // Auto-flag any bullet that involves calling the victim or dispatch
+        if (/call\s+(the\s+)?(victim|dispatch)|welfare\s+check|CALL\s+(THE\s+)?VICTIM|CALL\s+DISPATCH/i.test(b.text)) {
+          cls = (cls ? cls + ' ' : '') + 'call-urgent';
+        }
+        html += `<li id="${id}" class="${cls.trim()}" onclick="toggleBullet('${id}')">${b.text}</li>`;
+      });
+
+      html += `</ul></div></div>`;
+    });
+    html += `</div>`;
+
+    // Trailing warning
+    if (node.warning) {
+      html += `<div class="warn-box" style="margin-top:16px;"><span class="warn-icon">⚠️</span>${node.warning}</div>`;
+    }
+
+    html += `<p class="check-hint">Tip: click any bullet point to mark it done ✓</p>`;
+    html += `</div>`; // card-body
+
+    // Actions
+    if (node.actions && node.actions.length) {
+      html += `<div class="actions-section">`;
+      if (node.actionsLabel) html += `<div class="actions-label">${node.actionsLabel}</div>`;
+      html += `<div class="actions-grid">`;
+      node.actions.forEach(a => {
+        html += `<button class="action-btn ${a.style || 'primary'}" onclick="go('${a.next}')">${a.label}</button>`;
+      });
+      html += `</div></div>`;
+    }
+
+    html += `</div>`; // card
+    return html;
+  }
+
+  // ── Info node ────────────────────────────────────────────────────
+  function renderInfo(node) {
+    let html = `<div class="card">
+      <div class="card-header">
+        <span class="alert-badge badge-info">Info</span>
+        <div class="card-title">${node.title}</div>
+      </div>
+      <div class="card-body">
+        <div class="info-content">
+          <p>${node.content}</p>
+          <ul class="info-bullets">`;
+
+    (node.bullets || []).forEach(b => {
+      html += `<li>${b}</li>`;
+    });
+
+    html += `</ul></div></div>`;
+
+    if (node.actions && node.actions.length) {
+      html += `<div class="actions-section"><div class="actions-grid">`;
+      node.actions.forEach(a => {
+        html += `<button class="action-btn ${a.style || 'primary'}" onclick="go('${a.next}')">${a.label}</button>`;
+      });
+      html += `</div></div>`;
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+  // ── Reference bar toggle ─────────────────────────────────────────
+  function toggleRefBar() {
+    const bar   = document.getElementById('ref-bar');
+    const arrow = document.getElementById('ref-arrow');
+    const open  = !bar.classList.contains('hidden');
+    bar.classList.toggle('hidden', open);
+    arrow.classList.toggle('open', !open);
+    arrow.textContent = open ? '▼' : '▲';
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────
+  current = 'home';
+  render();
+  </script>
+</body>
+</html>

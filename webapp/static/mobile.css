@@ -1,0 +1,389 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Mobile / iPhone responsive overrides.
+   Loaded last so it wins. Targets ≤ 760px (most phones in portrait).
+   Goals: hamburger nav, full-screen drawer/palette, 44px touch targets,
+   16px inputs (no iOS zoom), safe-area insets for notch + home bar.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Make the page respect the iPhone notch + home indicator. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* iOS zooms inputs whose font-size is < 16px. Force everything to 16px on
+   mobile to suppress the auto-zoom-on-focus jump. */
+@media (max-width: 760px) {
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+  input::placeholder, textarea::placeholder { font-size: 14px; }
+}
+
+/* ───── Hamburger button (always present in DOM, only shown on mobile) ───── */
+.kh-hamburger {
+  display: none;
+  background: transparent;
+  color: var(--ink, #fff);
+  border: 1px solid #444;
+  border-radius: 4px;
+  width: 38px;
+  height: 38px;
+  font-size: 18px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .kh-hamburger { display: inline-flex; }
+}
+
+/* ───── Mobile masthead layout ───── */
+@media (max-width: 760px) {
+  .masthead {
+    padding: 10px 14px env(safe-area-inset-top);
+    padding-top: max(env(safe-area-inset-top), 10px);
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .mast-brand { gap: 10px; flex: 1; min-width: 0; }
+  .mast-mark { width: 32px; height: 32px; font-size: 18px; }
+  .mast-h { font-size: 16px; }
+  .mast-kicker { font-size: 9px; }
+
+  /* Hide top-nav links by default on mobile — they live in the slide-in panel. */
+  .topnav { display: none !important; }
+
+  /* Hide the user-tag + dot on mobile — saves space; user info is in the menu. */
+  .mast-meta { display: none !important; }
+
+  /* Tools row: only icons on mobile (no "Search" word). */
+  .mast-tools { gap: 4px; }
+  .kh-search-trigger {
+    padding: 6px 10px;
+    font-size: 0;     /* hide the "⌕ Search" label */
+  }
+  .kh-search-trigger::before {
+    content: "⌕";
+    font-size: 16px;
+  }
+  .kh-search-trigger > span,
+  .kh-search-trigger .kh-palette-kbd { display: none; }
+  .kh-search-trigger { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; }
+  .kh-icon-btn { width: 38px; height: 38px; }
+}
+
+/* ───── Mobile slide-in nav menu ───── */
+.kh-mobile-menu-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 8500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s;
+}
+.kh-mobile-menu-scrim.open { opacity: 1; pointer-events: auto; }
+
+.kh-mobile-menu {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: min(280px, 80vw);
+  background: #1c1c1c;
+  color: #fff;
+  border-right: 1px solid #333;
+  z-index: 8501;
+  transform: translateX(-100%);
+  transition: transform .22s cubic-bezier(.4, 0, .2, 1);
+  padding: 24px 0 max(env(safe-area-inset-bottom), 24px) 0;
+  padding-top: max(env(safe-area-inset-top), 24px);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.kh-mobile-menu.open { transform: translateX(0); }
+
+.kh-mobile-menu-h {
+  padding: 0 22px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 12px;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 18px;
+  color: #fff;
+}
+.kh-mobile-menu-h em { font-style: italic; color: #f4e5c1; font-weight: 400; }
+.kh-mobile-menu-h .who {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #888;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+  display: block;
+}
+.kh-mobile-menu a {
+  display: block;
+  padding: 14px 22px;
+  color: #e8e8e8;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-left: 3px solid transparent;
+}
+.kh-mobile-menu a:active,
+.kh-mobile-menu a:hover {
+  background: #2a2a2a;
+  border-left-color: #a8751a;
+  color: #f4e5c1;
+}
+.kh-mobile-menu a.active {
+  background: #0f3a66;
+  border-left-color: #f4e5c1;
+  color: #f4e5c1;
+}
+
+/* Light theme variant */
+html[data-theme="light"] .kh-mobile-menu {
+  background: #fdfaf1 !important;
+  color: #0e1a2b !important;
+  border-color: #d9d0b7 !important;
+}
+html[data-theme="light"] .kh-mobile-menu-h { color: #0e1a2b !important; border-color: #d9d0b7 !important; }
+html[data-theme="light"] .kh-mobile-menu-h em { color: #0f3a66 !important; }
+html[data-theme="light"] .kh-mobile-menu a { color: #0e1a2b !important; }
+
+/* ───── Drawer goes full-screen on mobile ───── */
+@media (max-width: 760px) {
+  .kh-drawer {
+    width: 100vw;
+    border-left: none;
+    padding-bottom: max(env(safe-area-inset-bottom), 8px);
+  }
+  .kh-drawer-head {
+    padding: 14px 18px 12px;
+    padding-top: max(env(safe-area-inset-top), 14px);
+  }
+  .kh-drawer-head .name { font-size: 18px; }
+  .kh-drawer-pin {
+    top: 10px;
+    right: 50px;
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+  .kh-drawer-pin span { font-size: 14px; }
+  .kh-drawer-close {
+    width: 38px; height: 38px;  /* Apple HIG 44px-ish */
+    font-size: 22px;
+  }
+  .kh-drawer-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .kh-drawer-tab {
+    flex: none;
+    min-width: 90px;
+    padding: 14px 12px;       /* taller for touch */
+    font-size: 11px;
+  }
+  .kh-drawer-body { padding: 18px 14px; }
+  .kh-kv {
+    grid-template-columns: 1fr;       /* stack key + value */
+    gap: 0;
+  }
+  .kh-kv .k {
+    padding: 10px 0 2px;
+    font-size: 9px;
+  }
+  .kh-kv .v {
+    padding: 8px 10px;
+    min-height: 36px;
+    font-size: 14px;
+    background: #2a2a2a;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+  html[data-theme="light"] .kh-kv .v {
+    background: #f5efde !important;
+  }
+  .kh-mini-table { font-size: 11px; }
+  .kh-mini-table th, .kh-mini-table td { padding: 6px 4px; }
+  .kh-stat-strip .stat .n { font-size: 16px; }
+  .kh-drawer-foot {
+    padding: 10px 14px;
+    padding-bottom: max(env(safe-area-inset-bottom), 10px);
+    flex-wrap: wrap;
+  }
+  .kh-drawer-foot .btn { padding: 12px 16px; flex: 1; text-align: center; }
+}
+
+/* ───── Command palette goes full-width on mobile ───── */
+@media (max-width: 760px) {
+  .kh-palette-scrim { padding-top: max(env(safe-area-inset-top), 20px); align-items: stretch; }
+  .kh-palette {
+    width: 100vw;
+    max-height: calc(100vh - max(env(safe-area-inset-top), 20px));
+    border-radius: 0;
+    border: none;
+  }
+  .kh-palette-input { padding: 18px 0; font-size: 18px !important; }
+  .kh-palette-item {
+    grid-template-columns: 1fr auto;
+    padding: 14px 16px;     /* taller for touch */
+    font-size: 14px;
+  }
+  .kh-palette-item .pill { font-size: 9px; }
+  .kh-palette-item .meta + .meta { display: none; }  /* fewer columns */
+}
+
+/* ───── Popovers (alerts, recently viewed) ───── */
+@media (max-width: 760px) {
+  .kh-pop {
+    position: fixed !important;
+    top: auto !important;
+    right: 8px !important;
+    left: 8px !important;
+    bottom: max(env(safe-area-inset-bottom), 8px) !important;
+    max-width: none;
+    max-height: 70vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .kh-pop-row { padding: 16px; }   /* bigger touch target */
+}
+
+/* ───── Help overlay ───── */
+@media (max-width: 760px) {
+  .kh-help-panel {
+    width: 96vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 22px 18px;
+  }
+  .kh-help-row { grid-template-columns: 1fr; gap: 4px; padding: 6px 0; border-bottom: 1px solid #333; }
+  .kh-help-row kbd { justify-self: start; }
+}
+
+/* ───── My Day, Court Calendar, Violations: stack on mobile ───── */
+@media (max-width: 760px) {
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .alert-strip { grid-template-columns: repeat(2, 1fr) !important; }
+  .alert-card .n { font-size: 24px; }
+  .case-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 14px 12px;
+  }
+  .case-row > * { width: 100%; }
+  .v-row, .s-row, .list-row {
+    grid-template-columns: 1fr !important;
+    gap: 4px !important;
+    padding: 14px 8px !important;
+  }
+  .filter-row { flex-wrap: wrap; }
+  .filter-row select { flex: 1; min-width: 120px; }
+}
+
+/* ───── Court calendar: turn month grid into a vertical agenda on mobile ───── */
+@media (max-width: 760px) {
+  .cal-grid {
+    grid-template-columns: 1fr;       /* one column = one day per row */
+  }
+  .cal-head {
+    display: none;                     /* no Sun/Mon row */
+  }
+  .cal-cell {
+    flex-direction: row;
+    align-items: center;
+    min-height: 0;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .cal-cell.muted { display: none; }   /* hide leading blanks entirely */
+  .cal-cell .date {
+    font-size: 18px;
+    font-weight: 700;
+    min-width: 36px;
+  }
+  .cal-event {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: normal;
+  }
+}
+
+/* ───── Forms (referrals, log activity, edit, etc.) ───── */
+@media (max-width: 760px) {
+  .form-grid, .field-row {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .form-grid .full { grid-column: 1 !important; }
+  .form-card, .lookup-card, .selected-card, .card, .edit-card {
+    padding: 16px 14px !important;
+  }
+  .lookup-row {
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    padding: 12px;
+  }
+  .lookup-row > .meta + .meta + .meta { display: none; }   /* trim middle metas */
+  .submit-row { flex-direction: column; align-items: stretch; }
+  .submit-row button, .form-actions .kh-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 14px;
+  }
+  .checkbox { padding: 10px 0; min-height: 44px; align-items: center; }
+}
+
+/* ───── Dashboard ───── */
+@media (max-width: 760px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .stat-card { padding: 14px !important; }
+  .stat-card .number { font-size: 20px !important; }
+  .app-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .app-card { padding: 18px !important; }
+  .container, .page { padding: 16px !important; }
+}
+
+/* ───── Tables in the case-management mockup: horizontal scroll ───── */
+@media (max-width: 760px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  .kh-mini-table { display: table; white-space: normal; }   /* drawer tables stay normal */
+}
+
+/* ───── General touch-friendly tweaks ───── */
+@media (max-width: 760px) {
+  /* All buttons / links inside cards: at least 44px tall (Apple HIG) */
+  button, .kh-btn, .app-button, .badge, a.kh-btn-ghost {
+    min-height: 36px;
+  }
+  /* Remove tap highlight blue flash on iOS */
+  a, button, [role="button"] {
+    -webkit-tap-highlight-color: rgba(168, 117, 26, 0.2);
+  }
+  /* Smooth scrolling everywhere */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Hide the [data-idn] dashed outline on mobile — it's noisy and double-tap is the gesture */
+  [data-idn]:hover { outline: none; }
+}
+
+/* ───── Bottom action bar (only on mobile, only on certain pages) ───── */
+.kh-mobile-bottom {
+  display: none;
+}
+@media (max-width: 760px) {
+  /* Reserved for a future pinned bottom nav on My Day etc. — no-op for now. */
+}

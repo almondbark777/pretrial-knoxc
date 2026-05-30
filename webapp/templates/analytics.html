@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - Knox County Pre-Trial Office</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+// Injected by FastAPI / Jinja
+window.__KH222 = {
+    analytics: {{ analytics|tojson|safe }},
+    stats:     {{ stats|tojson|safe }}
+};
+</script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+
+        header {
+            background-color: #1a3a6b;
+            color: white;
+            padding: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header-top {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header-top h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        nav {
+            background-color: #152d54;
+            padding: 0;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav li {
+            margin: 0;
+        }
+
+        nav a {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.95rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        nav a:hover {
+            background-color: rgba(255,255,255,0.05);
+            color: #fff;
+        }
+
+        nav a.active {
+            border-bottom-color: #4a9eff;
+            background-color: rgba(74,158,255,0.1);
+        }
+
+        main {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1a3a6b;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-trend {
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .kpi-trend.positive {
+            color: #28a745;
+        }
+
+        .kpi-trend.neutral {
+            color: #666;
+        }
+
+        .trend-arrow {
+            font-size: 1.2rem;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a3a6b;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e8ecf1;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 1rem;
+        }
+
+        .insights-section {
+            margin-bottom: 2rem;
+        }
+
+        .insights-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1a3a6b;
+            margin-bottom: 1.5rem;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .insight-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-left: 4px solid #4a9eff;
+        }
+
+        .insight-card.alert {
+            border-left-color: #f39c12;
+        }
+
+        .insight-card.success {
+            border-left-color: #28a745;
+        }
+
+        .insight-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #999;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .insight-text {
+            font-size: 0.95rem;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .export-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            background-color: #1a3a6b;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #152d54;
+        }
+
+        .btn.secondary {
+            background-color: #6c757d;
+        }
+
+        .btn.secondary:hover {
+            background-color: #5a6268;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            nav ul {
+                flex-direction: column;
+            }
+
+            nav a {
+                border-bottom: none;
+                border-left: 3px solid transparent;
+                padding-left: 1.5rem;
+            }
+
+            nav a.active {
+                border-left-color: #4a9eff;
+                border-bottom: none;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            .kpi-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media print {
+            body {
+                background-color: white;
+            }
+
+            header {
+                margin: -2rem -2rem 2rem -2rem;
+            }
+
+            .kpi-card, .chart-card, .insight-card {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+
+  <!-- KH-THEME-START — shared chrome injected by _patch_templates.py -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <h1>Knox County Pre-Trial Office</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="pretrial_app.html">Pre-Trial App</a></li>
+                <li><a href="client_profile.html">Client Profile</a></li>
+                <li><a href="violations.html">Violations</a></li>
+                <li><a href="analytics.html" class="active">Analytics</a></li>
+                <li><a href="gps_alert_procedures.html">GPS Procedures</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <h2 style="color: #1a3a6b; margin-bottom: 1.5rem; font-size: 1.5rem;">Dashboard Overview</h2>
+
+        <!-- KPI Row -->
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-label">Open Cases</div>
+                <div class="kpi-value">2,743</div>
+                <div class="kpi-trend positive">
+                    <span class="trend-arrow">→</span>
+                    <span>Stable</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Active GPS Cases</div>
+                <div class="kpi-value">339</div>
+                <div class="kpi-trend neutral">
+                    <span class="trend-arrow">→</span>
+                    <span>9.8% of total</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Monthly Check-Ins</div>
+                <div class="kpi-value">1,692</div>
+                <div class="kpi-trend positive">
+                    <span class="trend-arrow">↑</span>
+                    <span>Up 8% YoY</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Total Fees Collected</div>
+                <div class="kpi-value">$369.7K</div>
+                <div class="kpi-trend positive">
+                    <span class="trend-arrow">↑</span>
+                    <span>99.5% from GPS</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Buttons -->
+        <div class="export-row">
+            <button class="btn" onclick="window.print()">Export to PDF</button>
+            <button class="btn secondary" onclick="exportToExcel()">Export to Excel</button>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <!-- Compliance Rate Trend -->
+            <div class="chart-card">
+                <div class="chart-title">Compliance Rate Trend (12 Months)</div>
+                <div class="chart-container">
+                    <canvas id="complianceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Officer Caseload -->
+            <div class="chart-card">
+                <div class="chart-title">Officer Open Caseloads</div>
+                <div class="chart-container">
+                    <canvas id="caseloadChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Supervision Level Distribution -->
+            <div class="chart-card">
+                <div class="chart-title">Supervision Level Distribution</div>
+                <div class="chart-container">
+                    <canvas id="supervisionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Check-In Method Split -->
+            <div class="chart-card">
+                <div class="chart-title">Check-In Method Split</div>
+                <div class="chart-container">
+                    <canvas id="checkinChart"></canvas>
+                </div>
+            </div>
+
+            <!-- GPS Case Breakdown -->
+            <div class="chart-card">
+                <div class="chart-title">GPS Case Types</div>
+                <div class="chart-container">
+                    <canvas id="gpsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Payment Breakdown -->
+            <div class="chart-card">
+                <div class="chart-title">Payment Type Breakdown</div>
+                <div class="chart-container">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Insights Section -->
+        <div class="insights-section">
+            <h3 class="insights-title">Key Insights & Alerts</h3>
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <div class="insight-label">Caseload Distribution</div>
+                    <div class="insight-text">Level 3 defendants represent the largest supervision tier at 39.7% of open cases (1,089 cases), requiring intensive monitoring resources.</div>
+                </div>
+
+                <div class="insight-card alert">
+                    <div class="insight-label">GPS Notification Alert</div>
+                    <div class="insight-text">338 of 339 GPS cases (99.7%) have not had the DA notified. Immediate action required to ensure proper chain of custody documentation.</div>
+                </div>
+
+                <div class="insight-card success">
+                    <div class="insight-label">Check-In Efficiency</div>
+                    <div class="insight-text">Phone check-ins (900 cases, 53%) now exceed in-person visits (792 cases, 47%), suggesting staffing and scheduling optimization opportunities.</div>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-label">Revenue Analysis</div>
+                    <div class="insight-text">GPS monitoring fees account for 99.5% of all fee revenue ($367,560 of $369,668), with minimal PTR fee collection suggesting potential billing or eligibility issues.</div>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-label">Caseload Balance</div>
+                    <div class="insight-text">Officer caseloads range from 259 to 368 cases. Consider redistribution to equalize workload, with Kathy Jones carrying 42% more than Will Torbett.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const chartColors = {
+            navy: '#1a3a6b',
+            blue: '#4a9eff',
+            teal: '#17a2b8',
+            amber: '#f39c12',
+            success: '#28a745',
+            danger: '#dc3545'
+        };
+
+        // 1. Compliance Rate Trend Chart
+        const complianceCtx = document.getElementById('complianceChart').getContext('2d');
+        new Chart(complianceCtx, {
+            type: 'line',
+            data: {
+                labels: (window.__KH222.analytics.checkin_trend||[]).map(r => r.month),
+                datasets: [{
+                    label: 'Check-ins per month',
+                    data: (window.__KH222.analytics.checkin_trend||[]).map(r => r.count),
+                    borderColor: chartColors.blue,
+                    backgroundColor: 'rgba(74, 158, 255, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: chartColors.blue,
+                    pointBorderColor: '#fff',
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: '#333' }
+                    }
+                },
+                scales: {
+                    y: {
+                        // y-axis auto-scales
+                        ticks: { color: '#666' },
+                        grid: { color: '#e8ecf1' }
+                    },
+                    x: {
+                        ticks: { color: '#666' },
+                        grid: { color: '#e8ecf1' }
+                    }
+                }
+            }
+        });
+
+        // 2. Officer Caseload Chart (Horizontal Bar)
+        const caseloadCtx = document.getElementById('caseloadChart').getContext('2d');
+        new Chart(caseloadCtx, {
+            type: 'bar',
+            data: {
+                labels: (window.__KH222.analytics.officers||[]).map(r => r.name),
+                datasets: [{
+                    label: 'Open Cases',
+                    data: (window.__KH222.analytics.officers||[]).map(r => r.count),
+                    backgroundColor: [
+                        chartColors.navy,
+                        '#2d5a99',
+                        '#4073b8',
+                        chartColors.blue,
+                        chartColors.teal,
+                        '#1fa0be',
+                        '#2ba8c6',
+                        chartColors.amber,
+                        '#f5b041'
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#666' },
+                        grid: { color: '#e8ecf1' }
+                    },
+                    y: {
+                        ticks: { color: '#666' }
+                    }
+                }
+            }
+        });
+
+        // 3. Supervision Level Distribution (Doughnut)
+        const supervisionCtx = document.getElementById('supervisionChart').getContext('2d');
+        new Chart(supervisionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: (window.__KH222.analytics.levels||[]).map(r => `Level ${r.level} (${r.count.toLocaleString()})`),
+                datasets: [{
+                    data: (window.__KH222.analytics.levels||[]).map(r => r.count),
+                    backgroundColor: [
+                        chartColors.blue,
+                        chartColors.teal,
+                        chartColors.amber
+                    ],
+                    borderColor: 'white',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#333', padding: 15 }
+                    }
+                }
+            }
+        });
+
+        // 4. Check-In Method Split (Doughnut)
+        const checkinCtx = document.getElementById('checkinChart').getContext('2d');
+        new Chart(checkinCtx, {
+            type: 'doughnut',
+            data: {
+                labels: (window.__KH222.analytics.checkins||[]).map(r => `${r.type} (${r.count.toLocaleString()})`),
+                datasets: [{
+                    data: (window.__KH222.analytics.checkins||[]).map(r => r.count),
+                    backgroundColor: [
+                        chartColors.navy,
+                        chartColors.blue
+                    ],
+                    borderColor: 'white',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#333', padding: 15 }
+                    }
+                }
+            }
+        });
+
+        // 5. GPS Case Types (Doughnut)
+        const gpsCtx = document.getElementById('gpsChart').getContext('2d');
+        new Chart(gpsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: (window.__KH222.analytics.gps_types||[]).map(r => `${r.type} (${r.count.toLocaleString()})`),
+                datasets: [{
+                    data: (window.__KH222.analytics.gps_types||[]).map(r => r.count),
+                    backgroundColor: [
+                        chartColors.danger,
+                        chartColors.amber,
+                        chartColors.success
+                    ],
+                    borderColor: 'white',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#333', padding: 15 }
+                    }
+                }
+            }
+        });
+
+        // 6. Payment Breakdown (Bar Chart)
+        const paymentCtx = document.getElementById('paymentChart').getContext('2d');
+        new Chart(paymentCtx, {
+            type: 'bar',
+            data: {
+                labels: (window.__KH222.analytics.payments||[]).map(r => r.type),
+                datasets: [{
+                    label: 'Amount Collected ($)',
+                    data: (window.__KH222.analytics.payments||[]).map(r => r.total),
+                    backgroundColor: [
+                        chartColors.blue,
+                        chartColors.teal,
+                        chartColors.amber
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, labels: { color: '#333' } }
+                },
+                scales: {
+                    y: {
+                        ticks: {
+                            color: '#666',
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        },
+                        grid: { color: '#e8ecf1' }
+                    },
+                    x: {
+                        ticks: { color: '#666' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Export to Excel function
+        function exportToExcel() {
+            alert('Excel export feature coming soon! Use the PDF export option or contact IT for advanced reporting.');
+        }
+    </script>
+</body>
+</html>

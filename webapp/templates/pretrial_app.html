@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knox County Pre-Trial — Case Management</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#1a3a6b;--accent:#2563eb;--green:#16a34a;--red:#dc2626;--amber:#d97706;--purple:#7c3aed;--bg:#f0f4f8}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:#1f2937;min-height:100vh}
+
+.header{background:var(--navy);color:#fff;padding:11px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.header h1{font-size:15px;font-weight:700}
+.header p{font-size:11px;color:#93c5fd;margin-top:1px}
+.header-badge{margin-left:auto;background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.live-dot{width:7px;height:7px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.subnav{background:#0f2548;display:flex;padding:0 20px;overflow-x:auto}
+.snb{padding:9px 16px;font-size:12px;font-weight:600;color:#93c5fd;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+.snb:hover{color:#fff}.snb.active{color:#fff;border-bottom-color:#60a5fa}
+.nb{display:inline-block;background:#ef4444;color:#fff;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:4px}
+
+.stat-bar{display:grid;gap:10px;padding:12px 20px;background:#fff;border-bottom:1px solid #e5e7eb}
+.stat-bar.cols5{grid-template-columns:repeat(5,1fr)}
+.stat-bar.cols4{grid-template-columns:repeat(4,1fr)}
+.stat{border-left:4px solid #e5e7eb;padding:7px 12px;border-radius:0 6px 6px 0}
+.stat.g{border-color:var(--green)}.stat.r{border-color:var(--red)}.stat.b{border-color:var(--accent)}.stat.a{border-color:var(--amber)}.stat.p{border-color:var(--purple)}
+.sn{font-size:22px;font-weight:800;color:#111;line-height:1}.sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin-top:2px}
+
+.toolbar{padding:10px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#f8fafc;border-bottom:1px solid #e5e7eb}
+.sw{flex:1;min-width:180px;position:relative}
+.si{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:13px;pointer-events:none}
+.sinp{width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:7px 9px 7px 30px;font-size:12px;outline:none;background:#fff;transition:border-color .15s}
+.sinp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+select{border:1.5px solid #d1d5db;border-radius:8px;padding:6px 9px;font-size:12px;background:#fff;outline:none;color:#374151;cursor:pointer}
+select:focus{border-color:var(--accent)}
+.cl{font-size:12px;color:#6b7280;white-space:nowrap}
+.btn{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #d1d5db;background:#fff;color:#374151}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+
+.table-wrap{overflow-x:auto;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;background:#f9fafb;border-bottom:2px solid #e5e7eb;cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{color:var(--accent)}
+tbody tr{border-bottom:1px solid #f3f4f6;cursor:pointer;transition:background .1s}
+tbody tr:hover{background:#eff6ff}
+tbody td{padding:7px 12px;vertical-align:middle}
+.nc{font-weight:600;color:#111}.ns{font-size:10px;color:#6b7280;font-weight:400;margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.pill::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.po{background:#dcfce7;color:#15803d}.pc{background:#f3f4f6;color:#6b7280}
+.pf{background:#fee2e2;color:#b91c1c}.pm{background:#fef3c7;color:#92400e}
+.pg{background:#ede9fe;color:#6d28d9}
+.lv{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700}
+.l1{background:#dcfce7;color:#15803d}.l2{background:#fef3c7;color:#92400e}.l3{background:#fee2e2;color:#b91c1c}
+.nd{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+.muted{color:#9ca3af;font-style:italic;font-size:11px}
+
+.pgn{display:flex;align-items:center;gap:5px;padding:10px 20px;background:#fff;border-top:1px solid #e5e7eb;justify-content:center;flex-wrap:wrap}
+.pb{padding:4px 9px;border:1.5px solid #d1d5db;border-radius:6px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#374151;min-width:30px;text-align:center}
+.pb:hover{border-color:var(--accent);color:var(--accent)}.pb.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pi{font-size:11px;color:#6b7280;margin:0 6px}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mh{background:var(--navy);color:#fff;padding:15px 18px;border-radius:12px 12px 0 0;display:flex;align-items:flex-start;gap:10px}
+.mt{flex:1}.mt h2{font-size:15px;font-weight:700}.mt p{font-size:11px;color:#93c5fd;margin-top:2px}
+.mc{background:rgba(255,255,255,.15);border:none;color:#fff;width:26px;height:26px;border-radius:5px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mtabs{display:flex;border-bottom:1px solid #e5e7eb;background:#f9fafb}
+.mtab{padding:9px 14px;font-size:12px;font-weight:600;color:#6b7280;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent}
+.mtab:hover{color:#374151}.mtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.mb{padding:16px;overflow-y:auto;flex:1}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px}
+.df label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;display:block;margin-bottom:2px}
+.df .v{font-size:12px;font-weight:600;color:#111}
+.st{width:100%;border-collapse:collapse;font-size:12px}
+.st th{padding:6px 9px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;background:#f9fafb;border-bottom:1.5px solid #e5e7eb}
+.st td{padding:7px 9px;border-bottom:1px solid #f3f4f6;color:#374151}
+.st tr:last-child td{border-bottom:none}
+.se{text-align:center;padding:20px;color:#9ca3af;font-size:12px;font-style:italic}
+.mf{padding:11px 18px;border-top:1px solid #e5e7eb;display:flex;gap:6px;justify-content:flex-end;border-radius:0 0 12px 12px}
+
+.view{display:none}.view.active{display:block}
+
+/* Officer cards */
+.og{padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.oc{background:#fff;border-radius:10px;padding:13px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:4px solid var(--accent);cursor:pointer;transition:box-shadow .15s}
+.oc:hover{box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.oc h3{font-size:13px;font-weight:700;color:#111;margin-bottom:8px}
+.osr{display:flex;gap:8px;margin-bottom:6px}
+.oms{flex:1;text-align:center;background:#f9fafb;border-radius:6px;padding:5px 3px}
+.oms .n{font-size:17px;font-weight:800;color:#111}.oms .l{font-size:9px;font-weight:700;text-transform:uppercase;color:#6b7280}
+.obr{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:11px}
+.obbg{flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.obf{height:6px;background:linear-gradient(90deg,#2563eb,#60a5fa);border-radius:3px}
+
+/* GPS */
+.gf{padding:10px 20px;display:flex;gap:7px;flex-wrap:wrap;background:#f8fafc;border-bottom:1px solid #e5e7eb}
+.gpf{padding:4px 12px;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;background:#fff;color:#374151}
+.gpf.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.gpf.cust.active{background:var(--red);border-color:var(--red)}
+.gpf.alli.active{background:var(--amber);border-color:var(--amber)}
+.gpf.scrm.active{background:var(--purple);border-color:var(--purple)}
+.gpf.noda.active{background:#7f1d1d;border-color:#7f1d1d}
+
+/* Check-ins */
+.cis{display:flex;gap:10px;padding:12px 20px;background:#fff;border-bottom:1px solid #e5e7eb}
+.cs{flex:1;text-align:center;background:#f9fafb;border-radius:8px;padding:9px}
+.cs .n{font-size:22px;font-weight:800;color:#111}.cs .l{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+</style>
+
+  <!-- KH-THEME-START — shared chrome injected by _patch_templates.py -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+</head>
+<body>
+
+<div class="header">
+  <div style="font-size:24px">🏛️</div>
+  <div><h1>Knox County Pre-Trial — Case Management</h1><p>Functional Prototype · April 2026 SharePoint Export</p></div><div style="margin-left:auto"><a href="/client_profile.html" style="color:#fff;text-decoration:none;background:#2563eb;padding:6px 14px;border-radius:6px;font-weight:600;font-size:14px">🪪 Client Profile</a></div>
+  <div class="header-badge"><div class="live-dot"></div><span id="total-badge">Loading...</span></div>
+</div>
+
+<div class="subnav">
+  <button class="snb active" onclick="showView('def')">📋 Defendants</button>
+  <button class="snb" onclick="showView('off')">👤 Officers</button>
+  <button class="snb" onclick="showView('gps')">📡 GPS <span class="nb" id="gps-nb"></span></button>
+  <button class="snb" onclick="showView('ci')">✅ Check-Ins</button>
+</div>
+
+<!-- DEFENDANT VIEW -->
+<div id="view-def" class="view active">
+  <div class="stat-bar cols5">
+    <div class="stat g"><div class="sn" id="s-open"></div><div class="sl">Open Cases</div></div>
+    <div class="stat r"><div class="sn" id="s-closed"></div><div class="sl">Closed</div></div>
+    <div class="stat b"><div class="sn" id="s-gps"></div><div class="sl">GPS Active</div></div>
+    <div class="stat a"><div class="sn" id="s-ci"></div><div class="sl">Check-Ins</div></div>
+    <div class="stat p"><div class="sn" id="s-pay"></div><div class="sl">Fees Collected</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="sw"><span class="si">🔍</span><input class="sinp" id="def-search" placeholder="Search name, IDN, case #, officer..." oninput="defFilter()"></div>
+    <select id="def-status" onchange="defFilter()">
+      <option value="">All Statuses</option><option value="Open">Open</option><option value="Closed">Closed</option>
+    </select>
+    <select id="def-officer" onchange="defFilter()"><option value="">All Officers</option></select>
+    <select id="def-level" onchange="defFilter()">
+      <option value="">All Levels</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option>
+    </select>
+    <select id="def-charge" onchange="defFilter()">
+      <option value="">All Charges</option><option value="Felony">Felony</option><option value="Misdemeanor">Misdemeanor</option>
+    </select>
+    <select id="def-gps" onchange="defFilter()">
+      <option value="">GPS: All</option><option value="y">Has GPS</option><option value="n">No GPS</option>
+    </select>
+    <span class="cl" id="def-count"></span>
+    <button class="btn" onclick="defClear()">✕ Clear</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th onclick="defSort('name')">Defendant <span id="sh-name"></span></th>
+        <th onclick="defSort('idn')">IDN <span id="sh-idn"></span></th>
+        <th onclick="defSort('status')">Status <span id="sh-status"></span></th>
+        <th onclick="defSort('level')">Lvl <span id="sh-level"></span></th>
+        <th onclick="defSort('chargeType')">Charge <span id="sh-chargeType"></span></th>
+        <th onclick="defSort('officer')">Officer <span id="sh-officer"></span></th>
+        <th onclick="defSort('referral')">Referral <span id="sh-referral"></span></th>
+        <th>Records</th>
+      </tr></thead>
+      <tbody id="def-tbody"></tbody>
+    </table>
+  </div>
+  <div class="pgn" id="def-pgn"></div>
+</div>
+
+<!-- OFFICER VIEW -->
+<div id="view-off" class="view">
+  <div class="og" id="off-grid"></div>
+</div>
+
+<!-- GPS VIEW -->
+<div id="view-gps" class="view">
+  <div class="stat-bar cols4">
+    <div class="stat r"><div class="sn" id="gs-cust"></div><div class="sl">In Custody</div></div>
+    <div class="stat a"><div class="sn" id="gs-alli"></div><div class="sl">Allied</div></div>
+    <div class="stat p"><div class="sn" id="gs-scrm"></div><div class="sl">SCRAM</div></div>
+    <div class="stat r"><div class="sn" id="gs-noda"></div><div class="sl">⚠ DA Not Emailed</div></div>
+  </div>
+  <div class="gf">
+    <button class="gpf active" onclick="gpsFilter('all',this)">All</button>
+    <button class="gpf cust" onclick="gpsFilter('In Custody',this)">In Custody</button>
+    <button class="gpf alli" onclick="gpsFilter('Allied',this)">Allied</button>
+    <button class="gpf scrm" onclick="gpsFilter('SCRAM',this)">SCRAM</button>
+    <button class="gpf noda" onclick="gpsFilter('noda',this)" style="border-color:#dc2626;color:#dc2626">⚠ DA Not Emailed</button>
+    <button class="gpf" onclick="gpsFilter('novict',this)" style="border-color:#d97706;color:#d97706">Victim Not Confirmed</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Defendant</th><th>IDN</th><th>GPS Type</th><th>Victim</th>
+        <th>V. Contacted</th><th>V. Accept</th><th>DA Emailed</th><th>Install Date</th><th>Paid</th>
+      </tr></thead>
+      <tbody id="gps-tbody"></tbody>
+    </table>
+  </div>
+  <div class="pgn" id="gps-pgn"></div>
+</div>
+
+<!-- CHECK-IN VIEW -->
+<div id="view-ci" class="view">
+  <div class="cis">
+    <div class="cs"><div class="n" id="ci-tot"></div><div class="l">Total</div></div>
+    <div class="cs"><div class="n" id="ci-ip"></div><div class="l">In Person</div></div>
+    <div class="cs"><div class="n" id="ci-ph"></div><div class="l">Phone</div></div>
+    <div class="cs"><div class="n" id="ci-defs"></div><div class="l">Defendants</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="sw"><span class="si">🔍</span><input class="sinp" id="ci-search" placeholder="Search name or officer..." oninput="ciFilter()"></div>
+    <select id="ci-officer" onchange="ciFilter()"><option value="">All Officers</option></select>
+    <select id="ci-type" onchange="ciFilter()">
+      <option value="">All Types</option><option value="In Person">In Person</option><option value="Phone">Phone</option>
+    </select>
+    <span class="cl" id="ci-count"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Defendant</th><th>IDN</th><th>Date</th><th>Type</th><th>Officer</th><th>Level</th><th>Status</th></tr></thead>
+      <tbody id="ci-tbody"></tbody>
+    </table>
+  </div>
+  <div class="pgn" id="ci-pgn"></div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="mh">
+      <div class="mt"><h2 id="m-name"></h2><p id="m-sub"></p></div>
+      <button class="mc" onclick="closeModal()">✕</button>
+    </div>
+    <div class="mtabs">
+      <button class="mtab active" onclick="mTab('ov',this)">Overview</button>
+      <button class="mtab" onclick="mTab('ci',this)">Check-Ins <span id="m-ci-n"></span></button>
+      <button class="mtab" onclick="mTab('pay',this)">Payments <span id="m-pay-n"></span></button>
+      <button class="mtab" onclick="mTab('gps',this)">GPS <span id="m-gps-n"></span></button>
+    </div>
+    <div class="mb">
+      <div id="mt-ov"><div class="dg" id="m-grid"></div></div>
+      <div id="mt-ci" style="display:none"><table class="st"><thead><tr><th>Date</th><th>Type</th><th>Officer</th><th>Level</th></tr></thead><tbody id="m-ci-body"></tbody></table></div>
+      <div id="mt-pay" style="display:none"><table class="st"><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Officer</th></tr></thead><tbody id="m-pay-body"></tbody></table></div>
+      <div id="mt-gps" style="display:none"><table class="st"><thead><tr><th>Type</th><th>Victim</th><th>V.Contacted</th><th>V.Accept</th><th>DA Email</th><th>Install</th><th>Paid</th></tr></thead><tbody id="m-gps-body"></tbody></table></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">Close</button></div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──
+const RAW = {{ raw_data|tojson|safe }};
+const ALL=RAW.defendants;
+const STATS=RAW.stats;
+const PER=50;
+
+// ── INDEX ──
+const IDX={};
+ALL.forEach(function(d){if(!IDX[d.idn])IDX[d.idn]=d;});
+
+// ── STATE ──
+var defFilt=[],defPage=1,defSortF='referral',defSortD=-1;
+var gpsFilt=[],gpsPage=1,gpsAll=[];
+var ciFilt=[],ciPage=1,ciAll=[];
+
+// ── INIT ──
+window.onload=function(){
+  // Stats
+  document.getElementById('s-open').textContent=STATS.open.toLocaleString();
+  document.getElementById('s-closed').textContent=STATS.closed.toLocaleString();
+  document.getElementById('s-gps').textContent=STATS.gpsActive.toLocaleString();
+  document.getElementById('s-ci').textContent=STATS.checkInsTotal.toLocaleString();
+  document.getElementById('s-pay').textContent='$'+Math.round(STATS.totalPaid/1000)+'K';
+  document.getElementById('total-badge').textContent=ALL.length.toLocaleString()+' Records Loaded';
+  document.getElementById('gps-nb').textContent=STATS.gpsActive;
+
+  // Officer dropdown
+  var offs=[...new Set(ALL.map(function(d){return d.officer;}).filter(Boolean))].sort();
+  offs.forEach(function(o){
+    ['def-officer','ci-officer'].forEach(function(id){
+      var opt=document.createElement('option');
+      opt.value=o;opt.textContent=o;
+      document.getElementById(id).appendChild(opt);
+    });
+  });
+
+  // Flatten GPS and CI
+  ALL.forEach(function(d){
+    d.gpsRecords.forEach(function(g){gpsAll.push(Object.assign({},g,{dn:d.name,di:d.idn}));});
+    d.checkIns.forEach(function(c){ciAll.push(Object.assign({},c,{dn:d.name,di:d.idn}));});
+  });
+  ciAll.sort(function(a,b){return b.date<a.date?-1:b.date>a.date?1:0;});
+
+  // GPS stats
+  document.getElementById('gs-cust').textContent=gpsAll.filter(function(g){return g.gpsType==='In Custody';}).length;
+  document.getElementById('gs-alli').textContent=gpsAll.filter(function(g){return g.gpsType==='Allied';}).length;
+  document.getElementById('gs-scrm').textContent=gpsAll.filter(function(g){return g.gpsType==='SCRAM';}).length;
+  document.getElementById('gs-noda').textContent=gpsAll.filter(function(g){return g.daEmailed!=='True';}).length;
+
+  // CI stats
+  document.getElementById('ci-tot').textContent=ciAll.length.toLocaleString();
+  document.getElementById('ci-ip').textContent=ciAll.filter(function(c){return c.type==='In Person';}).length.toLocaleString();
+  document.getElementById('ci-ph').textContent=ciAll.filter(function(c){return c.type==='Phone';}).length.toLocaleString();
+  document.getElementById('ci-defs').textContent=new Set(ciAll.map(function(c){return c.di;})).size.toLocaleString();
+
+  defFilter();gpsFilter('all',null);ciFilter();buildOfficers();
+};
+
+// ── DEFENDANT TABLE ──
+function defFilter(){
+  var q=(document.getElementById('def-search').value||'').toLowerCase();
+  var st=document.getElementById('def-status').value;
+  var of=document.getElementById('def-officer').value;
+  var lv=document.getElementById('def-level').value;
+  var ch=document.getElementById('def-charge').value;
+  var gp=document.getElementById('def-gps').value;
+  defFilt=ALL.filter(function(d){
+    if(st&&d.status!==st)return false;
+    if(of&&d.officer!==of)return false;
+    if(lv&&d.level!==lv)return false;
+    if(ch&&d.chargeType!==ch)return false;
+    if(gp==='y'&&!d.gpsRecords.length)return false;
+    if(gp==='n'&&d.gpsRecords.length)return false;
+    if(q){var h=(d.name+d.idn+d.caseNum+d.officer+d.chargeType).toLowerCase();if(!h.includes(q))return false;}
+    return true;
+  });
+  defFilt.sort(function(a,b){
+    var av=a[defSortF]||'',bv=b[defSortF]||'';
+    return av<bv?-defSortD:av>bv?defSortD:0;
+  });
+  defPage=1;
+  document.getElementById('def-count').textContent=defFilt.length.toLocaleString()+' results';
+  defRender();
+}
+function defSort(f){
+  if(defSortF===f)defSortD*=-1;else{defSortF=f;defSortD=1;}
+  document.querySelectorAll('[id^="sh-"]').forEach(function(s){s.textContent='';});
+  document.getElementById('sh-'+f).textContent=defSortD===1?' ↑':' ↓';
+  defFilter();
+}
+function defClear(){
+  document.getElementById('def-search').value='';
+  ['def-status','def-officer','def-level','def-charge','def-gps'].forEach(function(id){document.getElementById(id).value='';});
+  defFilter();
+}
+function defRender(){
+  var s=(defPage-1)*PER,rows=defFilt.slice(s,s+PER),tb=document.getElementById('def-tbody');
+  if(!defFilt.length){tb.innerHTML='<tr><td colspan="8" class="nd">No records match</td></tr>';document.getElementById('def-pgn').innerHTML='';return;}
+  tb.innerHTML=rows.map(function(d){
+    var sp=d.status==='Open'?'<span class="pill po">Open</span>':'<span class="pill pc">'+(d.status||'—')+'</span>';
+    var lc=d.level==='1'?'l1':d.level==='2'?'l2':d.level==='3'?'l3':'';
+    var lb=d.level?'<span class="lv '+lc+'">'+d.level+'</span>':'—';
+    var cp=d.chargeType==='Felony'?'<span class="pill pf">Felony</span>':d.chargeType==='Misdemeanor'?'<span class="pill pm">Misd.</span>':'<span class="muted">—</span>';
+    var gp=d.gpsRecords.length?'<span class="pill pg" style="font-size:9px;padding:1px 4px;">GPS</span> ':'';
+    var rc=[];
+    if(d.checkIns.length)rc.push('<span style="font-size:10px;color:#2563eb;">'+d.checkIns.length+' CI</span>');
+    if(d.payments.length)rc.push('<span style="font-size:10px;color:#16a34a;">'+d.payments.length+' $</span>');
+    if(d.gpsRecords.length)rc.push('<span style="font-size:10px;color:#7c3aed;">GPS</span>');
+    return '<tr data-idn="'+esc(d.idn)+'" onclick="openModal('+JSON.stringify(d.idn)+')" title="Click for full modal · double-click for quick detail drawer"><td><div class="nc">'+gp+esc(d.name)+'<div class="ns">'+esc(d.caseNum)+'</div></div></td><td style="font-size:11px;color:#6b7280;">'+esc(d.idn)+'</td><td>'+sp+'</td><td>'+lb+'</td><td>'+cp+'</td><td style="font-size:11px;">'+esc(d.officer||'—')+'</td><td style="font-size:11px;color:#6b7280;">'+esc(d.referral)+'</td><td>'+rc.join(' ')+'</td></tr>';
+  }).join('');
+  buildPgn('def-pgn',defFilt.length,defPage,'defGo');
+}
+function defGo(p){defPage=p;defRender();}
+
+// ── GPS TABLE ──
+function gpsFilter(f,btn){
+  document.querySelectorAll('.gpf').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  if(f==='all')gpsFilt=gpsAll;
+  else if(f==='noda')gpsFilt=gpsAll.filter(function(g){return g.daEmailed!=='True';});
+  else if(f==='novict')gpsFilt=gpsAll.filter(function(g){return g.victimAccept!=='True';});
+  else gpsFilt=gpsAll.filter(function(g){return g.gpsType===f;});
+  gpsPage=1;gpsRender();
+}
+function gpsRender(){
+  var s=(gpsPage-1)*PER,rows=gpsFilt.slice(s,s+PER),tb=document.getElementById('gps-tbody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="9" class="nd">No records</td></tr>';document.getElementById('gps-pgn').innerHTML='';return;}
+  var tc={'In Custody':'#dc2626','Allied':'#d97706','SCRAM':'#7c3aed'};
+  tb.innerHTML=rows.map(function(g){
+    var c=tc[g.gpsType]||'#374151';
+    var da=g.daEmailed==='True'?'<span style="color:#16a34a;font-weight:700;">✓</span>':'<span style="color:#dc2626;font-weight:700;">✗</span>';
+    var va=g.victimAccept==='True'?'<span style="color:#16a34a;font-weight:700;">✓</span>':'<span style="color:#dc2626;">✗</span>';
+    var pd=g.paid&&g.paid.indexOf('Install')>=0?'✅':'—';
+    return '<tr onclick="openModal('+JSON.stringify(g.di)+')"><td class="nc">'+esc(g.dn)+'</td><td style="font-size:11px;color:#6b7280;">'+esc(g.di)+'</td><td style="color:'+c+';font-weight:700;font-size:11px;">'+esc(g.gpsType)+'</td><td style="font-size:11px;">'+esc(g.victim||'—')+'</td><td style="font-size:11px;">'+esc(g.victimTime||'—')+'</td><td>'+va+'</td><td>'+da+'</td><td style="font-size:11px;">'+esc(g.installDate||'—')+'</td><td>'+pd+'</td></tr>';
+  }).join('');
+  buildPgn('gps-pgn',gpsFilt.length,gpsPage,'gpsGo');
+}
+function gpsGo(p){gpsPage=p;gpsRender();}
+
+// ── CI TABLE ──
+function ciFilter(){
+  var q=(document.getElementById('ci-search').value||'').toLowerCase();
+  var of=document.getElementById('ci-officer').value;
+  var tp=document.getElementById('ci-type').value;
+  ciFilt=ciAll.filter(function(c){
+    if(of&&c.officer!==of)return false;
+    if(tp&&c.type!==tp)return false;
+    if(q&&!(c.dn+c.di+c.officer).toLowerCase().includes(q))return false;
+    return true;
+  });
+  ciPage=1;
+  document.getElementById('ci-count').textContent=ciFilt.length.toLocaleString()+' results';
+  ciRender();
+}
+function ciRender(){
+  var s=(ciPage-1)*PER,rows=ciFilt.slice(s,s+PER),tb=document.getElementById('ci-tbody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="nd">No records</td></tr>';document.getElementById('ci-pgn').innerHTML='';return;}
+  tb.innerHTML=rows.map(function(c){
+    var tc=c.type==='In Person'?'#2563eb':'#16a34a';
+    var sp=c.status==='Open'?'<span class="pill po">Open</span>':'<span class="pill pc">'+(c.status||'—')+'</span>';
+    return '<tr onclick="openModal('+JSON.stringify(c.di)+')"><td class="nc">'+esc(c.dn)+'</td><td style="font-size:11px;color:#6b7280;">'+esc(c.di)+'</td><td style="font-size:11px;">'+esc(c.date)+'</td><td><span style="color:'+tc+';font-weight:600;font-size:11px;">'+esc(c.type)+'</span></td><td style="font-size:11px;">'+esc(c.officer)+'</td><td style="font-size:11px;">'+esc(c.level||'—')+'</td><td>'+sp+'</td></tr>';
+  }).join('');
+  buildPgn('ci-pgn',ciFilt.length,ciPage,'ciGo');
+}
+function ciGo(p){ciPage=p;ciRender();}
+
+// ── PAGINATION (no callbacks — uses named global functions) ──
+function buildPgn(id,total,cur,fn){
+  var pages=Math.ceil(total/PER);
+  var el=document.getElementById(id);
+  if(pages<=1){el.innerHTML='';return;}
+  var h='';
+  var prev=Math.max(1,cur-1);
+  h+='<button class="pb" onclick="'+fn+'('+prev+')" '+(cur===1?'disabled':'')+'>‹</button>';
+  var lo=Math.max(1,cur-2),hi=Math.min(pages,cur+2);
+  if(lo>1){h+='<button class="pb" onclick="'+fn+'(1)">1</button>';if(lo>2)h+='<span class="pi">…</span>';}
+  for(var p=lo;p<=hi;p++){h+='<button class="pb'+(p===cur?' active':'')+'" onclick="'+fn+'('+p+')">'+p+'</button>';}
+  if(hi<pages){if(hi<pages-1)h+='<span class="pi">…</span>';h+='<button class="pb" onclick="'+fn+'('+pages+')">'+pages+'</button>';}
+  var nxt=Math.min(pages,cur+1);
+  h+='<button class="pb" onclick="'+fn+'('+nxt+')" '+(cur===pages?'disabled':'')+'>›</button>';
+  var from=((cur-1)*PER+1).toLocaleString(),to=Math.min(cur*PER,total).toLocaleString();
+  h+='<span class="pi">'+from+'–'+to+' of '+total.toLocaleString()+'</span>';
+  el.innerHTML=h;
+}
+
+// ── OFFICER VIEW ──
+function buildOfficers(){
+  var map={};
+  ALL.filter(function(d){return d.status==='Open';}).forEach(function(d){
+    if(!d.officer)return;
+    if(!map[d.officer])map[d.officer]={n:d.officer,t:0,ci:0,pay:0,gps:0,fel:0,mis:0};
+    var o=map[d.officer];
+    o.t++;o.ci+=d.checkIns.length;o.pay+=d.payments.length;o.gps+=d.gpsRecords.length;
+    if(d.chargeType==='Felony')o.fel++;
+    if(d.chargeType==='Misdemeanor')o.mis++;
+  });
+  var offs=Object.values(map).sort(function(a,b){return b.t-a.t;});
+  var mx=offs.length?offs[0].t:1;
+  var html=offs.map(function(o){
+    var pct=Math.round(o.t/mx*100);
+    var sub=[];
+    if(o.fel)sub.push('<span style="color:#b91c1c;font-weight:600;">'+o.fel+' Felony</span>');
+    if(o.mis)sub.push('<span style="color:#92400e;font-weight:600;">'+o.mis+' Misd.</span>');
+    return '<div class="oc" onclick="filterByOfficer('+JSON.stringify(o.n)+')">'
+      +'<h3>👤 '+esc(o.n)+'</h3>'
+      +'<div class="osr">'
+      +'<div class="oms"><div class="n">'+o.t+'</div><div class="l">Cases</div></div>'
+      +'<div class="oms"><div class="n">'+o.ci+'</div><div class="l">CI</div></div>'
+      +'<div class="oms"><div class="n">'+o.pay+'</div><div class="l">Pmts</div></div>'
+      +'<div class="oms"><div class="n">'+o.gps+'</div><div class="l">GPS</div></div>'
+      +'</div>'
+      +'<div class="obr"><span style="font-size:10px;color:#6b7280;width:60px;">Load</span>'
+      +'<div class="obbg"><div class="obf" style="width:'+pct+'%"></div></div>'
+      +'<span style="font-size:10px;color:#6b7280;">'+pct+'%</span></div>'
+      +(sub.length?'<div style="margin-top:5px;font-size:10px;">'+sub.join(' ')+'</div>':'')
+      +'<div style="margin-top:7px;font-size:10px;color:#93c5fd;">Click to filter list →</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('off-grid').innerHTML=html;
+}
+function filterByOfficer(name){
+  showView('def');
+  document.getElementById('def-officer').value=name;
+  defFilter();
+}
+
+// ── MODAL ──
+function openModal(idn){
+  var d=IDX[idn];if(!d)return;
+  document.getElementById('m-name').textContent=d.name;
+  document.getElementById('m-sub').textContent='IDN: '+d.idn+' · '+d.caseNum+(d.officer?' · '+d.officer:'');
+  document.getElementById('m-ci-n').textContent=d.checkIns.length?'('+d.checkIns.length+')':'';
+  document.getElementById('m-pay-n').textContent=d.payments.length?'('+d.payments.length+')':'';
+  document.getElementById('m-gps-n').textContent=d.gpsRecords.length?'('+d.gpsRecords.length+')':'';
+  var sc=d.status==='Open'?'#16a34a':'#6b7280';
+  var total=d.payments.reduce(function(s,p){return s+p.amount;},0);
+  document.getElementById('m-grid').innerHTML=[
+    mf('Status','<span style="color:'+sc+';font-weight:700;">'+(d.status||'—')+'</span>'),
+    mf('Level',d.level||'—'),mf('Officer',d.officer||'—'),mf('Charge Type',d.chargeType||'—'),
+    mf('Referral',d.referral||'—'),mf('Closed',d.closedDate||'—'),
+    mf('Case #',d.caseNum||'—'),mf('Victim',d.victim||'—'),
+    mf('GPS',d.gpsRecords.length?'✅ '+d.gpsRecords[0].gpsType:'—'),
+    mf('Fees Paid',total?'$'+total.toFixed(2):'—'),
+  ].join('');
+  document.getElementById('m-ci-body').innerHTML=d.checkIns.length
+    ?d.checkIns.map(function(c){return '<tr><td>'+esc(c.date)+'</td><td>'+esc(c.type)+'</td><td>'+esc(c.officer)+'</td><td>'+esc(c.level)+'</td></tr>';}).join('')
+    :'<tr><td colspan="4" class="se">No check-ins on record</td></tr>';
+  document.getElementById('m-pay-body').innerHTML=d.payments.length
+    ?d.payments.map(function(p){return '<tr><td>'+esc(p.date)+'</td><td style="color:#16a34a;font-weight:600;">$'+p.amount.toFixed(2)+'</td><td>'+esc(p.type)+'</td><td>'+esc(p.officer||'—')+'</td></tr>';}).join('')
+    :'<tr><td colspan="4" class="se">No payments on record</td></tr>';
+  document.getElementById('m-gps-body').innerHTML=d.gpsRecords.length
+    ?d.gpsRecords.map(function(g){
+      var da=g.daEmailed==='True'?'<span style="color:#16a34a;font-weight:700;">✓ Yes</span>':'<span style="color:#dc2626;">✗ No</span>';
+      var va=g.victimAccept==='True'?'<span style="color:#16a34a;font-weight:700;">✓ Yes</span>':'<span style="color:#dc2626;">✗ No</span>';
+      var pd=g.paid&&g.paid.indexOf('Install')>=0?'✅ Paid':'—';
+      return '<tr><td><strong>'+esc(g.gpsType)+'</strong></td><td>'+esc(g.victim||'—')+'</td><td>'+esc(g.victimTime||'—')+'</td><td>'+va+'</td><td>'+da+'</td><td>'+esc(g.installDate||'—')+'</td><td>'+pd+'</td></tr>';
+    }).join('')
+    :'<tr><td colspan="7" class="se">No GPS records found</td></tr>';
+  mTab('ov',null);
+  document.getElementById('overlay').classList.add('open');
+}
+function mf(l,v){return '<div class="df"><label>'+esc(l)+'</label><div class="v">'+v+'</div></div>';}
+function mTab(t,btn){
+  ['ov','ci','pay','gps'].forEach(function(x){document.getElementById('mt-'+x).style.display=x===t?'':'none';});
+  document.querySelectorAll('.mtab').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  else document.querySelector('.mtab').classList.add('active');
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');}
+document.getElementById('overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+// ── VIEW SWITCHER ──
+function showView(v){
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active');});
+  document.querySelectorAll('.snb').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('view-'+v).classList.add('active');
+  var idx={def:0,off:1,gps:2,ci:3}[v];
+  document.querySelectorAll('.snb')[idx].classList.add('active');
+}
+
+// ── UTILS ──
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>

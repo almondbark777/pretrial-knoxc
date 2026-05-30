@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log Activity · Knox County Pre-Trial</title>
+
+  <!-- KH-THEME-START -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+
+  <style>
+    .page { max-width: 1200px; margin: 0 auto; padding: 28px; }
+    .page-h {
+      font-family: var(--serif);
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--ink);
+      margin: 0 0 4px 0;
+      letter-spacing: -0.01em;
+    }
+    .page-h em { font-style: italic; color: var(--navy); font-weight: 400; }
+    .page-sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    /* Lookup card */
+    .lookup-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      position: sticky;
+      top: 70px;
+      z-index: 5;
+    }
+    .lookup-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .lookup-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--ink);
+      font-family: var(--sans);
+    }
+    .lookup-input:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px var(--navy-pale);
+    }
+
+    .lookup-results { margin-top: 12px; max-height: 280px; overflow-y: auto; }
+    .lookup-empty {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 8px 0;
+    }
+    .lookup-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-soft);
+      border-radius: 2px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      background: var(--bg-soft);
+      cursor: pointer;
+      transition: border-color .12s, background .12s;
+    }
+    .lookup-row:hover {
+      border-color: var(--navy);
+      background: var(--navy-pale);
+    }
+    .lookup-row.active-status { border-left: 3px solid var(--good); }
+    .lookup-row.closed-status { border-left: 3px solid var(--muted-2); opacity: .75; }
+    .lookup-row .name { font-weight: 600; color: var(--ink); }
+    .lookup-row .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+    .badge-active { background: var(--good); color: white; }
+    .badge-closed { background: var(--muted-2); color: white; }
+
+    /* Selected client banner */
+    .selected-card {
+      background: var(--navy);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 3px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .selected-card.show { display: flex; }
+    .selected-card .who {
+      font-family: var(--serif);
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .selected-card .meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--gold-pale);
+      opacity: .9;
+    }
+    .selected-card .close-btn {
+      background: rgba(255,255,255,.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,.3);
+      padding: 7px 14px;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .selected-card .close-btn:hover { background: rgba(255,255,255,.25); }
+
+    /* Forms */
+    .forms-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 880px) { .forms-row { grid-template-columns: 1fr; } }
+
+    .form-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+      opacity: .45;
+      pointer-events: none;
+      transition: opacity .15s;
+    }
+    .form-card.enabled { opacity: 1; pointer-events: auto; }
+
+    .form-h {
+      font-family: var(--serif);
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--navy);
+      margin: 0 0 4px 0;
+    }
+    .form-kicker {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 9px 11px;
+      font-size: 13px;
+      font-family: var(--sans);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px var(--navy-pale);
+    }
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .submit-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .recent {
+      margin-top: 28px;
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 18px 20px;
+    }
+    .recent h2 {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin: 0 0 12px 0;
+    }
+    .recent-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 14px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      font-size: 13px;
+    }
+    .recent-row:last-child { border-bottom: none; }
+    .recent-row .kind {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .recent-row .kind.checkin { background: var(--teal-pale); color: var(--teal); }
+    .recent-row .kind.payment { background: var(--gold-pale); color: var(--gold); }
+
+    .toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      padding: 14px 18px;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: var(--shadow-md);
+      z-index: 2000;
+      transform: translateY(-20px);
+      opacity: 0;
+      transition: opacity .15s, transform .15s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok  { background: var(--good); color: white; }
+    .toast.err { background: var(--red);  color: white; }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    <h1 class="page-h">Log <em>Activity</em></h1>
+    <div class="page-sub">Record a check-in, a payment, or both</div>
+
+    <!-- LOOKUP -->
+    <div class="lookup-card">
+      <div class="lookup-label">Step 1 — Find defendant by name or IDN</div>
+      <input id="lookup" class="lookup-input" type="text"
+             placeholder="Start typing a name or IDN…"
+             autocomplete="off">
+      <div id="lookupResults" class="lookup-results"></div>
+    </div>
+
+    <!-- SELECTED CLIENT -->
+    <div id="selectedCard" class="selected-card">
+      <div>
+        <div class="who" id="selName">—</div>
+        <div class="meta" id="selMeta">—</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a id="selEditLink" href="#" class="close-btn" title="Edit this defendant's information">✏ Edit Info</a>
+        <button class="close-btn" onclick="clearSelection()">Change</button>
+      </div>
+    </div>
+
+    <!-- FORMS (both side by side) -->
+    <div class="forms-row">
+
+      <!-- CHECK-IN -->
+      <div id="ciCard" class="form-card">
+        <h2 class="form-h">Check-In</h2>
+        <div class="form-kicker">Step 2a · log a contact</div>
+        <form id="ciForm" onsubmit="return submitCheckIn(event)">
+          <div class="field-row">
+            <div class="field">
+              <label for="ci_date">Date / Time</label>
+              <input id="ci_date" name="check_in_date" type="datetime-local" required>
+            </div>
+            <div class="field">
+              <label for="ci_type">Type</label>
+              <select id="ci_type" name="type_of_check_in" required>
+                <option value="In Person">In Person</option>
+                <option value="Phone">Phone</option>
+                <option value="Office Visit">Office Visit</option>
+                <option value="Field">Field</option>
+                <option value="Virtual">Virtual</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="ci_officer">Supervising Officer</label>
+            <input id="ci_officer" name="supervising_officer" type="text"
+                   placeholder="firstname.lastname@knoxsheriff.org">
+          </div>
+          <div class="submit-row">
+            <button type="submit" class="kh-btn">Save Check-In</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- PAYMENT -->
+      <div id="pmCard" class="form-card">
+        <h2 class="form-h">Payment</h2>
+        <div class="form-kicker">Step 2b · log a payment</div>
+        <form id="pmForm" onsubmit="return submitPayment(event)">
+          <div class="field-row">
+            <div class="field">
+              <label for="pm_date">Date / Time</label>
+              <input id="pm_date" name="payment_date" type="datetime-local" required>
+            </div>
+            <div class="field">
+              <label for="pm_amount">Amount ($)</label>
+              <input id="pm_amount" name="payment_amount" type="number" step="0.01" min="0" required placeholder="20.00">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pm_type">Payment Type</label>
+              <select id="pm_type" name="payment_type" required>
+                <option value="Ptr">PTR Fee</option>
+                <option value="Allied">Allied</option>
+                <option value="GPS">GPS</option>
+                <option value="SCRAM">SCRAM</option>
+                <option value="Install Fee">Install Fee</option>
+                <option value="Bond">Bond</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pm_officer">Officer Collecting</label>
+              <input id="pm_officer" name="officer" type="text" placeholder="firstname.lastname@knoxsheriff.org">
+            </div>
+          </div>
+          <div class="submit-row">
+            <button type="submit" class="kh-btn">Save Payment</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- RECENT ENTRIES (this session) -->
+    <div class="recent" id="recentBox" style="display:none;">
+      <h2>Logged this session</h2>
+      <div id="recentList"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // ───── State ──────────────────────────────────────────────────────────
+    let selected = null;  // {idn, name, ...}
+    const recent = [];
+
+    // ───── Lookup ─────────────────────────────────────────────────────────
+    const lookupEl  = document.getElementById('lookup');
+    const resultsEl = document.getElementById('lookupResults');
+    let lookupTimer = null, lastQ = '';
+
+    lookupEl.addEventListener('input', () => {
+      const q = lookupEl.value.trim();
+      if (lookupTimer) clearTimeout(lookupTimer);
+      if (q.length < 2) { resultsEl.innerHTML = ''; return; }
+      lookupTimer = setTimeout(() => runLookup(q), 200);
+    });
+
+    async function runLookup(q) {
+      lastQ = q;
+      try {
+        const r = await fetch('/api/lookup?q=' + encodeURIComponent(q) + '&limit=10');
+        const j = await r.json();
+        if (j.q !== lastQ) return;
+        renderResults(j.results || [], q);
+      } catch { renderResults([], q); }
+    }
+
+    function renderResults(rows, q) {
+      if (!rows.length) {
+        resultsEl.innerHTML = '<div class="lookup-empty">No matches. (Use the Referrals page to add someone new.)</div>';
+        return;
+      }
+      resultsEl.innerHTML = rows.map((r, i) => `
+        <div class="lookup-row ${r.active ? 'active-status' : 'closed-status'}" data-i="${i}" data-idn="${r.idn}" title="Click to select · double-click for quick detail drawer">
+          <div>
+            <div class="name">${r.name || '—'}</div>
+            <div class="meta">IDN ${r.idn}${r.caseNum ? ' · ' + r.caseNum : ''}</div>
+          </div>
+          <span class="badge ${r.active ? 'badge-active' : 'badge-closed'}">${r.status || '—'}</span>
+          <span class="meta">${r.level ? 'L' + r.level : ''}</span>
+          <span class="meta">${r.officer || ''}</span>
+          <a href="/edit_defendant.html?idn=${encodeURIComponent(r.idn)}"
+             class="kh-btn kh-btn-ghost edit-link"
+             style="padding:5px 10px; font-size:10px;"
+             onclick="event.stopPropagation();"
+             title="Edit this defendant's information">✏ Edit</a>
+        </div>
+      `).join('');
+      // Attach click handlers (skip clicks on the Edit link)
+      [...resultsEl.querySelectorAll('.lookup-row')].forEach((el, i) => {
+        el.addEventListener('click', (ev) => {
+          if (ev.target.closest('.edit-link')) return;
+          selectClient(rows[i]);
+        });
+      });
+    }
+
+    // ───── Selection ──────────────────────────────────────────────────────
+    function selectClient(r) {
+      selected = r;
+      document.getElementById('selName').textContent = r.name || ('IDN ' + r.idn);
+      document.getElementById('selMeta').textContent =
+        `IDN ${r.idn}${r.caseNum ? ' · ' + r.caseNum : ''}` +
+        `${r.officer ? ' · ' + r.officer : ''}` +
+        `${r.status ? ' · ' + r.status : ''}`;
+      document.getElementById('selectedCard').classList.add('show');
+      document.getElementById('selEditLink').href =
+        '/edit_defendant.html?idn=' + encodeURIComponent(r.idn);
+      document.getElementById('ciCard').classList.add('enabled');
+      document.getElementById('pmCard').classList.add('enabled');
+      // Pre-fill officer fields with whoever's logged in (best-effort)
+      fetch('/api/whoami').then(r=>r.json()).then(d => {
+        if (d && d.user) {
+          const ci = document.getElementById('ci_officer');
+          const pm = document.getElementById('pm_officer');
+          if (!ci.value) ci.value = d.user;
+          if (!pm.value) pm.value = d.user;
+        }
+      }).catch(()=>{});
+      // Default times to NOW
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset()*60000)
+                     .toISOString().slice(0,16);
+      document.getElementById('ci_date').value = local;
+      document.getElementById('pm_date').value = local;
+      // Hide search results
+      lookupEl.value = '';
+      resultsEl.innerHTML = '';
+    }
+
+    function clearSelection() {
+      selected = null;
+      document.getElementById('selectedCard').classList.remove('show');
+      document.getElementById('ciCard').classList.remove('enabled');
+      document.getElementById('pmCard').classList.remove('enabled');
+      document.getElementById('ciForm').reset();
+      document.getElementById('pmForm').reset();
+      lookupEl.focus();
+    }
+
+    // ───── Submit handlers ────────────────────────────────────────────────
+    async function submitCheckIn(e) {
+      e.preventDefault();
+      if (!selected) { toast('Select a defendant first', 'err'); return false; }
+      const fd = new FormData(document.getElementById('ciForm'));
+      const body = { idn: selected.idn, defendant: selected.name };
+      for (const [k, v] of fd.entries()) body[k] = v;
+
+      try {
+        const r = await fetch('/api/check_ins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (r.ok && j.ok) {
+          toast('Check-In saved', 'ok');
+          addRecent('checkin', body);
+          document.getElementById('ciForm').reset();
+        } else {
+          toast(j.error || 'Save failed', 'err');
+        }
+      } catch { toast('Network error', 'err'); }
+      return false;
+    }
+
+    async function submitPayment(e) {
+      e.preventDefault();
+      if (!selected) { toast('Select a defendant first', 'err'); return false; }
+      const fd = new FormData(document.getElementById('pmForm'));
+      const body = { idn: selected.idn, defendant: selected.name };
+      for (const [k, v] of fd.entries()) body[k] = v;
+
+      try {
+        const r = await fetch('/api/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (r.ok && j.ok) {
+          toast('Payment saved', 'ok');
+          addRecent('payment', body);
+          document.getElementById('pmForm').reset();
+        } else {
+          toast(j.error || 'Save failed', 'err');
+        }
+      } catch { toast('Network error', 'err'); }
+      return false;
+    }
+
+    function addRecent(kind, body) {
+      recent.unshift({ kind, body, t: new Date() });
+      const box = document.getElementById('recentBox');
+      box.style.display = 'block';
+      const list = document.getElementById('recentList');
+      list.innerHTML = recent.slice(0, 10).map(r => {
+        const t = r.t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        const detail = r.kind === 'payment'
+          ? '$' + (r.body.payment_amount || '0') + ' · ' + (r.body.payment_type || '')
+          : (r.body.type_of_check_in || '');
+        return `
+          <div class="recent-row">
+            <span class="kind ${r.kind}">${r.kind}</span>
+            <span>${r.body.defendant || 'IDN ' + r.body.idn}</span>
+            <span>${detail}</span>
+            <span style="color:var(--muted); font-family:var(--mono); font-size:11px;">${t}</span>
+          </div>`;
+      }).join('');
+    }
+
+    function toast(msg, kind) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (kind || 'ok');
+      setTimeout(() => { t.className = 'toast ' + (kind || 'ok'); }, 3500);
+    }
+  </script>
+</body>
+</html>

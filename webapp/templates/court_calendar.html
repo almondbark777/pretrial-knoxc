@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Court Calendar · Knox County Pre-Trial</title>
+  <!-- KH-THEME-START -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+  <style>
+    .page { max-width: 1280px; margin: 0 auto; padding: 28px; }
+    .h { font-family: var(--serif); font-size: 28px; font-weight: 500; margin: 0 0 4px; }
+    .h em { font-style: italic; color: var(--navy); font-weight: 400; }
+    .sub {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 22px;
+    }
+
+    .ctrl-row {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 18px;
+    }
+    .ctrl-row select, .ctrl-row button {
+      padding: 8px 12px; background: var(--surface); color: var(--ink);
+      border: 1px solid var(--rule); border-radius: 3px;
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em;
+      cursor: pointer;
+    }
+    .ctrl-row .spacer { flex: 1; }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .cal-head, .cal-cell {
+      background: var(--surface-raised);
+      padding: 8px;
+      min-height: 110px;
+    }
+    .cal-head {
+      min-height: 0;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+      padding: 10px 8px;
+    }
+    .cal-cell { display: flex; flex-direction: column; gap: 4px; }
+    .cal-cell.muted { background: var(--bg-soft); opacity: 0.55; }
+    .cal-cell.today {
+      outline: 2px solid var(--gold);
+      outline-offset: -2px;
+    }
+    .cal-cell .date {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .cal-cell.today .date { color: var(--gold); }
+
+    .cal-event {
+      background: var(--navy);
+      color: #f4e5c1;
+      padding: 4px 6px;
+      border-radius: 2px;
+      font-size: 10px;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cal-event:hover { background: #1a4d80; }
+    .cal-event .when {
+      font-family: var(--mono);
+      font-size: 9px;
+      opacity: 0.85;
+      margin-right: 4px;
+    }
+
+    .list-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 22px;
+      margin-top: 22px;
+    }
+    .list-card h2 {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin: 0 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .list-row {
+      display: grid;
+      grid-template-columns: auto 1fr 1fr 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .list-row:hover { background: var(--bg-soft); }
+    .list-row .date {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--gold);
+      min-width: 110px;
+    }
+    .list-row .name { font-weight: 600; }
+    .list-row .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .empty { padding: 40px; text-align: center; color: var(--muted); font-style: italic; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1 class="h">Court <em>Calendar</em></h1>
+  <div class="sub">Upcoming court appearances across all defendants</div>
+
+  <div class="ctrl-row">
+    <button onclick="navMonth(-1)">‹ Prev</button>
+    <button onclick="navToday()">Today</button>
+    <button onclick="navMonth(1)">Next ›</button>
+    <span class="spacer"></span>
+    <span id="monthLabel" style="font-family:var(--serif); font-size:18px;"></span>
+  </div>
+
+  <div id="cal" class="cal-grid"></div>
+
+  <div class="list-card">
+    <h2>Upcoming (next 30 days)</h2>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+let viewYear, viewMonth; // 0-indexed month
+let events = [];
+
+(async function init() {
+  const t = new Date();
+  viewYear = t.getFullYear();
+  viewMonth = t.getMonth();
+  const r = await fetch('/api/court_dates?days=120');
+  events = (await r.json()).court_dates || [];
+  render();
+})();
+
+function navMonth(d) { viewMonth += d; if (viewMonth<0){viewMonth=11; viewYear--;} else if (viewMonth>11){viewMonth=0; viewYear++;} render(); }
+function navToday() { const t = new Date(); viewYear = t.getFullYear(); viewMonth = t.getMonth(); render(); }
+
+function render() {
+  document.getElementById('monthLabel').textContent =
+    new Date(viewYear, viewMonth, 1).toLocaleString([], {month:'long', year:'numeric'});
+
+  const cal = document.getElementById('cal');
+  cal.innerHTML = '';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'cal-head';
+    h.textContent = d;
+    cal.appendChild(h);
+  });
+
+  const first = new Date(viewYear, viewMonth, 1);
+  const startDay = first.getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+
+  // Bucket events by YYYY-MM-DD
+  const byDay = {};
+  events.forEach(e => {
+    const d = new Date(e.date);
+    const key = d.toISOString().slice(0,10);
+    (byDay[key] ||= []).push(e);
+  });
+
+  // Leading blanks
+  for (let i = 0; i < startDay; i++) {
+    const c = document.createElement('div');
+    c.className = 'cal-cell muted';
+    cal.appendChild(c);
+  }
+  // Days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cell = document.createElement('div');
+    const dt = new Date(viewYear, viewMonth, day);
+    const key = dt.toISOString().slice(0,10);
+    cell.className = 'cal-cell' + (key === todayStr ? ' today' : '');
+    const ds = document.createElement('div');
+    ds.className = 'date';
+    ds.textContent = day;
+    cell.appendChild(ds);
+    (byDay[key] || []).forEach(e => {
+      const ev = document.createElement('div');
+      ev.className = 'cal-event';
+      ev.dataset.idn = e.idn;
+      ev.title = `${e.name} · ${e.court || ''}\n${e.notes || ''}`;
+      const t = new Date(e.date);
+      const time = t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+      ev.innerHTML = `<span class="when">${time}</span>${esc(e.name)}`;
+      ev.onclick = () => window.khDrawer && window.khDrawer.open(e.idn);
+      cell.appendChild(ev);
+    });
+    cal.appendChild(cell);
+  }
+
+  // List view
+  const upcoming = events
+    .filter(e => new Date(e.date) >= new Date(Date.now() - 24*60*60*1000))
+    .slice(0, 50);
+  const list = document.getElementById('list');
+  if (!upcoming.length) {
+    list.innerHTML = '<div class="empty">No upcoming court dates. Add them from a defendant\'s detail drawer.</div>';
+    return;
+  }
+  list.innerHTML = upcoming.map(e => `
+    <div class="list-row" data-idn="${e.idn}" onclick="window.khDrawer && window.khDrawer.open('${e.idn}')">
+      <span class="date">${esc(formatTs(e.date))}</span>
+      <div>
+        <div class="name">${esc(e.name)}</div>
+        <div class="meta">IDN ${esc(e.idn)}</div>
+      </div>
+      <span class="meta">${esc(e.court || '—')}</span>
+      <span class="meta">${esc(e.officer || '')}</span>
+    </div>`).join('');
+}
+
+function formatTs(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return d.toLocaleString([], {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

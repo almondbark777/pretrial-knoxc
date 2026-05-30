@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knox County Sheriff - Pre-Trial Services Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        /* ===== STICKY HEADER ===== */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background-color: #1a3a6b;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-shield {
+            font-size: 1.75rem;
+        }
+
+        .header-title {
+            line-height: 1.3;
+        }
+
+        .header-clock {
+            font-size: 0.95rem;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== NAVIGATION BAR ===== */
+        nav {
+            background-color: #0f2744;
+            padding: 0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 64px;
+            z-index: 999;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav li {
+            margin: 0;
+        }
+
+        nav a {
+            display: block;
+            padding: 0.85rem 1.2rem;
+            color: #cfd9e3;
+            text-decoration: none;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        nav a:hover {
+            background-color: rgba(37, 99, 235, 0.1);
+            color: #fff;
+            border-bottom-color: #2563eb;
+        }
+
+        nav a.active {
+            background-color: #2563eb;
+            color: #fff;
+            border-bottom-color: #2563eb;
+        }
+
+        /* ===== ALERT BANNER ===== */
+        .alert-banner {
+            background-color: #dc2626;
+            color: white;
+            padding: 1rem 2rem;
+            text-align: center;
+            font-weight: 500;
+            font-size: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ===== MAIN CONTAINER ===== */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ===== STATS ROW ===== */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid #2563eb;
+        }
+
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1a3a6b;
+        }
+
+        .stat-card .subtext {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 0.5rem;
+        }
+
+        /* ===== APP GRID ===== */
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .app-card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: inherit;
+            border: 1px solid #e5e7eb;
+        }
+
+        .app-card:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+            border-color: #2563eb;
+        }
+
+        .app-card.disabled {
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
+        .app-card.disabled .app-icon {
+            filter: grayscale(100%);
+        }
+
+        .app-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .app-card:hover .app-icon {
+            transform: scale(1.1);
+        }
+
+        .app-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1a3a6b;
+        }
+
+        .app-card p {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1.5rem;
+            flex-grow: 1;
+            line-height: 1.5;
+        }
+
+        .app-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: #2563eb;
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            align-self: flex-start;
+        }
+
+        .app-card:hover .app-button {
+            background-color: #1d4ed8;
+        }
+
+        .app-card.disabled .app-button {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .app-button-arrow {
+            font-size: 1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .app-card:hover .app-button-arrow {
+            transform: translateX(4px);
+        }
+
+        /* ===== BOTTOM SECTION ===== */
+        .bottom-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        @media (max-width: 1000px) {
+            .bottom-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ===== OFFICER CASELOAD TABLE ===== */
+        .section-card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-card h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1a3a6b;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .officer-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .officer-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .officer-name {
+            font-weight: 500;
+            color: #1a3a6b;
+            min-width: 140px;
+            font-size: 0.95rem;
+        }
+
+        .officer-bar {
+            flex-grow: 1;
+            height: 24px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .officer-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .officer-count {
+            font-weight: 600;
+            color: #1a3a6b;
+            min-width: 45px;
+            text-align: right;
+            font-size: 0.95rem;
+        }
+
+        /* ===== RECENT ACTIVITY FEED ===== */
+        .activity-item {
+            padding: 1rem;
+            border-left: 3px solid #2563eb;
+            background-color: #f9fafb;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .activity-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .activity-time {
+            font-size: 0.8rem;
+            color: #999;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.3rem;
+        }
+
+        .activity-title {
+            font-weight: 600;
+            color: #1a3a6b;
+            margin-bottom: 0.3rem;
+            font-size: 0.95rem;
+        }
+
+        .activity-desc {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background-color: #1a3a6b;
+            color: #cfd9e3;
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.9rem;
+            border-top: 1px solid #0f2744;
+            margin-top: 3rem;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                padding: 0.75rem 1rem;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .header-left {
+                font-size: 1rem;
+            }
+
+            .header-shield {
+                font-size: 1.5rem;
+            }
+
+            nav a {
+                padding: 0.7rem 0.9rem;
+                font-size: 0.8rem;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-card .number {
+                font-size: 2rem;
+            }
+
+            .app-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .bottom-section {
+                grid-template-columns: 1fr;
+            }
+
+            .alert-banner {
+                padding: 0.75rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            nav a {
+                padding: 0.6rem 0.7rem;
+                font-size: 0.75rem;
+            }
+
+            .stat-card .number {
+                font-size: 1.75rem;
+            }
+
+            .stat-card {
+                padding: 1.25rem;
+            }
+
+            .section-card {
+                padding: 1.25rem;
+            }
+
+            .officer-name {
+                min-width: auto;
+                font-size: 0.85rem;
+            }
+
+            .officer-count {
+                min-width: auto;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+
+  <!-- KH-THEME-START — shared chrome injected by _patch_templates.py -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+</head>
+<body>
+    <!-- STICKY HEADER -->
+    <header>
+        <div class="header-left">
+            <div class="header-shield">🛡</div>
+            <div class="header-title">Knox County Sheriff<br>Pre-Trial Services</div>
+        </div>
+        <div class="header-clock" id="clock">Loading...</div>
+    </header>
+
+    <!-- NAVIGATION BAR -->
+    <nav>
+        <ul>
+            <li><a href="index.html" class="active">Dashboard</a></li>
+            <li><a href="pretrial_app.html">Case Management</a></li>
+            <li><a href="client_profile.html">Client Profile</a></li>
+            <li><a href="violations.html">Violations</a></li>
+            <li><a href="analytics.html">Analytics</a></li>
+            <li><a href="gps_alert_procedures.html">GPS Procedures</a></li>
+        </ul>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <div class="container">
+                <!-- STATS ROW -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <h3>New Referrals</h3>
+                <div class="number">{{ '{:,}'.format(stats.new_referrals_month) }}</div>
+                <div class="subtext">{{ stats.month_label }} so far</div>
+            </div>
+            <div class="stat-card">
+                <h3>GPS Installs</h3>
+                <div class="number">{{ '{:,}'.format(stats.gps_installs_month) }}</div>
+                <div class="subtext">{{ stats.month_label }} so far</div>
+            </div>
+            <div class="stat-card">
+                <h3>Check-Ins Logged</h3>
+                <div class="number">{{ '{:,}'.format(stats.check_ins_month) }}</div>
+                <div class="subtext">{{ stats.month_label }} so far</div>
+            </div>
+            <div class="stat-card">
+                <h3>Fees Collected</h3>
+                <div class="number">${{ '{:,.0f}'.format(stats.fees_collected_month) }}</div>
+                <div class="subtext">{{ stats.month_label }} so far</div>
+            </div>
+        </div>
+
+        <!-- APP GRID -->
+        <div class="app-grid">
+            <a href="referrals.html" class="app-card">
+                <div class="app-icon">📝</div>
+                <h3>New Referral</h3>
+                <p>First point of contact — add a defendant to the active roster with built-in duplicate check</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="log_activity.html" class="app-card">
+                <div class="app-icon">✅</div>
+                <h3>Log Activity</h3>
+                <p>Record check-ins and payments with live defendant lookup</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="edit_defendant.html" class="app-card">
+                <div class="app-icon">✏️</div>
+                <h3>Edit Defendant</h3>
+                <p>Update any defendant's information — search by name or IDN, then edit any field</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="pretrial_app.html" class="app-card">
+                <div class="app-icon">📋</div>
+                <h3>Case Management</h3>
+                <p>Search all 2,743 defendants, check-ins, payments and GPS records</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="client_profile.html" class="app-card">
+                <div class="app-icon">🪪</div>
+                <h3>Client Profile</h3>
+                <p>Single-client lookup with GPS coverage math, check-ins, and payment breakdown</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="violations.html" class="app-card">
+                <div class="app-icon">⚠️</div>
+                <h3>Violation Reports</h3>
+                <p>File and review violation reports across all defendants</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="analytics.html" class="app-card">
+                <div class="app-icon">📊</div>
+                <h3>Analytics</h3>
+                <p>Compliance trends, officer workloads, and payment reports</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+
+            <a href="gps_alert_procedures.html" class="app-card">
+                <div class="app-icon">📡</div>
+                <h3>GPS Procedures</h3>
+                <p>Alert response procedures and staff reference guide</p>
+                <button class="app-button">Launch <span class="app-button-arrow">→</span></button>
+            </a>
+        </div>
+
+        <!-- BOTTOM SECTION -->
+        <div class="bottom-section">
+            <!-- OFFICER CASELOAD -->
+            <div class="section-card">
+                                <h2>Officer Caseloads</h2>
+                {% for o in officers %}
+                <div class="officer-row">
+                    <div class="officer-name">{{ o.officer }}</div>
+                    <div class="officer-bar">
+                        <div class="officer-bar-fill" style="width: {{ o.pct }}%"></div>
+                    </div>
+                    <div class="officer-count">{{ o.count }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- CASELOAD BY LETTER -->
+            <div class="section-card">
+                <h2>Caseload by Letter</h2>
+                {% for l in letters %}
+                <div class="officer-row">
+                    <div class="officer-name">{{ l.letter }}</div>
+                    <div class="officer-bar">
+                        <div class="officer-bar-fill" style="width: {{ l.pct }}%"></div>
+                    </div>
+                    <div class="officer-count">{{ l.count }}</div>
+                </div>
+                {% else %}
+                <div class="activity-desc">No active caseload.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        Knox County Sheriff's Office · Pre-Trial Services Division · Internal Use Only
+    </footer>
+
+    <!-- JAVASCRIPT FOR CLOCK -->
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const options = {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            };
+            const formatted = now.toLocaleDateString('en-US', options);
+            document.getElementById('clock').textContent = formatted;
+        }
+
+        // Update immediately
+        updateClock();
+
+        // Update every second
+        setInterval(updateClock, 1000);
+
+        // Set active nav link based on current page
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+            const navLinks = document.querySelectorAll('nav a');
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

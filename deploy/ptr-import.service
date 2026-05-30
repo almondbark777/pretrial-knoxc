@@ -1,0 +1,12 @@
+[Unit]
+Description=PTR daily SharePoint import (mailbox -> local SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ptrapp
+Group=ptrapp
+EnvironmentFile=/etc/ptr-import.env
+ExecStart=/usr/bin/python3 /opt/ptr-knoxc/webapp/sharepoint_import.py
+# Uses only the Python standard library — no venv needed.

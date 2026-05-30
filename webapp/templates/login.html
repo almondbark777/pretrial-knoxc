@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Sign in · Knox County Pre-Trial</title>
+  <link rel="apple-touch-icon" href="/static/icon-180.png">
+  <link rel="icon" type="image/png" href="/static/icon-192.png">
+  <meta name="theme-color" content="#0f3a66">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100vh;
+      background: #000;
+      color: #fff;
+      font-family: 'Inter Tight', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      padding-bottom: max(env(safe-area-inset-bottom), 24px);
+      padding-top: max(env(safe-area-inset-top), 24px);
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: #1c1c1c;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 36px 32px 32px;
+      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .brand .mark {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      background: #0f3a66;
+      color: #f4e5c1;
+      border-radius: 8px;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .brand .kicker {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 2px;
+    }
+    .brand .title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
+    .brand .title em { font-style: italic; color: #f4e5c1; font-weight: 400; }
+
+    h1.welcome {
+      font-family: 'Fraunces', serif;
+      font-size: 26px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    p.sub {
+      color: #999;
+      font-size: 14px;
+      margin-bottom: 26px;
+      line-height: 1.5;
+    }
+
+    .field { margin-bottom: 16px; }
+    label {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 13px 14px;
+      font-size: 16px;
+      font-family: 'Inter Tight', system-ui, sans-serif;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+      outline: none;
+      transition: border-color .12s, box-shadow .12s;
+    }
+    input:focus {
+      border-color: #a8751a;
+      box-shadow: 0 0 0 2px rgba(168, 117, 26, 0.25);
+    }
+    input::placeholder { color: #666; }
+
+    button.submit {
+      width: 100%;
+      padding: 14px;
+      background: #0f3a66;
+      color: #f4e5c1;
+      border: none;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: background .12s, transform .08s;
+    }
+    button.submit:hover { background: #1a4d80; }
+    button.submit:active { transform: translateY(1px); }
+    button.submit:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .err {
+      background: #3a1f1f;
+      border: 1px solid #b03b3b;
+      color: #ffd6d6;
+      padding: 11px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .err.show { display: block; }
+
+    .footer {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid #2a2a2a;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      color: #666;
+      text-align: center;
+      line-height: 1.6;
+    }
+    .footer strong { color: #999; }
+
+    @media (max-width: 480px) {
+      .login-card { padding: 28px 22px 24px; }
+      h1.welcome { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <form class="login-card" id="loginForm" onsubmit="return doLogin(event)">
+    <div class="brand">
+      <div class="mark">⚖</div>
+      <div>
+        <div class="kicker">Knox County Sheriff</div>
+        <div class="title">Pre-<em>Trial</em> Services</div>
+      </div>
+    </div>
+
+    <h1 class="welcome">Sign in</h1>
+    <p class="sub">Use your Knox County Sheriff email and the team password to continue.</p>
+
+    <div id="errBox" class="err">{{ error }}</div>
+
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email"
+             placeholder="firstname.lastname@knoxsheriff.org"
+             autocomplete="username"
+             autocapitalize="off"
+             autocorrect="off"
+             spellcheck="false"
+             required autofocus>
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password"
+             placeholder="Team password"
+             autocomplete="current-password"
+             required>
+    </div>
+
+    <input type="hidden" id="next" name="next" value="{{ next_path }}">
+    <button class="submit" type="submit" id="submitBtn">Sign in →</button>
+
+    <div class="footer">
+      <strong>Internal use only.</strong><br>
+      Pre-trial supervision · Knox County Sheriff's Office
+    </div>
+  </form>
+
+  <script>
+    // Show server-rendered error (if any) on load
+    (function() {
+      const e = document.getElementById('errBox');
+      if (e.textContent.trim()) e.classList.add('show');
+      else e.textContent = '';
+    })();
+
+    async function doLogin(ev) {
+      ev.preventDefault();
+      const errBox = document.getElementById('errBox');
+      errBox.classList.remove('show');
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+
+      const body = {
+        email:    document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        next:     document.getElementById('next').value || '/',
+      };
+
+      try {
+        const r = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (r.ok && j.ok) {
+          window.location.href = j.redirect || '/';
+          return;
+        }
+        errBox.textContent = j.error || 'Sign-in failed.';
+        errBox.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Sign in →';
+        document.getElementById('password').focus();
+        document.getElementById('password').select();
+      } catch (e) {
+        errBox.textContent = 'Network error. Try again.';
+        errBox.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Sign in →';
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>

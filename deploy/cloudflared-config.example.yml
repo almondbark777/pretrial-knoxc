@@ -1,0 +1,20 @@
+# Cloudflared tunnel config for the PTR web app.
+# Install location on the server: /etc/cloudflared/config.yml
+#
+# Replace the two <PLACEHOLDERS> below after you run `cloudflared tunnel create`:
+#   - <TUNNEL-ID>  : the UUID printed by `cloudflared tunnel create ptr-knoxc`
+#   - ptr.example.com : the hostname you want staff to use (must be a domain
+#                       already added to your Cloudflare account)
+
+tunnel: <TUNNEL-ID>
+credentials-file: /etc/cloudflared/<TUNNEL-ID>.json
+
+# Optional: keeps connections warm and logs at info level.
+loglevel: info
+
+ingress:
+  # All traffic for this hostname goes to the local uvicorn process.
+  - hostname: ptr.example.com
+    service: http://127.0.0.1:8000
+  # Catch-all: anything else gets a 404 (required last rule).
+  - service: http_status:404

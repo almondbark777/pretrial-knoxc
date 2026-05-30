@@ -1,0 +1,39 @@
+# --- Secrets & credentials (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.publishsettings
+*.PublishSettings
+.azure-publish-profile.xml
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# --- Local DB copies / working scratch ---
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+.claude/
+
+# --- Source data with defendant PII (NEVER commit) ---
+db/csv_clean/
+
+# --- Build / deploy artifacts ---
+*.zip
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

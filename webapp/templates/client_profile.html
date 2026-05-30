@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Profile — Knox County Pre-Trial Services</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --bg: #faf8f0;
+  --surface: #ffffff;
+  --border: #c8c0a8;
+  --primary: #1a4a7a;
+  --primary-light: #2563ab;
+  --primary-pale: #dbeafe;
+  --accent: #c47d00;
+  --teal: #0e7490;
+  --teal-pale: #cffafe;
+  --text: #1a1a2e;
+  --muted: #5a5a72;
+  --row-alt: #e8f0fb;
+  --font: 'Calibri', 'Trebuchet MS', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); font-size: 13px; background: var(--bg); color: var(--text); }
+
+/* ── HEADER ── */
+.header { background: var(--primary); color: #fff; padding: 13px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.header-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; opacity: .65; }
+.header h1 { font-size: 17px; font-weight: 700; }
+.reset-link { margin-left: auto; padding: 4px 12px; border: 1px solid rgba(255,255,255,.35); border-radius: 5px; background: rgba(255,255,255,.12); color: #fff; font-family: var(--font); font-size: 11px; font-weight: 600; cursor: pointer; }
+.reset-link:hover { background: rgba(255,255,255,.22); }
+
+/* ── INSTRUCTIONS ── */
+.instr-wrap { margin-bottom: 22px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; background: var(--surface); }
+.instr-toggle { width: 100%; padding: 12px 16px; background: var(--primary-pale); border: none; text-align: left; font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.instr-toggle:hover { background: #c7daf7; }
+.instr-body { padding: 18px 20px; border-top: 1px solid var(--border); background: var(--surface); }
+.instr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.instr-col-head { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; padding-bottom: 7px; border-bottom: 2px solid var(--primary); }
+.instr-list { padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.55; }
+.instr-list li { }
+.instr-warn { display: block; margin-top: 4px; color: #92400e; font-size: 11px; font-weight: 600; background: #fef3c7; border-radius: 4px; padding: 3px 7px; }
+.instr-file { display: inline-block; font-size: 11px; font-weight: 700; background: var(--primary-pale); color: var(--primary); border-radius: 4px; padding: 1px 6px; margin: 1px 0; }
+.instr-tip { margin-top: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 11px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 600px) { .instr-cols { grid-template-columns: 1fr; } }
+
+/* ── UPLOAD ── */
+#upload { max-width: 800px; margin: 44px auto; padding: 0 22px; }
+.up-intro { text-align: center; margin-bottom: 28px; }
+.up-intro h2 { font-size: 21px; color: var(--primary); margin-bottom: 7px; }
+.up-intro p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.slots { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 18px; }
+.slot { border: 2px dashed var(--border); border-radius: 9px; padding: 20px 14px; text-align: center; cursor: pointer; background: var(--surface); transition: .14s; position: relative; }
+.slot:hover, .slot.over { border-color: var(--primary-light); background: var(--primary-pale); }
+.slot.done { border-color: var(--primary); border-style: solid; background: #eff6ff; }
+.slot input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.slot-icon { font-size: 28px; margin-bottom: 7px; }
+.slot-lbl { font-weight: 700; font-size: 13px; color: var(--primary); margin-bottom: 3px; }
+.slot-sub { font-size: 11px; color: var(--muted); }
+.slot-fn { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 7px; min-height: 15px; word-break: break-all; }
+.go-btn { display: block; width: 100%; padding: 13px; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: var(--font); }
+.go-btn:hover:not(:disabled) { background: var(--primary-light); }
+.go-btn:disabled { background: var(--border); cursor: not-allowed; color: #999; }
+.priv { text-align: center; font-size: 11px; color: var(--muted); margin-top: 9px; }
+
+/* ── MAIN ── */
+#main { display: block; padding: 18px 22px; }
+.search-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.search-wrap { position: relative; flex: 1; max-width: 420px; }
+.search-wrap input { width: 100%; padding: 8px 12px; font-size: 14px; font-family: var(--font); border: 2px solid var(--border); border-radius: 7px; background: var(--surface); }
+.search-wrap input:focus { outline: none; border-color: var(--primary); }
+.dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 7px 7px; max-height: 260px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.drop-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0ede4; font-size: 13px; }
+.drop-item:hover { background: var(--primary-pale); }
+.drop-item .d-name { font-weight: 700; color: var(--primary); }
+.drop-item .d-idn { font-size: 11px; color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); }
+
+/* ── PROFILE CARD ── */
+#profile { display: none; }
+.p-header { background: var(--primary); color: #fff; border-radius: 9px 9px 0 0; padding: 16px 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+.p-name { font-size: 20px; font-weight: 700; }
+.p-meta { font-size: 12px; opacity: .75; margin-top: 3px; }
+.p-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 11px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.badge-open { background: #dbeafe; color: #1a4a7a; }
+.badge-closed { background: #e2e8f0; color: #475569; }
+.badge-gps { background: #cffafe; color: #164e63; }
+.badge-scram { background: #ede9fe; color: #4c1d95; }
+.badge-allied { background: #d1fae5; color: #065f46; }
+.badge-warn { background: #fef3c7; color: #92400e; }
+.badge-ok { background: #d1fae5; color: #065f46; }
+
+.p-body { border: 1px solid var(--border); border-top: none; border-radius: 0 0 9px 9px; background: var(--surface); }
+.p-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.p-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.p-section:last-child { border-bottom: none; }
+.p-section.full { grid-column: 1 / -1; }
+.p-section h3 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.info-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; border-bottom: 1px dotted #e5dfc8; }
+.info-row:last-child { border-bottom: none; }
+.info-row .k { color: var(--muted); }
+.info-row .v { font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+
+/* ── GPS COVERAGE ── */
+.gps-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.gps-stat { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; text-align: center; }
+.gps-stat .gs-val { font-size: 22px; font-weight: 700; color: var(--primary); }
+.gps-stat .gs-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.gps-stat.amber .gs-val { color: var(--accent); }
+.gps-stat.teal .gs-val { color: var(--teal); }
+
+.coverage-verdict { text-align: center; padding: 8px 14px; border-radius: 7px; font-weight: 700; font-size: 13px; margin-top: 10px; }
+.coverage-verdict.ok { background: var(--teal-pale); color: #0e4a5a; }
+.coverage-verdict.warn { background: #fef3c7; color: #78350f; }
+
+/* ── TABLES ── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.data-table th { background: var(--primary); color: #fff; padding: 7px 11px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+.data-table td { padding: 6px 11px; border-bottom: 1px solid var(--border); }
+.data-table tr:nth-child(even) td { background: var(--row-alt); }
+.data-table tr:last-child td { border-bottom: none; }
+.total-row td { font-weight: 700; background: var(--primary-pale) !important; border-top: 2px solid var(--primary); }
+.empty-msg { text-align: center; color: var(--muted); padding: 20px; font-size: 13px; }
+
+/* ── CHECKIN SUMMARY ── */
+.ci-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.ci-chip { background: var(--primary-pale); color: var(--primary); border-radius: 14px; padding: 4px 12px; font-size: 12px; font-weight: 700; }
+
+/* ── TRACK DATE ── */
+.track-date-wrap { display: flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; }
+.track-date-wrap label { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.track-date-wrap input[type=date] { font-family: var(--font); font-size: 13px; border: none; background: transparent; color: var(--text); padding: 0; height: auto; cursor: pointer; }
+.track-date-wrap input[type=date]:focus { outline: none; }
+.today-btn { padding: 2px 9px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.today-btn:hover { background: var(--primary-pale); }
+
+/* ── DAY ADJUSTMENT ── */
+.adj-box { border: 3px solid var(--accent); border-radius: 9px; background: #fffbeb; padding: 14px 16px; margin-top: 12px; }
+.adj-box.has-adj { border-color: var(--primary); background: var(--primary-pale); }
+.adj-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.adj-box.has-adj .adj-title { color: var(--primary); }
+.adj-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.adj-row label { font-size: 12px; color: var(--text); font-weight: 600; white-space: nowrap; }
+.adj-input { width: 90px; padding: 6px 10px; font-size: 16px; font-weight: 700; font-family: var(--font); border: 2px solid var(--accent); border-radius: 6px; background: #fff; text-align: center; color: var(--text); }
+.adj-box.has-adj .adj-input { border-color: var(--primary); }
+.adj-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-pale); }
+.adj-save { padding: 6px 14px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; }
+.adj-save:hover { background: var(--primary-light); }
+.adj-note { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.adj-from-bb { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 4px; }
+
+/* ── LOADING ── */
+#loading { display: none; position: fixed; inset: 0; background: rgba(250,248,240,.88); z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+#loading.on { display: flex; }
+.spin { width: 36px; height: 36px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: sp .7s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+@media (max-width: 680px) {
+  .slots, .p-grid, .gps-summary { grid-template-columns: 1fr; }
+  .p-section.full { grid-column: 1; }
+}
+</style>
+
+  <!-- KH-THEME-START — shared chrome injected by _patch_templates.py -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+</head>
+<body>
+
+<div id="loading"><div class="spin"></div><p style="color:var(--muted);font-weight:600">Loading data…</p></div>
+
+<div class="header">
+  <div>
+    <div class="header-lbl">Knox County Sheriff's Office</div>
+    <h1>Client Profile Lookup</h1>
+  </div>
+  
+</div>
+
+<nav style="background-color:#0f2744;padding:0;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+  <ul style="list-style:none;display:flex;flex-wrap:wrap;margin:0;padding:0;">
+    <li><a href="/"                            style="display:block;padding:.75rem 1.1rem;color:#cfd9e3;text-decoration:none;font-size:.9rem;">Dashboard</a></li>
+    <li><a href="/pretrial_app.html"           style="display:block;padding:.75rem 1.1rem;color:#cfd9e3;text-decoration:none;font-size:.9rem;">Case Management</a></li>
+    <li><a href="/client_profile.html"         style="display:block;padding:.75rem 1.1rem;color:#fff;background:#2563eb;text-decoration:none;font-size:.9rem;font-weight:600;">Client Profile</a></li>
+    <li><a href="/violations.html"             style="display:block;padding:.75rem 1.1rem;color:#cfd9e3;text-decoration:none;font-size:.9rem;">Violations</a></li>
+    <li><a href="/analytics.html"              style="display:block;padding:.75rem 1.1rem;color:#cfd9e3;text-decoration:none;font-size:.9rem;">Analytics</a></li>
+    <li><a href="/gps_alert_procedures.html"   style="display:block;padding:.75rem 1.1rem;color:#cfd9e3;text-decoration:none;font-size:.9rem;">GPS Procedures</a></li>
+  </ul>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="search-bar">
+    <div class="search-wrap">
+      <input type="search" id="srch" placeholder="Click or type to search by name / IDN…" autocomplete="off"
+        oninput="onSearch()" onkeydown="onKey(event)" onfocus="onFocus()" onblur="hideDrop()">
+      <div class="dropdown" id="drop" style="display:none"></div>
+    </div>
+    <div class="track-date-wrap">
+      <label for="track-date">Track GPS to:</label>
+      <input type="date" id="track-date" onchange="onTrackDateChange()">
+      <button class="today-btn" onclick="resetTrackDate()">Today</button>
+    </div>
+    <span class="hint" id="hint"></span>
+  </div>
+  <div id="profile"></div>
+</div>
+
+<script>
+// ═══════════════════════════ DATA (from server) ════════════════════
+const SERVER_DATA = {{ data|tojson|safe }};
+let clients = SERVER_DATA.clients;
+let dropIdx = -1;
+let dropList = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  initTrackDate();
+  id('hint').textContent = clients.length.toLocaleString() + ' clients loaded';
+});
+
+// ═══════════════════════════ SEARCH ══════════════════════════
+let currentClient = null;
+const sessionAdjustments = {}; // idn → number, overrides BB value for this session
+
+function onFocus() {
+  // Always show list on focus — empty shows all clients sorted A-Z
+  buildDropList(id('srch').value.trim().toLowerCase());
+  if (dropList.length) id('drop').style.display='block';
+}
+
+function onSearch() {
+  buildDropList(id('srch').value.trim().toLowerCase());
+  const el = id('drop');
+  el.style.display = dropList.length ? 'block' : 'none';
+  dropIdx = -1;
+}
+
+function buildDropList(q) {
+  const all = clients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if (!q) {
+    dropList = all.slice(0, 60);
+  } else {
+    dropList = all.filter(c => c.name.toLowerCase().includes(q) || c.idn.includes(q)).slice(0, 60);
+  }
+  const el = id('drop');
+  el.innerHTML = dropList.map((c,i) => `
+    <div class="drop-item" data-i="${i}" data-idn="${esc(c.idn)}" onmousedown="pickClient(${i})" title="Single-click to view profile · double-click for quick detail drawer">
+      <div class="d-name">${esc(c.name||'(No Name)')}</div>
+      <div class="d-idn">IDN: ${esc(c.idn)} &nbsp;·&nbsp; ${esc(c.status||'—')}</div>
+    </div>`).join('');
+  dropIdx = -1;
+}
+
+function onKey(e) {
+  const n = dropList.length;
+  if (e.key==='ArrowDown') { dropIdx=Math.min(dropIdx+1,n-1); highlightDrop(); e.preventDefault(); }
+  else if (e.key==='ArrowUp') { dropIdx=Math.max(dropIdx-1,0); highlightDrop(); e.preventDefault(); }
+  else if (e.key==='Enter' && dropIdx>=0) { pickClient(dropIdx); e.preventDefault(); }
+  else if (e.key==='Escape') { hideDrop(); }
+}
+function highlightDrop() {
+  id('drop').querySelectorAll('.drop-item').forEach((el,i)=>el.style.background=i===dropIdx?'var(--primary-pale)':'');
+}
+function showDrop() { if(dropList.length) id('drop').style.display='block'; }
+function hideDrop() { setTimeout(()=>id('drop').style.display='none',150); }
+
+function pickClient(i) {
+  const c = dropList[i];
+  currentClient = c;
+  id('srch').value = c.name || c.idn;
+  id('drop').style.display='none';
+  renderProfile(c);
+}
+
+// ═══════════════════════════ TRACK DATE ══════════════════════
+function todayISO() {
+  const d = new Date();
+  return d.toISOString().substring(0,10);
+}
+function initTrackDate() {
+  id('track-date').value = todayISO();
+}
+function resetTrackDate() {
+  id('track-date').value = todayISO();
+  if (currentClient) renderProfile(currentClient);
+}
+function onTrackDateChange() {
+  if (currentClient) renderProfile(currentClient);
+}
+function getTrackDate() {
+  const v = id('track-date').value;
+  if (v) { const d=new Date(v); if(!isNaN(d)) return d; }
+  return new Date();
+}
+
+// ═══════════════════════════ RENDER PROFILE ══════════════════
+function renderProfile(c) {
+  const el = id('profile');
+  el.style.display='block';
+
+  // GPS calc
+  const gpsTypeRaw = (c.gpsType||'').toUpperCase();
+  const vendor = gpsTypeRaw.includes('SCRAM') ? 'SCRAM' : gpsTypeRaw.includes('ALLIED') ? 'ALLIED' : gpsTypeRaw.includes('IC') ? 'IC' : '';
+  const dailyRate = vendor==='SCRAM' ? 15 : vendor==='ALLIED' ? 8 : vendor==='IC' ? 0 : null;
+
+  // GPS payments (filter by type)
+  const gpsPayTypes = ['scram','allied','install','gps','install fee'];
+  const gpsPayments = c.payments.filter(p => {
+    const t = (c._pm.typeCol ? (p[c._pm.typeCol]||'') : '').toLowerCase();
+    return gpsPayTypes.some(g => t.includes(g));
+  });
+  const allPayments = c.payments;
+
+  // PTR payments (non-GPS)
+  const ptrPayments = allPayments.filter(p => {
+    const t = (c._pm.typeCol ? (p[c._pm.typeCol]||'') : '').toLowerCase();
+    return !gpsPayTypes.some(g => t.includes(g));
+  });
+
+  let totalGpsPaid = 0;
+  gpsPayments.forEach(p => { if(c._pm.amtCol) totalGpsPaid += toNum(p[c._pm.amtCol]); });
+
+  let totalPtrPaid = 0;
+  ptrPayments.forEach(p => { if(c._pm.amtCol) totalPtrPaid += toNum(p[c._pm.amtCol]); });
+
+  let totalAllPaid = 0;
+  allPayments.forEach(p => { if(c._pm.amtCol) totalAllPaid += toNum(p[c._pm.amtCol]); });
+
+  // If payment types aren't differentiated, use all as GPS payments when GPS is active
+  let effectiveGpsPaid = totalGpsPaid;
+  if (c.gpsActive && gpsPayments.length === 0 && allPayments.length > 0) {
+    effectiveGpsPaid = totalAllPaid;
+  }
+
+  const daysCoveredRaw = dailyRate > 0 ? Math.max(0, (effectiveGpsPaid - GPS_INSTALL_FEE) / dailyRate) : null;
+
+  // Day adjustment — session value overrides BB value if officer updated it in the tool
+  const bbAdj = c.dayAdj || 0;
+  const sessionAdj = sessionAdjustments.hasOwnProperty(c.idn) ? sessionAdjustments[c.idn] : bbAdj;
+  const daysCovered = daysCoveredRaw !== null ? daysCoveredRaw + sessionAdj : null;
+
+  // Days active — GPS Install Date is the ONLY valid start date
+  const installDate = c.gpInstall || '';
+  let daysActive = null;
+  let startDateStr = installDate;
+  let startDateDisplay = '';
+  if (startDateStr) {
+    const start = new Date(startDateStr);
+    if (!isNaN(start)) {
+      startDateDisplay = fmtDate(startDateStr);
+      const trackDate = getTrackDate();
+      const closedDate = c.closed ? new Date(c.closed) : null;
+      let endDate = trackDate;
+      if (closedDate && !isNaN(closedDate) && closedDate < trackDate) endDate = closedDate;
+      daysActive = Math.max(0, Math.floor((endDate - start) / 86400000));
+    }
+  }
+
+  const surplus = (daysCovered !== null && daysActive !== null) ? daysCovered - daysActive : null;
+  const surplusDollars = (surplus !== null && dailyRate !== null) ? surplus * dailyRate : null;
+  const covered = surplus !== null ? surplus >= 0 : null;
+
+
+  // Check-in stats
+  const ciCount = c.checkIns.length;
+  const ciByType = {};
+  c.checkIns.forEach(ci => {
+    const t = (c._ci.typeCol ? (ci[c._ci.typeCol]||'') : '') || 'Unknown';
+    ciByType[t] = (ciByType[t]||0)+1;
+  });
+
+  // Status badge
+  const sl = (c.status||'').toLowerCase();
+  const statusCls = sl.includes('open') ? 'badge-open' : sl.includes('clos') ? 'badge-closed' : 'badge-warn';
+  const gpsCls = vendor==='SCRAM' ? 'badge-scram' : vendor==='ALLIED' ? 'badge-allied' : 'badge-gps';
+
+  el.innerHTML = `
+<div style="max-width:900px" data-idn="${esc(c.idn)}" title="Double-click anywhere on this profile for quick detail drawer">
+  <div class="p-header">
+    <div>
+      <div class="p-name">${esc(c.name||'(No Name)')}</div>
+      <div class="p-meta">IDN: ${esc(c.idn)} &nbsp;|&nbsp; Case #: ${esc(c.caseNo||'—')}</div>
+      <div class="p-badges">
+        ${c.status ? `<span class="badge ${statusCls}">${esc(c.status)}</span>` : ''}
+        ${c.gpsActive ? `<span class="badge ${gpsCls}">📡 GPS${vendor?' — '+vendor:''}</span>` : ''}
+        ${c.dma?.toLowerCase()==='yes'||c.dma==='True' ? '<span class="badge badge-warn">DMA</span>' : ''}
+        ${c.ptrDone?.toLowerCase()==='yes' ? '<span class="badge badge-allied">✓ PTR Complete</span>' : ''}
+      </div>
+    </div>
+  </div>
+  <div class="p-body">
+    <div class="p-grid">
+
+      <!-- CASE INFO -->
+      <div class="p-section">
+        <h3>Case Information</h3>
+        ${ir('Officer',c.officer)}
+        ${ir('Pretrial Level',c.level)}
+        ${ir('Supervision Type',c.suptype)}
+        ${ir('Charge Type',c.charge)}
+        ${ir('Order From',c.order)}
+        ${ir('Referral Date',fmtDate(c.refdate))}
+        ${ir('Closed Date',fmtDate(c.closed))}
+        ${ir('PTR Completed',c.ptrDone)}
+        ${ir('Bond Amount',c.bond>0?'$'+c.bond.toLocaleString():'')}
+        ${ir('Birthdate',fmtDate(c.bday))}
+        ${ir('Victim',c.victim)}
+      </div>
+
+      <!-- CHECK-INS -->
+      <div class="p-section">
+        <h3>Check-Ins &mdash; ${ciCount} total</h3>
+        ${ciCount > 0 ? `
+          <div class="ci-summary">
+            ${Object.entries(ciByType).map(([t,n])=>`<span class="ci-chip">${esc(t)}: ${n}</span>`).join('')}
+          </div>
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Type</th><th>Officer</th></tr></thead>
+            <tbody>
+              ${c.checkIns.slice(0,20).map(ci=>`
+                <tr>
+                  <td>${esc(fmtDate(c._ci.dateCol?ci[c._ci.dateCol]:'')||'—')}</td>
+                  <td>${esc(c._ci.typeCol?ci[c._ci.typeCol]:'—')}</td>
+                  <td>${esc(c._ci.offCol?ci[c._ci.offCol]:'—')}</td>
+                </tr>`).join('')}
+              ${c.checkIns.length>20?`<tr><td colspan="3" style="color:var(--muted);font-style:italic;text-align:center">+ ${c.checkIns.length-20} more…</td></tr>`:''}
+            </tbody>
+          </table>` : '<p class="empty-msg">No check-in records loaded.</p>'}
+      </div>
+
+      <!-- GPS PANEL -->
+      ${c.gpsActive ? `
+      <div class="p-section full">
+        <h3>GPS Monitoring Coverage</h3>
+        <div class="p-grid" style="border:none;gap:0">
+          <div>
+            ${ir('GPS Vendor / Type', vendor || c.gpsType || '—')}
+            ${ir('Daily Rate', dailyRate !== null ? '$'+dailyRate+'/day' : '—')}
+            ${ir('GPS Install Date (Start)', startDateDisplay || '<span style="color:var(--accent);font-weight:700">Not found in GPS 48 Hours file</span>')}
+            ${ir('Tracking To', fmtDate(id('track-date').value) || 'Today')}
+            ${ir('DA Emailed', c.gpDA)}
+            ${ir('Victim Accept/Deny', c.gpVictim)}
+            ${ir('Order', c.gpOrder)}
+          </div>
+          <div>
+            <div class="gps-summary">
+              <div class="gps-stat teal">
+                <div class="gs-val">${daysActive !== null ? daysActive : '—'}</div>
+                <div class="gs-lbl">Days Active</div>
+              </div>
+              <div class="gps-stat">
+                <div class="gs-val">${daysCovered !== null ? daysCovered.toFixed(1) : '—'}</div>
+                <div class="gs-lbl">Days Covered (adj.)</div>
+              </div>
+              <div class="gps-stat amber">
+                <div class="gs-val">$${effectiveGpsPaid.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+                <div class="gs-lbl">GPS Payments</div>
+              </div>
+            </div>
+
+            ${surplus !== null ? `
+            <div class="coverage-verdict ${covered?'ok':'warn'}">
+              ${covered
+                ? `✓ COVERED — Surplus: ${surplus.toFixed(1)} days ($${surplusDollars.toFixed(0)})`
+                : `⚠ SHORTFALL — ${Math.abs(surplus).toFixed(1)} days short ($${Math.abs(surplusDollars).toFixed(0)} needed)`}
+            </div>` : '<p style="color:var(--accent);font-size:12px;font-weight:600;margin-top:8px">⚠ GPS Install Date not found — upload the GPS 48 Hours file to calculate coverage.</p>'}
+
+            <!-- DAY ADJUSTMENT BOX -->
+            <div class="adj-box ${sessionAdj !== 0 ? 'has-adj' : ''}">
+              <div class="adj-title">
+                ${sessionAdj !== 0 ? '✏️ Day Adjustment Applied' : '⚡ Day Adjustment'}
+              </div>
+              <div class="adj-row">
+                <label for="adj-input-${c.idn}">Adjust days covered by:</label>
+                <input type="number" class="adj-input" id="adj-input-${c.idn}"
+                  value="${sessionAdj}"
+                  step="1"
+                  placeholder="0"
+                  onkeydown="if(event.key==='Enter') applyAdj('${c.idn}')">
+                <button class="adj-save" onclick="applyAdj('${c.idn}')">Apply</button>
+              </div>
+              ${bbAdj !== 0 ? `<div class="adj-from-bb">📋 Blue Book value: ${bbAdj > 0 ? '+' : ''}${bbAdj} days</div>` : ''}
+              <div class="adj-note">
+                Positive = add days (e.g. payments not yet reflected, custody credit).<br>
+                Negative = subtract days. Recalculates coverage instantly.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
+
+      <!-- PAYMENTS -->
+      <div class="p-section full">
+        <h3>Payment History &mdash; Total: $${totalAllPaid.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</h3>
+        ${allPayments.length > 0 ? `
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Officer</th></tr></thead>
+          <tbody>
+            ${allPayments.map(p => {
+              const d = c._pm.dateCol ? p[c._pm.dateCol]||'' : '';
+              const a = c._pm.amtCol ? toNum(p[c._pm.amtCol]) : 0;
+              const t = c._pm.typeCol ? p[c._pm.typeCol]||'' : '';
+              const o = c._pm.offCol  ? p[c._pm.offCol]||''  : '';
+              return `<tr>
+                <td>${esc(fmtDate(d)||'—')}</td>
+                <td>$${a.toFixed(2)}</td>
+                <td>${esc(t||'—')}</td>
+                <td>${esc(o||'—')}</td>
+              </tr>`;
+            }).join('')}
+            <tr class="total-row">
+              <td colspan="3"><strong>Total</strong></td>
+              <td><strong>$${totalAllPaid.toFixed(2)}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        ${totalGpsPaid > 0 && totalPtrPaid > 0 ? `
+        <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+          GPS payments: <strong>$${totalGpsPaid.toFixed(2)}</strong> &nbsp;·&nbsp;
+          PTR fee payments: <strong>$${totalPtrPaid.toFixed(2)}</strong>
+        </div>` : ''}
+        ` : '<p class="empty-msg">No payment records loaded.</p>'}
+      </div>
+
+    </div>
+  </div>
+</div>`;
+}
+
+// ═══════════════════════════ HELPERS ═════════════════════════
+const id   = s => document.getElementById(s);
+const norm = v => (v||'').toString().trim();
+const r    = (row, col) => col ? (row[col]||'') : '';
+const esc  = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const toNum= v => parseFloat((v||'0').toString().replace(/[^0-9.-]/g,''))||0;
+
+function fmtDate(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+function ir(label, val) {
+  if (!val || val==='—') return '';
+  return `<div class="info-row"><span class="k">${label}</span><span class="v">${esc(val)}</span></div>`;
+}
+
+function applyAdj(idn) {
+  const input = document.getElementById('adj-input-' + idn);
+  if (!input) return;
+  const val = parseFloat(input.value) || 0;
+  sessionAdjustments[idn] = val;
+  if (currentClient && currentClient.idn === idn) renderProfile(currentClient);
+}
+
+
+</script>
+</body>
+</html>

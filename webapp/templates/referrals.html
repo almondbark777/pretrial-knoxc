@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Referral · Knox County Pre-Trial</title>
+
+  <!-- KH-THEME-START — shared chrome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+
+  <style>
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px; }
+
+    .page-h {
+      font-family: var(--serif);
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--ink);
+      margin: 0 0 4px 0;
+      letter-spacing: -0.01em;
+    }
+    .page-h em { font-style: italic; color: var(--navy); font-weight: 400; }
+    .page-sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    /* Lookup / dup-check card */
+    .lookup-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .lookup-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .lookup-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-family: var(--sans);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .lookup-input:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px var(--navy-pale);
+    }
+
+    .lookup-results { margin-top: 12px; }
+    .lookup-empty {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 8px 0;
+    }
+    .lookup-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-soft);
+      border-radius: 2px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      background: var(--bg-soft);
+    }
+    .lookup-row.active {
+      background: #fdecec;
+      border-color: var(--red);
+    }
+    .lookup-row .name { font-weight: 600; color: var(--ink); }
+    .lookup-row .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+    .badge-active {
+      background: var(--red);
+      color: white;
+    }
+    .badge-closed {
+      background: var(--muted-2);
+      color: white;
+    }
+
+    .dup-warning {
+      background: #fdecec;
+      border: 1px solid var(--red);
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: 2px;
+      margin-top: 10px;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .dup-warning strong { font-family: var(--mono); }
+
+    /* Form card */
+    .form-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .form-section-h {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rule);
+      margin: 22px 0 16px 0;
+    }
+    .form-section-h:first-child { margin-top: 0; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px 22px;
+    }
+    .form-grid .full { grid-column: span 2; }
+
+    .field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .field input[type=text],
+    .field input[type=date],
+    .field input[type=number],
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 9px 11px;
+      font-size: 13px;
+      font-family: var(--sans);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px var(--navy-pale);
+    }
+    .field textarea { min-height: 80px; resize: vertical; font-family: var(--sans); }
+
+    .checkrow {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 6px 0;
+    }
+    .checkbox {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .checkbox input { transform: translateY(1px); }
+
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      padding: 14px 18px;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: var(--shadow-md);
+      z-index: 2000;
+      transform: translateY(-20px);
+      opacity: 0;
+      transition: opacity .15s, transform .15s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok  { background: var(--good); color: white; }
+    .toast.err { background: var(--red);  color: white; }
+
+    @media (max-width: 720px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    <h1 class="page-h">New <em>Referral</em></h1>
+    <div class="page-sub">First point of contact · adds defendant to active roster</div>
+
+    <!-- DUPLICATE LOOKUP -->
+    <div class="lookup-card">
+      <div class="lookup-label">Step 1 — Search existing defendants by name or IDN</div>
+      <input id="lookup" class="lookup-input" type="text"
+             placeholder="Start typing a name (e.g. SMITH) or IDN (e.g. 1701536)…"
+             autocomplete="off">
+      <div id="dupWarning"></div>
+      <div id="lookupResults" class="lookup-results"></div>
+    </div>
+
+    <!-- FORM -->
+    <form id="referralForm" class="form-card" onsubmit="return submitReferral(event)">
+      <div class="form-section-h">Defendant</div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="f_name">Name (Last, First Middle)</label>
+          <input id="f_name" name="defendant_name" type="text" required placeholder="SMITH, JOHN ROBERT">
+        </div>
+        <div class="field">
+          <label for="f_idn">IDN</label>
+          <input id="f_idn" name="idn" type="text" required placeholder="1701536">
+        </div>
+        <div class="field">
+          <label for="f_birthdate">Birthdate</label>
+          <input id="f_birthdate" name="birthdate" type="date">
+        </div>
+        <div class="field">
+          <label for="f_case_number">Warrant / Case Number(s)</label>
+          <input id="f_case_number" name="case_number" type="text" placeholder="@1655513">
+        </div>
+      </div>
+
+      <div class="form-section-h">Supervision</div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="f_pretrial_level">Pretrial Level</label>
+          <select id="f_pretrial_level" name="pretrial_level">
+            <option value="">—</option>
+            <option value="1">Level 1</option>
+            <option value="2">Level 2</option>
+            <option value="3">Level 3</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f_supervision_type">Supervision Type</label>
+          <select id="f_supervision_type" name="supervision_type">
+            <option value="">—</option>
+            <option value="Pre-Trial">Pre-Trial</option>
+            <option value="Allied">Allied</option>
+            <option value="GPS">GPS</option>
+            <option value="SCRAM">SCRAM</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f_charge_type">Charge Type</label>
+          <select id="f_charge_type" name="charge_type">
+            <option value="">—</option>
+            <option value="Misdemeanor">Misdemeanor</option>
+            <option value="Felony">Felony</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f_order_from">Order From</label>
+          <select id="f_order_from" name="order_from">
+            <option value="">—</option>
+            <option value="Judge">Judge</option>
+            <option value="Magistrate">Magistrate</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f_supervising_officer">Supervising Officer</label>
+          <input id="f_supervising_officer" name="supervising_officer" type="text"
+                 placeholder="firstname.lastname@knoxsheriff.org">
+        </div>
+        <div class="field">
+          <label for="f_referral_date">Referral Date</label>
+          <input id="f_referral_date" name="referral_date" type="date">
+        </div>
+        <div class="field">
+          <label for="f_contact_date">Contact Date</label>
+          <input id="f_contact_date" name="contact_date" type="date">
+        </div>
+        <div class="field">
+          <label for="f_signed_copy_date">Received Signed Copy Date</label>
+          <input id="f_signed_copy_date" name="received_signed_copy_date" type="date">
+        </div>
+        <div class="field full">
+          <label>Conditions</label>
+          <div class="checkrow">
+            <label class="checkbox"><input type="checkbox" id="f_gps" name="gps"> GPS Monitoring</label>
+            <label class="checkbox"><input type="checkbox" id="f_dma" name="dma"> DMA</label>
+            <label class="checkbox"><input type="checkbox" id="f_comments_flag" name="comments_flag"> Comments on file</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f_gps_type">GPS Type (if applicable)</label>
+          <select id="f_gps_type" name="gps_type">
+            <option value="">—</option>
+            <option value="ALLIED">Allied</option>
+            <option value="IN CUSTODY">In Custody</option>
+            <option value="SCRAM">SCRAM</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f_bond_amount">Bond Amount</label>
+          <input id="f_bond_amount" name="bond_amount" type="number" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="field full">
+          <label for="f_bond_conditions">Bond Conditions</label>
+          <textarea id="f_bond_conditions" name="bond_conditions" placeholder="Any specific conditions of bond…"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section-h">Victim Information (if any)</div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="f_victim">Victim Name</label>
+          <input id="f_victim" name="victim" type="text" placeholder="LASTNAME, FIRST">
+        </div>
+        <div class="field">
+          <label for="f_victim_idn">Victim IDN</label>
+          <input id="f_victim_idn" name="victim_idn" type="text">
+        </div>
+        <div class="field full">
+          <label for="f_victim_time_48">Victim 48-hour notification time</label>
+          <input id="f_victim_time_48" name="victim_time_48" type="datetime-local">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="reset" class="kh-btn kh-btn-ghost">Clear</button>
+        <button type="submit" class="kh-btn">Submit Referral</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // ───── Live duplicate lookup ──────────────────────────────────────────
+    const lookupEl  = document.getElementById('lookup');
+    const resultsEl = document.getElementById('lookupResults');
+    const warnEl    = document.getElementById('dupWarning');
+
+    let lookupTimer = null;
+    let lastQ = '';
+
+    lookupEl.addEventListener('input', () => {
+      const q = lookupEl.value.trim();
+      // also mirror name/IDN into the form fields if they're empty.
+      maybeMirror(q);
+      if (lookupTimer) clearTimeout(lookupTimer);
+      if (q.length < 2) { renderResults([], q); return; }
+      lookupTimer = setTimeout(() => runLookup(q), 200);
+    });
+
+    function maybeMirror(q) {
+      const isDigits = /^\d+$/.test(q);
+      const idnEl  = document.getElementById('f_idn');
+      const nameEl = document.getElementById('f_name');
+      if (isDigits && !idnEl.value) idnEl.value = q;
+      if (!isDigits && !nameEl.value) nameEl.value = q.toUpperCase();
+    }
+
+    async function runLookup(q) {
+      lastQ = q;
+      try {
+        const r = await fetch('/api/lookup?q=' + encodeURIComponent(q) + '&limit=10');
+        const j = await r.json();
+        if (j.q !== lastQ) return;  // stale
+        renderResults(j.results || [], q);
+      } catch (e) {
+        renderResults([], q);
+      }
+    }
+
+    function renderResults(rows, q) {
+      // Warn loudly if any open/active match
+      const activeHits = rows.filter(r => r.active);
+      if (activeHits.length) {
+        const top = activeHits[0];
+        warnEl.innerHTML = `
+          <div class="dup-warning">
+            ⚠ <strong>${top.name}</strong> (IDN ${top.idn}) already has an OPEN case
+            ${top.caseNum ? '· ' + top.caseNum : ''}
+            ${top.officer ? '· assigned to ' + top.officer : ''}.
+            Adding a new referral will create a duplicate. Confirm before continuing.
+          </div>`;
+      } else {
+        warnEl.innerHTML = '';
+      }
+      if (!rows.length) {
+        resultsEl.innerHTML = q.length >= 2
+          ? '<div class="lookup-empty">No matches — this person looks new.</div>'
+          : '';
+        return;
+      }
+      resultsEl.innerHTML = rows.map(r => `
+        <div class="lookup-row ${r.active ? 'active' : ''}" data-idn="${r.idn}" title="Double-click for quick detail drawer">
+          <div>
+            <div class="name">${r.name || '—'}</div>
+            <div class="meta">IDN ${r.idn}${r.caseNum ? ' · ' + r.caseNum : ''}</div>
+          </div>
+          <span class="badge ${r.active ? 'badge-active' : 'badge-closed'}">${r.status || '—'}</span>
+          <span class="meta">${r.level ? 'L' + r.level : ''}</span>
+          <span class="meta">${r.officer || ''}</span>
+          <a href="/edit_defendant.html?idn=${encodeURIComponent(r.idn)}"
+             class="kh-btn kh-btn-ghost"
+             style="padding:5px 10px; font-size:10px;"
+             title="Edit this defendant's information">✏ Edit</a>
+        </div>
+      `).join('');
+    }
+
+    // ───── Submit ─────────────────────────────────────────────────────────
+    async function submitReferral(e) {
+      e.preventDefault();
+      const form = document.getElementById('referralForm');
+      const fd = new FormData(form);
+      const body = {};
+      for (const [k, v] of fd.entries()) body[k] = v;
+      // checkbox fields → boolean
+      body.gps           = document.getElementById('f_gps').checked;
+      body.dma           = document.getElementById('f_dma').checked;
+      body.comments_flag = document.getElementById('f_comments_flag').checked;
+
+      try {
+        const r = await fetch('/api/referrals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (r.ok && j.ok) {
+          toast('Referral saved · IDN ' + body.idn, 'ok');
+          form.reset();
+          lookupEl.value = '';
+          renderResults([], '');
+        } else {
+          toast(j.error || 'Save failed', 'err');
+        }
+      } catch (e) {
+        toast('Network error', 'err');
+      }
+      return false;
+    }
+
+    function toast(msg, kind) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (kind || 'ok');
+      setTimeout(() => { t.className = 'toast ' + (kind || 'ok'); }, 3500);
+    }
+
+    // Default referral_date and contact_date to today on first render.
+    (function setDefaults() {
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('f_referral_date').value = today;
+      document.getElementById('f_contact_date').value  = today;
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the PTR SharePoint import daily
+
+[Timer]
+# 05:30 local time — after the Power Automate flow emails the export at ~05:00.
+OnCalendar=*-*-* 05:30:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

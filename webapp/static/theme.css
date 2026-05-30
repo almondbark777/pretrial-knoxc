@@ -1,0 +1,392 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Knox County Pre-Trial — shared theme
+   Design tokens + masthead + navigation. Loaded on every template.
+   Per-page CSS still lives in each template's <style> block.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #f5f1e6;
+  --bg-soft: #ebe5d3;
+  --surface: #fdfaf1;
+  --surface-raised: #ffffff;
+  --ink: #0e1a2b;
+  --ink-soft: #1f2c43;     /* was #2b3a50 — darker for higher contrast */
+  --muted: #4a5160;        /* was #6b7184 — readable on cream/tan */
+  --muted-2: #5e6373;      /* was #8f94a3 — readable on cream/tan */
+  --rule: #d9d0b7;
+  --rule-soft: #e6dec6;
+  --navy: #0f3a66;
+  --navy-2: #1b5591;
+  --navy-pale: #dfe9f5;
+  --gold: #a8751a;
+  --gold-pale: #f4e5c1;
+  --teal: #0e5b6b;
+  --teal-pale: #c8e5e8;
+  --good: #2a6a3f;
+  --good-pale: #cfe3d4;
+  --warn-bg: #fbeacc;
+  --warn-fg: #7a4808;
+  --red: #8b2a2a;
+  --red-pale: #f1d6d6;
+  --shadow-sm: 0 1px 0 rgba(14, 26, 43, .04), 0 1px 2px rgba(14, 26, 43, .04);
+  --shadow-md: 0 1px 0 rgba(14, 26, 43, .04), 0 6px 18px -8px rgba(14, 26, 43, .18);
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sans: 'Inter Tight', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --serif: 'Fraunces', 'Charter', Georgia, serif;
+}
+
+/* Hide any existing top-level header/nav from the original mockups —
+   the unified .masthead is injected by /static/site-chrome.js */
+body > header:not(.masthead),
+body > nav:not(.masthead-nav) {
+  display: none !important;
+}
+
+/* Body & base — wins over per-template inline styles because this file is
+   loaded after the inline <style> blocks. */
+body {
+  background: var(--bg) !important;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+/* ─── Masthead ─────────────────────────────────────────────────────────── */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.mast-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.mast-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--navy);
+  color: var(--gold-pale);
+  border-radius: 6px;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.mast-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.mast-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.mast-h {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 2px 0 0 0;
+}
+
+.mast-h em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--navy);
+}
+
+.mast-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mast-meta .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--good);
+  display: inline-block;
+}
+
+.mast-meta .user-tag {
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Top navigation ───────────────────────────────────────────────────── */
+
+.topnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.topnav a {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 3px;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+
+.topnav a:hover {
+  background: var(--navy-pale);
+  color: var(--navy);
+}
+
+.topnav a.active {
+  background: var(--navy);
+  color: var(--gold-pale);
+}
+
+/* ─── Reusable utility classes (opt-in for per-page restyling later) ──── */
+
+.kh-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kh-btn {
+  display: inline-block;
+  padding: 10px 18px;
+  background: var(--navy);
+  color: var(--gold-pale);
+  border: none;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.kh-btn:hover {
+  background: var(--ink);
+}
+
+.kh-btn-ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+}
+
+.kh-btn-ghost:hover {
+  background: var(--navy-pale);
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+/* Tame super-saturated mockup colors so they harmonize with the cream theme.
+   Targets generic Tailwind-ish hues that show up across the original templates. */
+
+[style*="background-color: #1a3a6b"],
+[style*="background:#1a3a6b"],
+[style*="background-color:#0f2744"],
+[style*="background:#0f2744"] {
+  background: var(--navy) !important;
+}
+
+/* Readability backstop: any element that paints itself with a dark navy/ink
+   background should default its child text to a light color so dark-on-dark
+   doesn't happen. Inner elements that explicitly set their own color win. */
+[style*="background-color: #1a3a6b"],
+[style*="background:#1a3a6b"],
+[style*="background-color:#0f2744"],
+[style*="background:#0f2744"],
+[style*="background-color:#0f2548"],
+[style*="background:#0f2548"],
+[style*="background-color:#1e293b"],
+[style*="background:#1e293b"],
+[style*="background-color:#0f172a"],
+[style*="background:#0f172a"],
+.bg-navy, .navy-bar, .subnav, .header,
+[class*="-dark"], [class*="dark-"] {
+  color: #f4e5c1;
+}
+[style*="background-color: #1a3a6b"] *:not(a):not(button):not([style*="color"]),
+[style*="background:#1a3a6b"]      *:not(a):not(button):not([style*="color"]),
+[style*="background-color:#0f2744"] *:not(a):not(button):not([style*="color"]),
+[style*="background:#0f2744"]      *:not(a):not(button):not([style*="color"]),
+[style*="background-color:#0f2548"] *:not(a):not(button):not([style*="color"]),
+[style*="background:#0f2548"]      *:not(a):not(button):not([style*="color"]) {
+  color: inherit;
+}
+
+/* Body/main text — pin a strong default ink color so any leftover "color:#999"
+   styles from the mockups still land readably on cream. */
+body, body p, body li, body td, body th, body label, body span:not([class]) {
+  color: var(--ink);
+}
+
+/* Spacing for content under sticky masthead so the first card doesn't kiss the bar */
+main, .container, .main-content, .content, .dashboard {
+  padding-top: 0;
+}
+
+/* Print: drop the masthead from printed pages */
+@media print {
+  .masthead { display: none !important; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DARK MODE OVERRIDE — added by request 2026-04-25.
+   Forces black background + white text everywhere. Sits at the END so it
+   wins over both the cream tokens above AND the per-template inline styles
+   in the original mockups.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #000 !important;
+  --bg-soft: #1a1a1a !important;
+  --surface: #111 !important;
+  --surface-raised: #1c1c1c !important;
+  --ink: #fff !important;
+  --ink-soft: #e8e8e8 !important;
+  --muted: #c8c8c8 !important;
+  --muted-2: #a8a8a8 !important;
+  --rule: #333 !important;
+  --rule-soft: #2a2a2a !important;
+}
+
+html, body {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* Surfaces (cards, panels, banners) → dark gray */
+.masthead,
+.kh-card,
+.stat-card,
+.section-card,
+.app-card,
+.activity-item,
+.officer-row,
+.lookup-card,
+.form-card,
+.recent,
+.modal,
+.modal-content,
+.card,
+.panel,
+section,
+main,
+article,
+aside,
+header,
+footer,
+table, thead, tbody, tr, td, th,
+input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]),
+select,
+textarea {
+  background-color: #1c1c1c !important;
+  color: #fff !important;
+  border-color: #333 !important;
+}
+
+/* All headings, paragraphs, labels, list items → white */
+h1, h2, h3, h4, h5, h6, p, li, label, td, th, dt, dd,
+div, span, small, strong, em, blockquote {
+  color: #fff !important;
+}
+
+/* Links — white but slightly dimmer; underline on hover */
+a { color: #ffffff !important; }
+a:hover { color: #f4e5c1 !important; }
+
+/* Inputs / selects — pin contents to white on the dark surface */
+input::placeholder, textarea::placeholder { color: #888 !important; }
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--gold, #a8751a) !important;
+  outline-offset: 1px !important;
+}
+
+/* Preserve button identity — buttons keep their navy/gold/red coloring,
+   so list them explicitly so they don't get nuked by the rules above. */
+button, .kh-btn, .app-button, .badge, .badge-active, .badge-closed,
+.btn, [class*="btn-"], [class*="-btn"] {
+  /* keep whatever color the per-component rule set */
+}
+button, .kh-btn, .app-button { color: #fff !important; }
+
+/* Status pills — keep their own color schemes (don't override) */
+.po, .pc, .l1, .l2, .l3, .badge, .status-pill {
+  color: inherit;
+}
+
+/* Officer name / accent text inside dark cards */
+.officer-name, .activity-title, .activity-desc, .activity-time,
+.stat-card h3, .stat-card .number, .stat-card .subtext,
+.app-card h3, .app-card p {
+  color: #fff !important;
+}
+.stat-card .number { color: #f4e5c1 !important; } /* highlight numbers */
+
+/* Top nav — light text on a dark masthead */
+.topnav a { color: #e8e8e8 !important; }
+.topnav a:hover { background: #2a2a2a !important; color: #f4e5c1 !important; }
+.topnav a.active { background: var(--navy, #0f3a66) !important; color: #f4e5c1 !important; }
+
+/* Mast brand mark — gold-on-navy stays */
+.mast-mark { background: var(--navy, #0f3a66) !important; color: #f4e5c1 !important; }
+
+/* Selected client banner (log_activity) stays navy */
+.selected-card { background: var(--navy, #0f3a66) !important; }
+
+/* Lookup rows — slightly lighter than card so they pop */
+.lookup-row { background: #242424 !important; border-color: #333 !important; }
+.lookup-row:hover { background: #2e2e2e !important; }
+.lookup-row.active-status { border-left-color: #4caf50 !important; }
+.lookup-row.closed-status { border-left-color: #666 !important; }
+.lookup-row.active { background: #3a1f1f !important; border-color: #8b2a2a !important; }
+
+/* Duplicate warning — readable red on dark */
+.dup-warning {
+  background: #3a1f1f !important;
+  border-color: #b03b3b !important;
+  color: #ffd6d6 !important;
+}
+
+/* Recent activity items inside the dark feed */
+.activity-item { background: #242424 !important; border-left-color: #4a90e2 !important; }
+.officer-bar { background: #2a2a2a !important; }
+

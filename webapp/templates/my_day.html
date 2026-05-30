@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Day · Knox County Pre-Trial</title>
+  <!-- KH-THEME-START -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+  <style>
+    .page { max-width: 1280px; margin: 0 auto; padding: 28px; }
+    .greet {
+      font-family: var(--serif);
+      font-size: 30px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      margin: 0 0 4px 0;
+    }
+    .greet em { font-style: italic; color: var(--navy); font-weight: 400; }
+    .sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 26px;
+    }
+
+    .alert-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .alert-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--gold);
+      border-radius: 4px;
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: transform .12s, border-color .12s;
+    }
+    .alert-card:hover { border-left-color: #b03b3b; transform: translateY(-1px); }
+    .alert-card.danger { border-left-color: #b03b3b; }
+    .alert-card.info   { border-left-color: var(--navy); }
+    .alert-card.good   { border-left-color: #2a6a3f; }
+    .alert-card .n {
+      font-family: var(--mono);
+      font-size: 30px;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    .alert-card .l {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 22px;
+    }
+    @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+    .card h2 {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin: 0 0 14px 0;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .card h2 .ct {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: none;
+    }
+
+    .case-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--rule-soft);
+      cursor: pointer;
+      transition: background .1s;
+      font-size: 13px;
+    }
+    .case-row:hover { background: var(--bg-soft); }
+    .case-row .name { font-weight: 600; }
+    .case-row .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .case-row .last-ci.overdue { color: #b03b3b; font-weight: 600; }
+    .badge-l {
+      display: inline-block;
+      padding: 2px 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      border-radius: 2px;
+    }
+    .badge-l1 { background: #2a6a3f; color: #fff; }
+    .badge-l2 { background: #a8751a; color: #fff; }
+    .badge-l3 { background: #8b2a2a; color: #fff; }
+    .gps-tag {
+      display: inline-block;
+      background: #7c3aed;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 2px;
+      margin-left: 6px;
+    }
+
+    .reminder {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      font-size: 13px;
+    }
+    .reminder input[type=checkbox] { margin-top: 4px; cursor: pointer; }
+    .reminder.done { opacity: 0.5; text-decoration: line-through; }
+    .reminder .r-body { flex: 1; }
+    .reminder .r-meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .reminder .x {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 11px;
+      align-self: center;
+    }
+    .reminder .x:hover { color: #b03b3b; }
+    .add-reminder {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .add-reminder input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 13px;
+      font-family: var(--sans);
+    }
+    .add-reminder button {
+      background: var(--navy);
+      color: var(--gold-pale);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .empty {
+      padding: 18px 8px;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1 class="greet">My <em>Day</em></h1>
+  <div class="sub" id="sub">Loading your shift…</div>
+
+  <div class="alert-strip" id="alertStrip"></div>
+
+  <div class="grid-2">
+    <div>
+      <div class="card" id="overdueAnchor">
+        <h2>Overdue check-ins <span class="ct" id="overdueCt"></span></h2>
+        <div id="overdueBox"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <h2>My caseload <span class="ct" id="caseCt"></span></h2>
+        <div id="caseBox"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" id="reminders">
+        <h2>Reminders <span class="ct" id="remCt"></span></h2>
+        <div id="remBox"><div class="empty">Loading…</div></div>
+        <div class="add-reminder">
+          <input id="remInput" type="text" placeholder="Add a reminder for yourself…" maxlength="500">
+          <button onclick="addReminder()">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Court this week <span class="ct" id="courtCt"></span></h2>
+        <div id="courtBox"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Pinned ★ <span class="ct" id="pinCt"></span></h2>
+        <div id="pinBox"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let state = null;
+
+(async function load() {
+  const r = await fetch('/api/my_day');
+  state = await r.json();
+  renderAll();
+  // Greeting
+  const h = new Date().getHours();
+  const word = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const officer = state.officer || '';
+  const name = officer.split('@')[0].split('.').map(s => s[0]?.toUpperCase() + s.slice(1)).join(' ');
+  document.querySelector('.greet').innerHTML = `${word}, <em>${name || 'Officer'}</em>`;
+  document.getElementById('sub').textContent = new Date().toLocaleDateString([], {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+})();
+
+function renderAll() {
+  const a = state.alerts || {};
+  document.getElementById('alertStrip').innerHTML = `
+    <div class="alert-card ${a.overdue_checkins > 0 ? 'danger' : 'good'}" onclick="document.getElementById('overdueAnchor').scrollIntoView({behavior:'smooth'})">
+      <div class="n">${a.overdue_checkins || 0}</div>
+      <div class="l">Overdue check-ins</div>
+    </div>
+    <div class="alert-card ${a.pending_violations > 0 ? 'danger' : 'good'}" onclick="window.location.href='/violations.html'">
+      <div class="n">${a.pending_violations || 0}</div>
+      <div class="l">Pending violations</div>
+    </div>
+    <div class="alert-card info" onclick="window.location.href='/court_calendar.html'">
+      <div class="n">${a.court_this_week || 0}</div>
+      <div class="l">Court this week</div>
+    </div>
+    <div class="alert-card info" onclick="document.getElementById('reminders').scrollIntoView({behavior:'smooth'})">
+      <div class="n">${a.my_reminders || 0}</div>
+      <div class="l">Open reminders</div>
+    </div>`;
+
+  // Overdue
+  const overdue = (state.caseload || []).filter(c => isOverdue(c.last_ci));
+  document.getElementById('overdueCt').textContent = overdue.length;
+  document.getElementById('overdueBox').innerHTML = overdue.length
+    ? overdue.map(renderCase).join('')
+    : '<div class="empty">Nobody is overdue. Nice work.</div>';
+
+  // Caseload
+  document.getElementById('caseCt').textContent = (state.caseload || []).length;
+  document.getElementById('caseBox').innerHTML = (state.caseload || []).length
+    ? state.caseload.map(renderCase).join('')
+    : '<div class="empty">No active cases assigned to you.</div>';
+
+  // Reminders
+  renderReminders();
+
+  // Court
+  document.getElementById('courtCt').textContent = (state.court_this_week || []).length;
+  document.getElementById('courtBox').innerHTML = (state.court_this_week || []).length
+    ? state.court_this_week.map(c => `
+        <div class="case-row" data-idn="${c.idn}" onclick="window.khDrawer && window.khDrawer.open('${c.idn}')">
+          <div>
+            <div class="name">${esc(c.name)}</div>
+            <div class="meta">${esc(c.court || 'Court TBD')} · ${esc(formatTs(c.date))}</div>
+          </div>
+          <span class="meta">${esc(c.officer || '')}</span>
+        </div>`).join('')
+    : '<div class="empty">No court appearances on your caseload this week.</div>';
+
+  // Pinned
+  document.getElementById('pinCt').textContent = (state.pinned || []).length;
+  document.getElementById('pinBox').innerHTML = (state.pinned || []).length
+    ? state.pinned.map(p => `
+        <div class="case-row" data-idn="${p.idn}" onclick="window.khDrawer && window.khDrawer.open('${p.idn}')">
+          <div>
+            <div class="name">★ ${esc(p.name)}</div>
+            <div class="meta">IDN ${esc(p.idn)} · ${esc(p.status || '—')}</div>
+          </div>
+        </div>`).join('')
+    : '<div class="empty">Star defendants from the drawer to pin them here.</div>';
+}
+
+function renderCase(c) {
+  const overdue = isOverdue(c.last_ci);
+  const lvl = c.level ? `<span class="badge-l badge-l${c.level}">L${c.level}</span>` : '';
+  const gps = c.gps ? '<span class="gps-tag">GPS</span>' : '';
+  return `
+    <div class="case-row" data-idn="${c.idn}" onclick="window.khDrawer && window.khDrawer.open('${c.idn}')">
+      <div>
+        <div class="name">${esc(c.name)} ${gps}</div>
+        <div class="meta">IDN ${esc(c.idn)}${c.caseNum ? ' · ' + esc(c.caseNum) : ''} · ${esc(c.charge || '—')}</div>
+      </div>
+      ${lvl}
+      <span class="meta last-ci ${overdue ? 'overdue' : ''}">${c.last_ci ? 'Last CI ' + daysAgo(c.last_ci) + 'd ago' : 'No CI'}</span>
+      <span class="meta">$${(c.total_paid || 0).toFixed(0)}</span>
+    </div>`;
+}
+
+function renderReminders() {
+  const rs = state.reminders || [];
+  document.getElementById('remCt').textContent = rs.filter(r => !r.completed).length;
+  if (!rs.length) {
+    document.getElementById('remBox').innerHTML = '<div class="empty">No reminders. Add one below.</div>';
+    return;
+  }
+  document.getElementById('remBox').innerHTML = rs.map(r => `
+    <div class="reminder ${r.completed ? 'done' : ''}">
+      <input type="checkbox" ${r.completed ? 'checked' : ''} onchange="toggleRem(${r.id}, this.checked)">
+      <div class="r-body">
+        ${esc(r.body)}
+        <div class="r-meta">${r.idn ? '<a data-idn="' + r.idn + '" onclick="window.khDrawer.open(\'' + r.idn + '\'); event.stopPropagation();" style="cursor:pointer;">' + esc(r.name || ('IDN ' + r.idn)) + '</a> · ' : ''}${r.due ? 'due ' + esc(formatTs(r.due)) : 'no due date'}</div>
+      </div>
+      <span class="x" onclick="delRem(${r.id})">×</span>
+    </div>`).join('');
+}
+
+async function addReminder() {
+  const i = document.getElementById('remInput');
+  const body = (i.value || '').trim();
+  if (!body) return;
+  await fetch('/api/reminders', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({body}),
+  });
+  i.value = '';
+  reload();
+}
+async function toggleRem(id, done) {
+  if (done) {
+    await fetch('/api/reminders/' + id + '/complete', {method: 'POST'});
+  }
+  reload();
+}
+async function delRem(id) {
+  if (!confirm('Delete this reminder?')) return;
+  await fetch('/api/reminders/' + id, {method: 'DELETE'});
+  reload();
+}
+async function reload() {
+  const r = await fetch('/api/my_day');
+  state = await r.json();
+  renderAll();
+}
+
+function isOverdue(iso) {
+  if (!iso) return true;
+  const d = new Date(iso);
+  return (Date.now() - d.getTime()) / (1000*60*60*24) > 14;
+}
+function daysAgo(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
+}
+function formatTs(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  return d.toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

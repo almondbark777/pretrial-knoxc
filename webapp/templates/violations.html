@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Violations · Knox County Pre-Trial</title>
+  <!-- KH-THEME-START -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+  <style>
+    .page { max-width: 1280px; margin: 0 auto; padding: 28px; }
+    .h { font-family: var(--serif); font-size: 28px; font-weight: 500; margin: 0 0 4px; }
+    .h em { font-style: italic; color: var(--navy); font-weight: 400; }
+    .sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 22px; }
+    @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card { background: var(--surface-raised); border: 1px solid var(--rule); border-radius: 4px; padding: 22px; }
+    .card h2 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
+
+    .lookup-input {
+      width: 100%; padding: 12px 14px; font-size: 14px; font-family: var(--sans);
+      border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); color: var(--ink);
+    }
+    .lookup-results { margin-top: 8px; max-height: 200px; overflow-y: auto; }
+    .lookup-row {
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+      padding: 8px 12px; border: 1px solid var(--rule-soft); border-radius: 2px;
+      margin-bottom: 4px; font-size: 12px; cursor: pointer;
+    }
+    .lookup-row:hover { border-color: var(--navy); background: var(--bg-soft); }
+    .lookup-row .name { font-weight: 600; }
+    .lookup-row .meta { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge { display: inline-block; font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+    .badge.open { background: #2a6a3f; color: #fff; }
+    .badge.closed { background: #555; color: #fff; }
+
+    .selected {
+      background: var(--navy); color: #fff; padding: 12px 16px; border-radius: 3px;
+      margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    }
+    .selected .who { font-family: var(--serif); font-size: 16px; font-weight: 500; }
+    .selected .meta { font-family: var(--mono); font-size: 10px; opacity: 0.85; letter-spacing: 0.08em; }
+    .selected button { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 5px 10px; border-radius: 2px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 9px 11px; font-size: 13px; font-family: var(--sans);
+      border: 1px solid var(--rule); border-radius: 2px; background: var(--surface); color: var(--ink);
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .checkrow { display: flex; gap: 18px; flex-wrap: wrap; padding: 6px 0; }
+    .checkbox { display: inline-flex; gap: 8px; align-items: center; font-size: 12px; cursor: pointer; }
+
+    .submit-row { display: flex; justify-content: flex-end; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+    .submit-row button { background: #8b2a2a; color: #fff; border: none; padding: 10px 20px; border-radius: 3px; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .submit-row button:hover { background: #a13434; }
+    .submit-row button:disabled { background: #555; cursor: not-allowed; }
+
+    .v-row {
+      display: grid; grid-template-columns: auto 1fr auto auto auto;
+      gap: 12px; align-items: center; padding: 12px 0;
+      border-bottom: 1px solid var(--rule-soft); font-size: 13px; cursor: pointer;
+    }
+    .v-row:hover { background: var(--bg-soft); }
+    .v-row .when { font-family: var(--mono); font-size: 10px; color: var(--gold); white-space: nowrap; }
+    .v-row .who { font-weight: 600; }
+    .v-row .meta { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.05em; }
+    .sev { display: inline-block; font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+    .sev.minor { background: #5e6373; color: #fff; }
+    .sev.major { background: #a8751a; color: #fff; }
+    .sev.critical { background: #8b2a2a; color: #fff; }
+    .empty { padding: 30px; text-align: center; color: var(--muted); font-style: italic; }
+
+    .filter-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .filter-row select { padding: 6px 10px; font-family: var(--mono); font-size: 11px; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); color: var(--ink); }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1 class="h">Violation <em>Reports</em></h1>
+  <div class="sub">File a new violation · view all recent</div>
+
+  <div class="grid-2">
+    <!-- LEFT: file new -->
+    <div class="card">
+      <h2>File new violation</h2>
+
+      <div class="field">
+        <label>Find defendant</label>
+        <input id="lookup" class="lookup-input" type="text" placeholder="Name or IDN…" autocomplete="off">
+        <div id="lookupResults" class="lookup-results"></div>
+        <div id="selected" class="selected" style="display:none;">
+          <div>
+            <div class="who" id="selName">—</div>
+            <div class="meta" id="selMeta">—</div>
+          </div>
+          <button onclick="clearSel()">Change</button>
+        </div>
+      </div>
+
+      <form id="vform" onsubmit="return submitViolation(event)">
+        <div class="field-row">
+          <div class="field">
+            <label>Date / Time</label>
+            <input id="vdate" type="datetime-local" required>
+          </div>
+          <div class="field">
+            <label>Severity</label>
+            <select id="vsev" required>
+              <option value="minor">Minor</option>
+              <option value="major" selected>Major</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <select id="vcat" required>
+            <option value="missed-checkin">Missed check-in</option>
+            <option value="failed-drug-screen">Failed drug screen</option>
+            <option value="gps-tamper">GPS tamper / off-zone</option>
+            <option value="new-arrest">New arrest</option>
+            <option value="curfew">Curfew violation</option>
+            <option value="contact-violation">Contact violation</option>
+            <option value="non-payment">Non-payment of fees</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea id="vdesc" rows="4" placeholder="What happened?"></textarea>
+        </div>
+        <div class="field">
+          <label>Action taken</label>
+          <select id="vact">
+            <option value="">—</option>
+            <option value="warning">Verbal warning</option>
+            <option value="da-notified">DA notified</option>
+            <option value="court-notified">Court notified</option>
+            <option value="arrest-warrant">Arrest warrant requested</option>
+            <option value="bond-revocation">Bond revocation requested</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="checkrow">
+            <label class="checkbox"><input id="vctnotif" type="checkbox"> Court has been notified</label>
+            <label class="checkbox"><input id="vdanotif" type="checkbox"> DA has been notified</label>
+          </div>
+        </div>
+        <div class="submit-row">
+          <button type="submit" id="vsubmit" disabled>File Violation</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- RIGHT: list -->
+    <div class="card">
+      <h2>All violations <span style="font-family:var(--mono); font-size:11px; color:var(--muted); text-transform:none; letter-spacing:0.05em; margin-left:6px;" id="vct"></span></h2>
+      <div class="filter-row">
+        <select id="filterCat" onchange="render()">
+          <option value="">All categories</option>
+          <option value="missed-checkin">Missed check-in</option>
+          <option value="failed-drug-screen">Failed drug screen</option>
+          <option value="gps-tamper">GPS tamper</option>
+          <option value="new-arrest">New arrest</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="filterSev" onchange="render()">
+          <option value="">All severities</option>
+          <option value="minor">Minor</option>
+          <option value="major">Major</option>
+          <option value="critical">Critical</option>
+        </select>
+        <select id="filterPending" onchange="render()">
+          <option value="">All</option>
+          <option value="pending">Pending action</option>
+          <option value="acted">Acted on</option>
+        </select>
+      </div>
+      <div id="vlist"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selected = null;
+let allViolations = [];
+let lookupRows = [];
+let lookupTimer = null, lastQ = '';
+
+// ───── Defendant lookup ──────────
+const lookupEl = document.getElementById('lookup');
+const resultsEl = document.getElementById('lookupResults');
+lookupEl.addEventListener('input', () => {
+  const q = lookupEl.value.trim();
+  if (lookupTimer) clearTimeout(lookupTimer);
+  if (q.length < 2) { resultsEl.innerHTML = ''; return; }
+  lookupTimer = setTimeout(() => runLookup(q), 200);
+});
+async function runLookup(q) {
+  lastQ = q;
+  const r = await fetch('/api/lookup?q=' + encodeURIComponent(q) + '&limit=8');
+  const j = await r.json();
+  if (j.q !== lastQ) return;
+  lookupRows = j.results || [];
+  resultsEl.innerHTML = lookupRows.length
+    ? lookupRows.map((r, i) => `
+      <div class="lookup-row" onclick="pickClient(${i})" data-idn="${r.idn}">
+        <div>
+          <div class="name">${esc(r.name)}</div>
+          <div class="meta">IDN ${r.idn}${r.officer ? ' · ' + esc(r.officer) : ''}</div>
+        </div>
+        <span class="badge ${r.active ? 'open' : 'closed'}">${esc(r.status || '—')}</span>
+      </div>`).join('')
+    : '<div style="font-family:var(--mono); font-size:11px; color:var(--muted); padding:8px;">No matches.</div>';
+}
+function pickClient(i) {
+  selected = lookupRows[i];
+  document.getElementById('selName').textContent = selected.name;
+  document.getElementById('selMeta').textContent = `IDN ${selected.idn} · ${selected.status || '—'}${selected.officer ? ' · ' + selected.officer : ''}`;
+  document.getElementById('selected').style.display = 'flex';
+  document.getElementById('vsubmit').disabled = false;
+  resultsEl.innerHTML = '';
+  lookupEl.value = '';
+  // Default datetime to now
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  document.getElementById('vdate').value = local;
+}
+function clearSel() {
+  selected = null;
+  document.getElementById('selected').style.display = 'none';
+  document.getElementById('vsubmit').disabled = true;
+}
+
+// ───── Submit ──────────
+async function submitViolation(e) {
+  e.preventDefault();
+  if (!selected) return false;
+  const body = {
+    idn: selected.idn,
+    violation_date: document.getElementById('vdate').value,
+    category: document.getElementById('vcat').value,
+    severity: document.getElementById('vsev').value,
+    description: document.getElementById('vdesc').value,
+    action_taken: document.getElementById('vact').value,
+    court_notified: document.getElementById('vctnotif').checked,
+    da_notified: document.getElementById('vdanotif').checked,
+  };
+  const r = await fetch('/api/violations', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  const j = await r.json();
+  if (r.ok && j.ok) {
+    window.khToast && window.khToast('Violation filed', 'ok');
+    document.getElementById('vform').reset();
+    clearSel();
+    load();
+  } else {
+    window.khToast && window.khToast(j.error || 'Failed', 'err');
+  }
+  return false;
+}
+
+// ───── List ──────────
+async function load() {
+  const r = await fetch('/api/violations');
+  allViolations = (await r.json()).violations || [];
+  render();
+}
+function render() {
+  const cat = document.getElementById('filterCat').value;
+  const sev = document.getElementById('filterSev').value;
+  const pen = document.getElementById('filterPending').value;
+  let rows = allViolations;
+  if (cat) rows = rows.filter(v => v.category === cat);
+  if (sev) rows = rows.filter(v => v.severity === sev);
+  if (pen === 'pending') rows = rows.filter(v => !v.court_notified && !v.da_notified);
+  if (pen === 'acted')   rows = rows.filter(v => v.court_notified || v.da_notified);
+
+  document.getElementById('vct').textContent = `${rows.length} of ${allViolations.length}`;
+
+  if (!rows.length) {
+    document.getElementById('vlist').innerHTML = '<div class="empty">No violations match the filter.</div>';
+    return;
+  }
+  document.getElementById('vlist').innerHTML = rows.map(v => `
+    <div class="v-row" data-idn="${v.idn}" onclick="window.khDrawer && window.khDrawer.open('${v.idn}')">
+      <span class="when">${esc(formatTs(v.date))}</span>
+      <div>
+        <div class="who">${esc(v.category || '—')}</div>
+        <div class="meta">IDN ${esc(v.idn)} · ${esc(v.officer || '')} ${v.action_taken ? '· ' + esc(v.action_taken) : ''}</div>
+        ${v.description ? `<div style="margin-top:4px; color:var(--ink-soft); font-size:12px;">${esc(v.description.slice(0,140))}${v.description.length>140?'…':''}</div>` : ''}
+      </div>
+      <span class="sev ${v.severity || 'minor'}">${esc(v.severity || '—')}</span>
+      <span class="meta">${v.court_notified ? '✓ court' : '— court'}</span>
+      <span class="meta">${v.da_notified ? '✓ DA' : '— DA'}</span>
+    </div>`).join('');
+}
+
+function formatTs(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return d.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+load();
+</script>
+</body>
+</html>

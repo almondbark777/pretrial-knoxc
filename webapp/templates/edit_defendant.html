@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Defendant · Knox County Pre-Trial</title>
+
+  <!-- KH-THEME-START -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <script defer src="/static/site-chrome.js"></script>
+  <!-- KH-THEME-END -->
+
+  <style>
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px; }
+
+    .page-h {
+      font-family: var(--serif);
+      font-size: 28px;
+      font-weight: 500;
+      margin: 0 0 4px 0;
+      letter-spacing: -0.01em;
+    }
+    .page-h em { font-style: italic; color: var(--navy); font-weight: 400; }
+    .page-sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    /* Lookup card */
+    .lookup-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .lookup-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .lookup-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+    }
+
+    .lookup-results { margin-top: 12px; max-height: 280px; overflow-y: auto; }
+    .lookup-empty {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 8px 0;
+    }
+    .lookup-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-soft);
+      border-radius: 2px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .lookup-row .name { font-weight: 600; }
+    .lookup-row .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+    .badge-active { background: #2a6a3f; color: white; }
+    .badge-closed { background: #666; color: white; }
+
+    /* Edit card */
+    .edit-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 24px;
+      display: none;
+    }
+    .edit-card.show { display: block; }
+
+    .edit-banner {
+      background: var(--navy);
+      color: #fff;
+      padding: 14px 18px;
+      border-radius: 2px;
+      margin: -24px -24px 22px -24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .edit-banner .name {
+      font-family: var(--serif);
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .edit-banner .idn {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      opacity: 0.85;
+    }
+
+    .form-section-h {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rule);
+      margin: 22px 0 16px 0;
+    }
+    .form-section-h:first-of-type { margin-top: 0; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px 22px;
+    }
+    .form-grid .full { grid-column: span 2; }
+
+    .field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 9px 11px;
+      font-size: 13px;
+      font-family: var(--sans);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+    }
+
+    .checkrow {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 6px 0;
+    }
+    .checkbox {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .changed-tag {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--gold);
+      margin-left: 6px;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .field.dirty .changed-tag { opacity: 1; }
+
+    .toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      padding: 14px 18px;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      z-index: 2000;
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: opacity .15s, transform .15s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok { background: #2a6a3f; color: white; }
+    .toast.err { background: #8b2a2a; color: white; }
+
+    @media (max-width: 720px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    <h1 class="page-h">Edit <em>Defendant</em></h1>
+    <div class="page-sub">Update any field on a defendant record</div>
+
+    <!-- LOOKUP -->
+    <div class="lookup-card" id="lookupCard">
+      <div class="lookup-label">Find defendant by name or IDN</div>
+      <input id="lookup" class="lookup-input" type="text"
+             placeholder="Start typing a name or IDN…" autocomplete="off">
+      <div id="lookupResults" class="lookup-results"></div>
+    </div>
+
+    <!-- EDIT FORM -->
+    <form id="editForm" class="edit-card" onsubmit="return saveDefendant(event)">
+      <div class="edit-banner">
+        <div>
+          <div class="name" id="editName">—</div>
+          <div class="idn" id="editIdn">IDN —</div>
+        </div>
+        <button type="button" class="kh-btn kh-btn-ghost" onclick="closeEdit()">Change defendant</button>
+      </div>
+
+      <div class="form-section-h">Identity</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Name (Last, First Middle)<span class="changed-tag">edited</span></label>
+          <input data-col="defendant_name" type="text" required>
+        </div>
+        <div class="field">
+          <label>Birthdate<span class="changed-tag">edited</span></label>
+          <input data-col="birthdate" type="date">
+        </div>
+        <div class="field full">
+          <label>Case Numbers (comma-separated, leading @ optional)<span class="changed-tag">edited</span></label>
+          <input data-col="case_numbers" type="text" placeholder="@1655513, @1655514">
+        </div>
+      </div>
+
+      <div class="form-section-h">Supervision</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Pretrial Level<span class="changed-tag">edited</span></label>
+          <select data-col="pretrial_level">
+            <option value="">—</option>
+            <option value="1">Level 1</option>
+            <option value="2">Level 2</option>
+            <option value="3">Level 3</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Supervision Type<span class="changed-tag">edited</span></label>
+          <input data-col="supervision_type" type="text">
+        </div>
+        <div class="field">
+          <label>Charge Type<span class="changed-tag">edited</span></label>
+          <select data-col="charge_type">
+            <option value="">—</option>
+            <option value="Misdemeanor">Misdemeanor</option>
+            <option value="Felony">Felony</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Order From<span class="changed-tag">edited</span></label>
+          <select data-col="order_from">
+            <option value="">—</option>
+            <option value="Judge">Judge</option>
+            <option value="Magistrate">Magistrate</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Supervising Officer<span class="changed-tag">edited</span></label>
+          <input data-col="supervising_officer" type="text"
+                 placeholder="firstname.lastname@knoxsheriff.org">
+        </div>
+        <div class="field">
+          <label>Bond Amount ($)<span class="changed-tag">edited</span></label>
+          <input data-col="bond_amount" type="number" step="0.01" min="0">
+        </div>
+        <div class="field full">
+          <label>Conditions<span class="changed-tag">edited</span></label>
+          <div class="checkrow">
+            <label class="checkbox"><input data-col="gps" type="checkbox"> GPS Monitoring</label>
+            <label class="checkbox"><input data-col="dma" type="checkbox"> DMA</label>
+            <label class="checkbox"><input data-col="ptr_successfully_completed" type="checkbox"> PTR Successfully Completed</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section-h">Status &amp; Dates</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Case Status<span class="changed-tag">edited</span></label>
+          <select data-col="case_status">
+            <option value="Open">Open</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Referral Date<span class="changed-tag">edited</span></label>
+          <input data-col="referral_date" type="date">
+        </div>
+        <div class="field">
+          <label>Closed Date<span class="changed-tag">edited</span></label>
+          <input data-col="closed_date" type="date">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="kh-btn kh-btn-ghost" onclick="resetForm()">Discard changes</button>
+        <button type="submit" class="kh-btn">Save Changes</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let original = null;     // snapshot of loaded data
+    let currentIdn = null;
+
+    // ───── On load: if ?idn=X is in URL, pre-load that defendant ──────────
+    (function init() {
+      const params = new URLSearchParams(window.location.search);
+      const idn = params.get('idn');
+      if (idn) loadDefendant(idn);
+    })();
+
+    // ───── Lookup ─────────────────────────────────────────────────────────
+    const lookupEl  = document.getElementById('lookup');
+    const resultsEl = document.getElementById('lookupResults');
+    let lookupTimer = null, lastQ = '';
+
+    lookupEl.addEventListener('input', () => {
+      const q = lookupEl.value.trim();
+      if (lookupTimer) clearTimeout(lookupTimer);
+      if (q.length < 2) { resultsEl.innerHTML = ''; return; }
+      lookupTimer = setTimeout(() => runLookup(q), 200);
+    });
+
+    async function runLookup(q) {
+      lastQ = q;
+      try {
+        const r = await fetch('/api/lookup?q=' + encodeURIComponent(q) + '&limit=10');
+        const j = await r.json();
+        if (j.q !== lastQ) return;
+        renderResults(j.results || [], q);
+      } catch { renderResults([], q); }
+    }
+
+    function renderResults(rows, q) {
+      if (!rows.length) {
+        resultsEl.innerHTML = '<div class="lookup-empty">No matches.</div>';
+        return;
+      }
+      resultsEl.innerHTML = rows.map((r, i) => `
+        <div class="lookup-row" data-i="${i}">
+          <div>
+            <div class="name">${r.name || '—'}</div>
+            <div class="meta">IDN ${r.idn}${r.caseNum ? ' · ' + r.caseNum : ''}</div>
+          </div>
+          <span class="badge ${r.active ? 'badge-active' : 'badge-closed'}">${r.status || '—'}</span>
+          <span class="meta">${r.level ? 'L' + r.level : ''}</span>
+          <span class="meta">${r.officer || ''}</span>
+          <span class="meta">${r.referral || ''}</span>
+        </div>
+      `).join('');
+      [...resultsEl.querySelectorAll('.lookup-row')].forEach((el, i) => {
+        el.addEventListener('click', () => loadDefendant(rows[i].idn));
+      });
+    }
+
+    // ───── Load + populate ────────────────────────────────────────────────
+    async function loadDefendant(idn) {
+      try {
+        const r = await fetch('/api/defendants/' + encodeURIComponent(idn));
+        if (!r.ok) { toast('Defendant not found', 'err'); return; }
+        const d = await r.json();
+        original = d;
+        currentIdn = d.idn;
+        document.getElementById('editName').textContent = d.defendant_name || '—';
+        document.getElementById('editIdn').textContent  = 'IDN ' + d.idn;
+        document.getElementById('editForm').classList.add('show');
+
+        // Populate every data-col field
+        document.querySelectorAll('[data-col]').forEach(el => {
+          const col = el.dataset.col;
+          const v = d[col];
+          if (el.type === 'checkbox') el.checked = !!v;
+          else if (el.tagName === 'SELECT') el.value = (v == null ? '' : String(v));
+          else if (el.type === 'date') el.value = toDateInput(v);
+          else el.value = (v == null ? '' : String(v));
+          el.closest('.field').classList.remove('dirty');
+        });
+        // Wire change-tracking
+        document.querySelectorAll('[data-col]').forEach(el => {
+          el.addEventListener('input', () => el.closest('.field').classList.add('dirty'));
+          el.addEventListener('change', () => el.closest('.field').classList.add('dirty'));
+        });
+
+        // Update URL so the page is bookmarkable / shareable
+        history.replaceState({}, '', '?idn=' + encodeURIComponent(d.idn));
+        // Hide search list
+        lookupEl.value = '';
+        resultsEl.innerHTML = '';
+        // Scroll to form
+        document.getElementById('editForm').scrollIntoView({behavior:'smooth', block:'start'});
+      } catch (e) {
+        toast('Network error', 'err');
+      }
+    }
+
+    function toDateInput(v) {
+      if (!v) return '';
+      // Accept either MM/DD/YYYY or ISO
+      const s = String(v).trim();
+      let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) return `${m[3]}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+      return '';
+    }
+
+    // ───── Save (PATCH) ───────────────────────────────────────────────────
+    async function saveDefendant(e) {
+      e.preventDefault();
+      if (!currentIdn) return false;
+      const body = {};
+      document.querySelectorAll('[data-col]').forEach(el => {
+        const col = el.dataset.col;
+        if (el.type === 'checkbox') body[col] = el.checked;
+        else body[col] = el.value;
+      });
+      try {
+        const r = await fetch('/api/defendants/' + encodeURIComponent(currentIdn), {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (r.ok && j.ok) {
+          toast(`Saved · ${(j.changed_cols||[]).length} field(s) updated`, 'ok');
+          // Re-fetch so the form reflects what's now in the DB
+          loadDefendant(currentIdn);
+        } else {
+          toast(j.error || 'Save failed', 'err');
+        }
+      } catch (e) { toast('Network error', 'err'); }
+      return false;
+    }
+
+    function resetForm() {
+      if (!original) return;
+      document.querySelectorAll('[data-col]').forEach(el => {
+        const col = el.dataset.col;
+        const v = original[col];
+        if (el.type === 'checkbox') el.checked = !!v;
+        else if (el.type === 'date') el.value = toDateInput(v);
+        else el.value = (v == null ? '' : String(v));
+        el.closest('.field').classList.remove('dirty');
+      });
+    }
+
+    function closeEdit() {
+      document.getElementById('editForm').classList.remove('show');
+      currentIdn = null;
+      original = null;
+      history.replaceState({}, '', window.location.pathname);
+      lookupEl.focus();
+    }
+
+    function toast(msg, kind) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (kind || 'ok');
+      setTimeout(() => { t.className = 'toast ' + (kind || 'ok'); }, 3500);
+    }
+  </script>
+</body>
+</html>
