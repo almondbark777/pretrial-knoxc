@@ -99,6 +99,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(securityHeaders)
 	r.Use(a.Middleware)
 
 	// Static assets (public).
@@ -159,6 +160,21 @@ func main() {
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// securityHeaders sets conservative, low-risk response headers on every response.
+// X-Frame-Options SAMEORIGIN blocks clickjacking while still allowing the landing
+// page's own same-origin iframe (the embedded client tracker). No strict CSP — the
+// pages use small inline <script>s for search/filter/toasts, which a default-src
+// policy would break; that's a deliberate, separate decision.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "SAMEORIGIN")
+		h.Set("Referrer-Policy", "same-origin")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // csrfGuard rejects state-changing POSTs to /admin/* whose form CSRF token does

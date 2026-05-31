@@ -290,3 +290,36 @@ A supervisor can, from the themed UI, find a wrongly-added person, **Delete** th
 import**, recorded in the audit log — and officers can add/edit per-defendant
 extension data. Flipping `IMPORTER_RETIRED=true` turns Delete into a physical row
 delete with no other code change.
+
+---
+
+## Entry — 2026-05-30 (production hardening + follow-ons) · Model: claude-opus-4-8 (1M)
+
+Follow-on work to make the write surface production-ready. All on `main`, tests green.
+
+- **Roster-mode (team) calendar** (Brief 2.9): `/calendar.html` with no `idn`
+  aggregates per-day counts (check-ins / payments / missed / due) across all clients
+  (one open-preferred rep per IDN, no double-count) + month-total KPIs + month nav;
+  `?idn=` keeps the per-client view. New "Calendar" nav link.
+- **Auth allow-list → config** (Brief 4.5): `auth.New` reads `ALLOWED_EMAILS`
+  (falls back to the built-in 22); covered by `internal/auth/auth_test.go`.
+- **CSRF**: synchronizer-token on all `/admin/*` POSTs — `auth.CSRF` mints a
+  per-session token, the form-rendering handlers embed it, and a `csrfGuard`
+  middleware rejects mismatches (constant-time, fails closed). Verified live:
+  no-token / wrong-token → 403, valid → 303, for both officer and supervisor writes.
+- **Secure cookie**: `COOKIE_SECURE=true` marks the session cookie Secure (HTTPS
+  behind Cloudflare). **Security headers**: `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: SAMEORIGIN` (clickjacking protection that still permits the
+  landing page's own same-origin tracker iframe), `Referrer-Policy: same-origin`.
+  No strict CSP — pages use small inline scripts; that's a separate decision.
+- **Deploy prep**: `deploy/DEPLOY_GO.md` cutover checklist; documented
+  `ALLOWED_EMAILS` / `SUPERVISOR_EMAILS` / `IMPORTER_RETIRED` / `COOKIE_SECURE` in
+  `webapp/.env.example`; systemd unit notes the `static/lookup/` shipping requirement.
+- **UX/a11y polish**: responsive wide-table horizontal scroll, single-row mobile
+  nav, positive empty states, toast `role="status"`, `aria-label` on icon-only
+  delete buttons.
+- **Repo hygiene**: `.gitattributes` enforces LF (the deploy target is Linux),
+  ending Windows CRLF churn.
+
+Rate limiting was intentionally left to the Cloudflare edge (22 users behind
+Access; an in-memory limiter adds risk for little gain).
