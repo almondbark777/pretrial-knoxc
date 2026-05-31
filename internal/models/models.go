@@ -84,6 +84,27 @@ type CalDay struct {
 	Events []CalEvent
 }
 
+// RosterDay is one cell of the roster-mode (team) calendar: aggregated counts
+// across all clients for that day. Day 0 == padding cell before the 1st.
+type RosterDay struct {
+	Day      int `json:"day"`
+	CheckIns int `json:"checkIns"`
+	Payments int `json:"payments"`
+	Missed   int `json:"missed"`
+	Due      int `json:"due"`
+}
+
+// RosterCalendar is the rendered roster-mode month: padded day cells + the
+// month totals (the "per day / per month" aggregation from Brief 2.9).
+type RosterCalendar struct {
+	Title       string      `json:"title"`
+	Days        []RosterDay `json:"days"`
+	TotCheckIns int         `json:"totCheckIns"`
+	TotPayments int         `json:"totPayments"`
+	TotMissed   int         `json:"totMissed"`
+	TotDue      int         `json:"totDue"`
+}
+
 // ── Admin & data-entry shapes (Phase 7) ──────────────────────────────────────
 
 // Note is one free-text note attached to a defendant.

@@ -332,6 +332,64 @@ func calendarMonth(c *compute.Client, track time.Time, year int, month time.Mont
 	return title, days
 }
 
+// rosterCalendarMonth aggregates events across ALL clients into per-day counts
+// for the roster-mode (team standup) calendar — Brief 2.9's second calendar mode.
+// One representative per IDN (open-preferred) is used so a multi-case person's
+// shared check-ins/payments aren't double-counted. Categories: check-ins,
+// payments (GPS + PTR), missed windows, and upcoming due windows.
+func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, year int, month time.Month) models.RosterCalendar {
+	first := compute.Noon(year, month, 1)
+	daysIn := first.AddDate(0, 1, -1).Day()
+	byDay := map[int]*models.RosterDay{}
+	rc := models.RosterCalendar{Title: first.Format("January 2006")}
+
+	for _, cases := range clients {
+		c := openRep(cases)
+		if c == nil {
+			continue
+		}
+		for _, ev := range compute.GetEventsForClient(*c, track) {
+			if ev.Date.Year() != year || ev.Date.Month() != month {
+				continue
+			}
+			d := ev.Date.Day()
+			rd := byDay[d]
+			if rd == nil {
+				rd = &models.RosterDay{Day: d}
+				byDay[d] = rd
+			}
+			switch {
+			case strings.HasPrefix(ev.Kind, "checkin"):
+				rd.CheckIns++
+				rc.TotCheckIns++
+			case ev.Kind == "payment" || ev.Kind == "ptr-fee":
+				rd.Payments++
+				rc.TotPayments++
+			case ev.Kind == "missed":
+				rd.Missed++
+				rc.TotMissed++
+			case ev.Kind == "due":
+				rd.Due++
+				rc.TotDue++
+			}
+		}
+	}
+
+	var days []models.RosterDay
+	for i := 0; i < int(first.Weekday()); i++ { // Sunday=0 leading pad
+		days = append(days, models.RosterDay{Day: 0})
+	}
+	for d := 1; d <= daysIn; d++ {
+		if rd := byDay[d]; rd != nil {
+			days = append(days, *rd)
+		} else {
+			days = append(days, models.RosterDay{Day: d})
+		}
+	}
+	rc.Days = days
+	return rc
+}
+
 func sortByName(rows []models.RosterRow) {
 	sort.Slice(rows, func(i, j int) bool {
 		return strings.ToUpper(rows[i].Name) < strings.ToUpper(rows[j].Name)

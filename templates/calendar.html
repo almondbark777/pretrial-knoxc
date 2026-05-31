@@ -7,11 +7,57 @@
 </head>
 <body>
 <header class="topbar">
-  <a href="/dashboard" class="pilllink">&larr; Dashboard</a>
-  <span class="grow"></span><span class="muted">{{.User}}</span>
+  {{if .Roster}}
+    <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+    <nav class="nav"><a href="/" class="tracker-link">&larr; Client Tracker</a><a href="/dashboard">Dashboard</a><a href="/pretrial_app.html">Cases</a><a href="/analytics.html">Analytics</a><a href="/calendar.html" class="active">Calendar</a>{{if .IsSupervisor}}<a href="/admin/deleted">Deleted</a>{{end}}</nav>
+    <span class="grow"></span>
+    <span class="muted">{{.User}}</span>
+    <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+  {{else}}
+    <a href="/dashboard" class="pilllink">&larr; Dashboard</a>
+    <span class="grow"></span><span class="muted">{{.User}}</span>
+  {{end}}
 </header>
 
-{{if .NotFound}}
+{{if .Roster}}
+<h1>Team Calendar <span class="muted">— {{.Title}}</span></h1>
+<p class="muted">Activity across all clients this month. Counts per day; totals below. For a single client, open their profile and choose “calendar”.</p>
+
+<section class="cards">
+  <div class="kpi ok"><span>{{.RC.TotCheckIns}}</span>✓ Check-ins</div>
+  <div class="kpi"><span>{{.RC.TotPayments}}</span>Payments</div>
+  <div class="kpi risk"><span>{{.RC.TotMissed}}</span>⚠ Missed windows</div>
+  <div class="kpi warn"><span>{{.RC.TotDue}}</span>◯ Due windows</div>
+</section>
+
+<p>
+  <a class="btn btn-ghost" href="/calendar.html?month={{.PrevMonth}}">&larr; Prev</a>
+  &nbsp;<strong>{{.Title}}</strong>&nbsp;
+  <a class="btn btn-ghost" href="/calendar.html?month={{.NextMonth}}">Next &rarr;</a>
+</p>
+
+<div class="cal-legend muted">
+  <span class="ev ev-checkin-inperson">check-ins</span>
+  <span class="ev ev-payment">payments</span>
+  <span class="ev ev-missed">missed</span>
+  <span class="ev ev-due">due</span>
+</div>
+
+<div class="cal">
+  <div class="cal-hd">Sun</div><div class="cal-hd">Mon</div><div class="cal-hd">Tue</div><div class="cal-hd">Wed</div><div class="cal-hd">Thu</div><div class="cal-hd">Fri</div><div class="cal-hd">Sat</div>
+  {{range .RC.Days}}
+    <div class="cal-d{{if eq .Day 0}} pad{{end}}">
+      {{if .Day}}<div class="cal-n">{{.Day}}</div>
+        {{if .CheckIns}}<div class="ev ev-checkin-inperson" title="check-ins">✓ {{.CheckIns}}</div>{{end}}
+        {{if .Payments}}<div class="ev ev-payment" title="payments">$ {{.Payments}}</div>{{end}}
+        {{if .Missed}}<div class="ev ev-missed" title="missed windows">⚠ {{.Missed}}</div>{{end}}
+        {{if .Due}}<div class="ev ev-due" title="due windows">◯ {{.Due}}</div>{{end}}
+      {{end}}
+    </div>
+  {{end}}
+</div>
+
+{{else if .NotFound}}
   <p class="err">No client with IDN {{.NotFound}}.</p>
 {{else}}
 <h1>{{.C.Name}} <span class="muted">IDN {{.C.IDN}}</span></h1>

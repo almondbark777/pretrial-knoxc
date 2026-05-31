@@ -328,34 +328,49 @@ func (s *Server) Analytics(w http.ResponseWriter, r *http.Request) {
 // ── Per-client calendar (month grid) ──────────────────────────────────────────
 
 func (s *Server) Calendar(w http.ResponseWriter, r *http.Request) {
-	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
 	clients, err := s.clients()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 	track := compute.TodayET()
-	cases := clients[idn]
-	if len(cases) == 0 {
-		s.render(w, "calendar.html", map[string]any{"User": auth.User(r), "NotFound": idn})
-		return
-	}
-	c, _ := selectCase(cases, r.URL.Query().Get("case"))
 	year, month := track.Year(), track.Month()
 	if mp := r.URL.Query().Get("month"); mp != "" {
 		if t, e := time.Parse("2006-01", mp); e == nil {
 			year, month = t.Year(), t.Month()
 		}
 	}
-	title, days := calendarMonth(c, track, year, month)
 	cur := compute.Noon(year, month, 1)
+	prev, next := cur.AddDate(0, -1, 0).Format("2006-01"), cur.AddDate(0, 1, 0).Format("2006-01")
+	user := auth.User(r)
+
+	// No idn → roster mode: aggregated team calendar across all clients (Brief 2.9).
+	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
+	if idn == "" {
+		rc := rosterCalendarMonth(clients, track, year, month)
+		s.render(w, "calendar.html", map[string]any{
+			"User": user, "IsSupervisor": s.Auth.IsSupervisor(user),
+			"Roster": true, "RC": rc, "Title": rc.Title,
+			"PrevMonth": prev, "NextMonth": next,
+		})
+		return
+	}
+
+	// idn present → per-client calendar (existing behavior).
+	cases := clients[idn]
+	if len(cases) == 0 {
+		s.render(w, "calendar.html", map[string]any{"User": user, "NotFound": idn})
+		return
+	}
+	c, _ := selectCase(cases, r.URL.Query().Get("case"))
+	title, days := calendarMonth(c, track, year, month)
 	s.render(w, "calendar.html", map[string]any{
-		"User":      auth.User(r),
+		"User":      user,
 		"C":         c,
 		"Title":     title,
 		"Days":      days,
-		"PrevMonth": cur.AddDate(0, -1, 0).Format("2006-01"),
-		"NextMonth": cur.AddDate(0, 1, 0).Format("2006-01"),
+		"PrevMonth": prev,
+		"NextMonth": next,
 	})
 }
 
