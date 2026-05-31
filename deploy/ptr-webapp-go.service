@@ -8,8 +8,13 @@ Type=simple
 User=ptrapp
 Group=ptrapp
 WorkingDirectory=/opt/ptr-knoxc
-# Secrets via EnvironmentFile (APP_PASSWORD, APP_SESSION_SECRET, SQLITE_DB_PATH).
-# Keep 0600 root:ptrapp. The Go binary needs no venv/python.
+# Config via EnvironmentFile (0600 root:ptrapp; the Go binary needs no venv/python):
+#   APP_PASSWORD, APP_SESSION_SECRET, SQLITE_DB_PATH  — access + DB path
+#   ALLOWED_EMAILS    — sign-in allow-list (unset = built-in 22)
+#   SUPERVISOR_EMAILS — delete/restore/override tier (subset of allow-list)
+#   IMPORTER_RETIRED  — false=tombstone delete (default); true=physical at cutover
+# APP_BASE_DIR must hold templates/ AND static/ (static/lookup/ carries the
+# client-tracker bundle the landing page serves) — ship both alongside the binary.
 EnvironmentFile=/opt/ptr-knoxc/webapp/.env
 Environment=APP_BASE_DIR=/opt/ptr-knoxc
 Environment=LISTEN_ADDR=127.0.0.1:8000
