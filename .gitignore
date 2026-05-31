@@ -48,3 +48,7 @@ Thumbs.db
 # --- Unpacked spec assets (regenerable via scripts/unpack.py) + tilde artifacts ---
 /assets/
 *.exe~
+
+# deploy bundle (build artifact)
+ptr1-deploy.tar.gz
+*.tar.gz
