@@ -1,0 +1,15 @@
+[Unit]
+Description=Nightly PTR SQLite backup, ~30 min after the daily import settles
+
+[Timer]
+# PHASE_1 observed ptr-import.service finishing ~11:12 UTC (timer ~11:14 UTC ≈
+# 07:14 ET) on the deployed box — NOT the repo ptr-import.timer's 05:30 line.
+# Fire ~30 min after the import completes so we snapshot the freshly-imported DB.
+# ⚠ VERIFY ON ptr1 before trusting: `systemctl list-timers ptr-import.timer` and
+# the last ptr-import.service run; adjust this OnCalendar to import_finish + 30m.
+OnCalendar=*-*-* 11:45:00 UTC
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

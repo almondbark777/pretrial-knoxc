@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knox County Pre-Trial — Sign in</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login">
+<form class="card" method="post" action="/api/login" onsubmit="return doLogin(event)">
+  <div class="login-brand"><span class="brand-mark"></span><h1>Knox County Pre-Trial</h1></div>
+  <p class="muted">Sign in with your @knoxsheriff.org email.</p>
+  {{if .Error}}<p class="err">{{.Error}}</p>{{end}}
+  <input type="hidden" name="next" value="{{.Next}}">
+  <label>Email <input name="email" type="email" autocomplete="username" required></label>
+  <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+  <button type="submit">Sign in</button>
+  <p id="msg" class="err"></p>
+</form>
+<script>
+async function doLogin(e){
+  e.preventDefault();
+  const f = e.target;
+  const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email:f.email.value, password:f.password.value, next:f.next.value})});
+  const j = await r.json();
+  if(j.ok){ location.href = j.redirect || '/'; }
+  else { document.getElementById('msg').textContent = j.error || 'Login failed'; }
+  return false;
+}
+</script>
+</body>
+</html>

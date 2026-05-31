@@ -115,10 +115,16 @@ def _ls_rows(table: str, colmap: dict) -> list[dict]:
     c.execute(f"SELECT * FROM dbo.{table}")
     out = []
     for r in c.fetchall():
-        row = {}
-        for snake, header in colmap.items():
-            if snake in r:
-                row[header] = _ls_str(r[snake])
+        # Emit EVERY mapped header, even when the underlying SQL column is
+        # absent (-> ""), so the app's colFind() discovers a stable, complete
+        # set of columns regardless of which optional columns this DB happens
+        # to carry. A real CSV always has all its headers; this mirrors that.
+        # Without this, a missing raw_gps_48_hours."switched_to"/"switched_gps_date"/
+        # "notes" column made colFind() return null and silently disabled
+        # switch-aware billing, GPS-relief freezing, and the fee-waiver banner
+        # (PHASE_2 finding R1). NOTE: this only makes discovery deterministic —
+        # those features still require the source data to actually be present.
+        row = {header: _ls_str(r.get(snake)) for snake, header in colmap.items()}
         out.append(row)
     return out
 

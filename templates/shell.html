@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knox County Pre-Trial — Client Tracker</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="shell">
+<header class="shell-bar">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  <span class="muted shell-sub">Client Tracker</span>
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  <a class="btn" href="/dashboard" title="Open the new admin &amp; data-entry app">Admin &amp; Data-Entry &rarr;</a>
+  <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+</header>
+<iframe class="shell-frame" src="/static/lookup/PTR_Client_Lookup.html" title="PTR Client Lookup"></iframe>
+</body>
+</html>

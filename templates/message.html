@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  <span class="grow"></span><span class="muted">{{.User}}</span>
+</header>
+<h1>{{.Title}}</h1>
+<p>{{.Message}}</p>
+<p><a href="{{if .Back}}{{.Back}}{{else}}/{{end}}">&larr; Go back</a></p>
+</body>
+</html>

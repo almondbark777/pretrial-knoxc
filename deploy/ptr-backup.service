@@ -1,0 +1,27 @@
+[Unit]
+Description=PTR SQLite backup (WAL-safe online snapshot -> backup drive)
+# Don't race the import; back up the settled DB. ptr-import.service is a oneshot,
+# so "After" only orders them if both happen to be queued in the same boot.
+After=network-online.target ptr-import.service
+Wants=network-online.target
+# Only run if the backup drive is mounted (see ptr-backup.timer comment for the
+# matching mnt-backup-ptr.mount / fstab entry).
+RequiresMountsFor=/mnt/backup/ptr
+
+[Service]
+Type=oneshot
+User=ptrapp
+Group=ptrapp
+# Override any default by editing these (e.g. after the kh222 -> pretrial_release
+# rename, set DB=/opt/ptr-knoxc/db/pretrial_release.db here).
+Environment=DB=/opt/ptr-knoxc/db/kh222.db
+Environment=DEST=/mnt/backup/ptr
+Environment=PYTHON=/opt/ptr-knoxc/venv/bin/python3
+Environment=RETAIN_DAYS=30
+ExecStart=/opt/ptr-knoxc/deploy/ptr-backup.sh
+
+# --- Hardening: read-only system, but the backup drive must be writable. ---
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/mnt/backup/ptr

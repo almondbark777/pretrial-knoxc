@@ -481,7 +481,11 @@ def insert_referral(d: dict) -> dict:
 
     case_number = (d.get("case_number") or "").strip()
     if case_number:
-        for cn in [s.strip().lstrip("@") for s in case_number.split(",") if s.strip()]:
+        # Tokenize on comma OR whitespace — grouped cases arrive as "@A, @B"
+        # AND space-joined as "@A @B" (Appendix B #3). split(",") alone drops
+        # the space-joined form into a single bad token. Mirrors the canonical
+        # JS split(/[,\s]+/) and the ETL split_cases().
+        for cn in [s.strip().lstrip("@") for s in re.split(r"[,\s]+", case_number) if s.strip()]:
             c.execute("""INSERT INTO dbo.cases (idn, case_number, source)
                          VALUES (%s, %s, %s)""", (idn, cn, "blue_book"))
 
@@ -712,7 +716,9 @@ def update_defendant(idn: int, body: dict) -> dict:
 
     # Optional: if case_numbers provided, sync cases table.
     if "case_numbers" in body:
-        new_cases = [s.strip().lstrip("@") for s in (body["case_numbers"] or "").split(",") if s.strip()]
+        # Tokenize on comma OR whitespace (Appendix B #3); mirrors the canonical
+        # JS split(/[,\s]+/). split(",") alone breaks space-joined "@A @B".
+        new_cases = [s.strip().lstrip("@") for s in re.split(r"[,\s]+", body["case_numbers"] or "") if s.strip()]
         c.execute("SELECT case_number FROM dbo.cases WHERE idn = %s", (idn,))
         existing = {r[0] for r in c.fetchall()}
         wanted = set(new_cases)

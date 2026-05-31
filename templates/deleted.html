@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deleted records — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  <nav class="nav"><a href="/" class="tracker-link">&larr; Client Tracker</a><a href="/dashboard">Dashboard</a><a href="/pretrial_app.html">Cases</a><a href="/analytics.html">Analytics</a><a href="/admin/deleted" class="active">Deleted</a></nav>
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+</header>
+
+{{if .Msg}}<div class="toast"><span class="grow">{{.Msg}}</span><button type="button" class="toast-close" aria-label="Dismiss" onclick="this.closest('.toast').remove()">×</button></div>{{end}}
+
+<h1>Deleted records <span class="muted">({{len .Tombstones}})</span></h1>
+<p class="muted">
+  The audit-log breadcrumb of every suppressed person/case. Tombstones keep them
+  hidden from all views across the nightly import.
+  {{if .ImporterRetired}}<strong class="risk">IMPORTER_RETIRED is on — restores cannot recover physically-deleted rows.</strong>
+  {{else}}Restoring lifts the tombstone and the record reappears everywhere.{{end}}
+</p>
+
+{{if .Tombstones}}
+<div style="padding:0 20px 40px">
+<table>
+  <thead><tr><th>Name</th><th>IDN</th><th>Scope</th><th>Deleted by</th><th>When</th><th>Reason</th><th></th></tr></thead>
+  <tbody>
+  {{range .Tombstones}}
+    <tr>
+      <td>{{if .Name}}{{.Name}}{{else}}<span class="muted">(row gone)</span>{{end}}</td>
+      <td class="muted">{{.IDN}}</td>
+      <td>{{if .CaseNumber}}case {{.CaseNumber}}{{else}}<span class="badge-risk">whole person</span>{{end}}</td>
+      <td>{{.DeletedBy}}</td>
+      <td class="muted">{{.DeletedAt}}</td>
+      <td>{{.Reason}}</td>
+      <td>
+        <form method="post" action="/admin/restore" style="margin:0"
+              onsubmit="return confirm('Restore IDN {{.IDN}}{{if .CaseNumber}} case {{.CaseNumber}}{{end}}?');">
+          <input type="hidden" name="idn" value="{{.IDN}}">
+          {{if .CaseNumber}}<input type="hidden" name="case" value="{{.CaseNumber}}">{{end}}
+          <button type="submit">Restore</button>
+        </form>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<p class="muted" style="padding:0 20px">No deleted records. Nothing is currently suppressed.</p>
+{{end}}
+</body>
+</html>

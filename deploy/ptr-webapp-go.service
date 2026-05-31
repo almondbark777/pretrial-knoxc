@@ -1,0 +1,30 @@
+[Unit]
+Description=Knox County Pre-Trial Services web app (Go single binary)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ptrapp
+Group=ptrapp
+WorkingDirectory=/opt/ptr-knoxc
+# Secrets via EnvironmentFile (APP_PASSWORD, APP_SESSION_SECRET, SQLITE_DB_PATH).
+# Keep 0600 root:ptrapp. The Go binary needs no venv/python.
+EnvironmentFile=/opt/ptr-knoxc/webapp/.env
+Environment=APP_BASE_DIR=/opt/ptr-knoxc
+Environment=LISTEN_ADDR=127.0.0.1:8000
+# After the DB rename, point here (until then, kh222.db):
+Environment=SQLITE_DB_PATH=/opt/ptr-knoxc/db/pretrial_release.db
+ExecStart=/opt/ptr-knoxc/server
+Restart=always
+RestartSec=3
+
+# --- Hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+# Loopback only; cloudflared reaches it locally.
+
+[Install]
+WantedBy=multi-user.target

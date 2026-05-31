@@ -31,9 +31,20 @@ db/csv_clean/
 # --- Build / deploy artifacts ---
 *.zip
 
+# --- Go build artifacts ---
+/server
+/ptr-server
+*.exe
+srv.log
+srv.err
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# --- Unpacked spec assets (regenerable via scripts/unpack.py) + tilde artifacts ---
+/assets/
+*.exe~

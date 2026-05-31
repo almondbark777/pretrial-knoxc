@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendar — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a href="/dashboard" class="pilllink">&larr; Dashboard</a>
+  <span class="grow"></span><span class="muted">{{.User}}</span>
+</header>
+
+{{if .NotFound}}
+  <p class="err">No client with IDN {{.NotFound}}.</p>
+{{else}}
+<h1>{{.C.Name}} <span class="muted">IDN {{.C.IDN}}</span></h1>
+<p>
+  <a href="/calendar.html?idn={{.C.IDN}}&month={{.PrevMonth}}">&larr; Prev</a>
+  &nbsp;<strong>{{.Title}}</strong>&nbsp;
+  <a href="/calendar.html?idn={{.C.IDN}}&month={{.NextMonth}}">Next &rarr;</a>
+  &nbsp;·&nbsp; <a href="/client_profile.html?idn={{.C.IDN}}">profile</a>
+</p>
+
+<div class="cal-legend muted">
+  <span class="ev ev-referral">referral</span>
+  <span class="ev ev-checkin-inperson">check-in</span>
+  <span class="ev ev-payment">payment</span>
+  <span class="ev ev-ptr-fee">PTR fee</span>
+  <span class="ev ev-gps-install">GPS</span>
+  <span class="ev ev-missed">missed</span>
+  <span class="ev ev-due">due</span>
+  <span class="ev ev-closed">closed</span>
+</div>
+
+<div class="cal">
+  <div class="cal-hd">Sun</div><div class="cal-hd">Mon</div><div class="cal-hd">Tue</div><div class="cal-hd">Wed</div><div class="cal-hd">Thu</div><div class="cal-hd">Fri</div><div class="cal-hd">Sat</div>
+  {{range .Days}}
+    <div class="cal-d{{if eq .Day 0}} pad{{end}}">
+      {{if .Day}}<div class="cal-n">{{.Day}}</div>
+        {{range .Events}}<div class="ev ev-{{.Kind}}" title="{{.Label}}">{{.Label}}</div>{{end}}
+      {{end}}
+    </div>
+  {{end}}
+</div>
+{{end}}
+</body>
+</html>
