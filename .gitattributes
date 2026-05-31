@@ -1,0 +1,11 @@
+# Normalize line endings to LF in the repo and on checkout (the deploy target is
+# Linux; this stops Windows autocrlf from churning every file the toolchain touches).
+* text=auto eol=lf
+
+# Binary / generated assets — never touch.
+*.db   binary
+*.woff2 binary
+*.png  binary
+*.jpg  binary
+*.bin  binary
+*.exe  binary
