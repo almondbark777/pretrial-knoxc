@@ -6,9 +6,16 @@
 
 ## TL;DR
 
-The Go rewrite is **feature-complete, tested, hardened, and documented — all on
-`main`.** It is **not yet deployed to `ptr1`** (that's the real next step) and the
-**show-cause letters are pending Alex's template** (framework ready; not recreated).
+The Go rewrite is **feature-complete, tested, hardened, documented — and DEPLOYED
+to `ptr1` (2026-05-31).** The Go binary is live (systemd `ptr-webapp`, `/health`
+green, on the real `kh222.db`, behind cloudflared + Access). The **show-cause
+letters are pending Alex's template** (framework ready; not recreated).
+
+> **Deployed 2026-05-31** via `deploy/install-on-ptr1.sh` (bundle scp'd + run on the
+> box; key-auth set up for `alex@ptr1`). Pre-swap backups of the binary, unit, and DB
+> are in `/opt/ptr-knoxc/backups/`. `SUPERVISOR_EMAILS` set (the 6 + alexander.bentley),
+> `IMPORTER_RETIRED=false`, `COOKIE_SECURE=true`. The systemd unit points at the
+> current `kh222.db` (rename not done). Rollback = restore the saved unit + restart.
 
 ---
 
@@ -65,9 +72,11 @@ The Go rewrite is **feature-complete, tested, hardened, and documented — all o
 
 ## ⬜ What still needs to be done
 
-1. **Deploy to `ptr1`** *(the real next step — needs the box)*. Follow
-   `deploy/DEPLOY_GO.md`, then run `deploy/smoke.sh`. Best done after Phase 5 backups
-   are live on `ptr1` and the `kh222.db → pretrial_release.db` rename.
+1. **✅ DONE — Deploy to `ptr1`** (2026-05-31). Live via `deploy/install-on-ptr1.sh`.
+   Still worth doing soon: **Phase 5 automated backups** on `ptr1` (only a manual
+   pre-deploy DB copy exists so far — the open 🔴), and the
+   `kh222.db → pretrial_release.db` rename (cosmetic; the unit currently points at
+   `kh222.db`). Verify the UI + roster counts on the live data.
 2. **Show-cause letters** *(pending Alex's template/skill — do NOT recreate)*. The
    **Behind-on-GPS report (`/reports/behind`) is the launchpad**: it's the exact list
    the letters draw from. When the template arrives, add a "Generate letters" action
