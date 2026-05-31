@@ -239,6 +239,10 @@ label{font-size:12.5px;color:var(--muted)}
 .login-brand{display:flex;align-items:center;gap:10px;margin-bottom:2px}
 .login-brand .brand-mark{width:26px;height:26px}
 
+/* CSV export link (subtle pill, right-aligned in a section heading) */
+.export{float:right;font-size:11.5px;font-weight:550;color:var(--muted);border:1px solid var(--line-2);border-radius:var(--r-pill);padding:1px 10px;text-decoration:none}
+.export:hover{color:var(--ink);background:rgba(255,255,255,.05);text-decoration:none}
+
 /* ── badges / chips ──────────────────────────────────────────────────────── */
 .badge-risk,.badge,.badge-ok,.badge-warn{
   display:inline-flex;align-items:center;gap:4px;

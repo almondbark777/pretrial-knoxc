@@ -131,6 +131,11 @@ func main() {
 	r.Get("/api/defendants", srv.APIDefendants)
 	r.Get("/api/refresh", srv.APIRefresh)
 
+	// CSV exports (read-only; the dependency-free "Export to Excel" equivalent).
+	r.Get("/export/behind.csv", srv.ExportBehind)
+	r.Get("/export/missed.csv", srv.ExportMissed)
+	r.Get("/export/cases.csv", srv.ExportCases)
+
 	// Admin & data-entry (write/correction surface). Every POST carries a CSRF
 	// token (csrfGuard). Supervisor-gated routes enforce the role inside the
 	// handler; CRUD routes are open to any allowed officer. Everything is audited.
