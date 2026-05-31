@@ -114,7 +114,7 @@ func auditCount(t *testing.T, d *sql.DB, action, rowID string) int {
 }
 
 func newServer(d *sql.DB) *Server {
-	a := auth.New("pw", "secret", []string{"alexander.bentley@knoxsheriff.org"})
+	a := auth.New("pw", "secret", nil, []string{"alexander.bentley@knoxsheriff.org"})
 	return New(d, a, nil, time.Minute, false)
 }
 
@@ -332,7 +332,7 @@ func runReq(a *auth.Authenticator, h http.HandlerFunc, method, path, asEmail str
 // is audited.
 func TestSupervisorGating(t *testing.T) {
 	d := testDB(t)
-	a := auth.New("pw", "secret", []string{"alexander.bentley@knoxsheriff.org"})
+	a := auth.New("pw", "secret", nil, []string{"alexander.bentley@knoxsheriff.org"})
 	// A minimal template so the HTML 403 path (message.html) can render.
 	tmpl := template.Must(template.New("").Parse(`{{define "message.html"}}{{.Title}}{{end}}`))
 	srv := New(d, a, tmpl, time.Minute, false)

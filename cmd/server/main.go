@@ -90,7 +90,7 @@ func main() {
 	}
 
 	importerRetired := envBool("IMPORTER_RETIRED")
-	a := auth.New(password, secret, envList("SUPERVISOR_EMAILS"))
+	a := auth.New(password, secret, envList("ALLOWED_EMAILS"), envList("SUPERVISOR_EMAILS"))
 	srv := handlers.New(database, a, tmpl, 60*time.Second, importerRetired)
 
 	r := chi.NewRouter()

@@ -17,9 +17,11 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-// AllowedUsers — the 22 @knoxsheriff.org emails (matched case-insensitively),
-// ported verbatim from webapp/users.py. Move to config/DB later.
-var rawUsers = []string{
+// defaultUsers — the built-in 22 @knoxsheriff.org allow-list (matched
+// case-insensitively), ported from webapp/users.py. Used as the FALLBACK when
+// ALLOWED_EMAILS is unset, so deployments can override the list via config
+// without a rebuild (the email list is no longer hard-wired into behavior).
+var defaultUsers = []string{
 	"Daniel.Harris@knoxsheriff.org", "Justin.Webber@knoxsheriff.org",
 	"Bryan.Hackett@knoxsheriff.org", "natashja.akers@knoxsheriff.org",
 	"shellie.medford@knoxsheriff.org", "James.Rexroad@knoxsheriff.org",
@@ -44,13 +46,20 @@ type Authenticator struct {
 const sessionName = "kh_sess"
 
 // New builds an Authenticator. sessionSecret signs the cookie (12h lifetime).
-// supervisorEmails is the SUPERVISOR_EMAILS subset of the allow-list that may
-// delete / restore / override (Phase 7 roles). Entries not on the allow-list are
-// ignored — a supervisor must still be an allowed user.
-func New(password, sessionSecret string, supervisorEmails []string) *Authenticator {
-	allowed := make(map[string]bool, len(rawUsers))
-	for _, u := range rawUsers {
-		allowed[strings.ToLower(strings.TrimSpace(u))] = true
+// allowedEmails is the @knoxsheriff.org allow-list (from ALLOWED_EMAILS); when
+// empty it falls back to the built-in defaultUsers, so an unset env keeps the
+// prior 22-user behavior. supervisorEmails is the SUPERVISOR_EMAILS subset that
+// may delete / restore / override (Phase 7 roles); entries not on the allow-list
+// are ignored — a supervisor must still be an allowed user.
+func New(password, sessionSecret string, allowedEmails, supervisorEmails []string) *Authenticator {
+	if len(allowedEmails) == 0 {
+		allowedEmails = defaultUsers
+	}
+	allowed := make(map[string]bool, len(allowedEmails))
+	for _, u := range allowedEmails {
+		if e := strings.ToLower(strings.TrimSpace(u)); e != "" {
+			allowed[e] = true
+		}
 	}
 	supervisors := map[string]bool{}
 	for _, e := range supervisorEmails {
