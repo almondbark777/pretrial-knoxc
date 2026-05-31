@@ -72,6 +72,17 @@ containing "PTR" (e.g. `PTR Fee`); the EM-fee engine uses the broader daily set.
 The form's payment-type options use the real strings so entries register in the
 right calculation.
 
+### Date handling
+The add forms use a browser date picker, which emits ISO `YYYY-MM-DD`, but the
+imported `raw_*` data — and these `added_*` mirror tables, which are read by the
+**M/D/YYYY-only EM-fee parser** — store dates SharePoint-style. `db.normInputDate`
+converts app-entered dates (payment / check-in / referral / birthdate) to canonical
+`M/D/YYYY` at write time, so an entered date is indistinguishable from an imported
+one and parses **everywhere** (BuildClients *and* the fee engine). It's idempotent
+for already-US input. The officer-CRUD date inputs (court dates / reminders) keep
+ISO on purpose — those sort lexically and are read only by the flexible compute
+parser. Proven by `TestNormInputDate` + `TestAddedPaymentDateReachesEMFees`.
+
 ## Verification
 - `internal/db/dataentry_test.go`: add → appears in `BuildClients` with correct
   fields; duplicate IDN rejected; added payment/check-in flow into

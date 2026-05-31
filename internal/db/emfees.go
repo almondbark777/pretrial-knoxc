@@ -13,9 +13,12 @@ import (
 // first, so a supervisor-deleted person never generates a dunning letter — the same
 // importer-proof guarantee BuildClients enforces for every other view.
 //
-// Note: field overrides are NOT yet spliced into this report (a deliberate v1
-// scope cut; overrides are rare typo-fixes and the EM-fee math keys off the 48-hour
-// and payment data, not the overridable blue-book display fields).
+// Supervisor field overrides ARE spliced into the blue-book rows here (by idn,
+// exactly as BuildClients/LookupDatasets do), so a corrected GPS type (which sets
+// the $8 ALLIED / $15 SCRAM rate), name (the junk-name filter and the letter), case
+// status (the Open/Closed split) or referral/closed date (the billing window) flows
+// into the fee math and the generated show-cause letter — keeping this report and
+// its legally-meaningful letters consistent with every other view.
 func EMFees(d *sql.DB, asOf time.Time) (emfees.Result, error) {
 	gps48, err := queryMaps(d, "raw_gps_48_hours")
 	if err != nil {
@@ -41,6 +44,21 @@ func EMFees(d *sql.DB, asOf time.Time) (emfees.Result, error) {
 		return emfees.Result{}, err
 	} else {
 		blueBook = append(blueBook, extra...)
+	}
+
+	// Splice supervisor field overrides into the blue-book rows by idn — the same
+	// correction every other view sees (BuildClients/LookupDatasets) — so the fee
+	// math and the show-cause letters reflect a fixed GPS type/rate, name, case
+	// status, or referral/closed date. Overridable fields are blue-book columns, so
+	// only blueBook is spliced; the 48-hour and payment sources are left as-is.
+	overrides, err := loadOverrides(d)
+	if err != nil {
+		return emfees.Result{}, err
+	}
+	for _, r := range blueBook {
+		for f, v := range overrides[norm(r["idn"])] {
+			r[f] = v
+		}
 	}
 
 	tomb, err := loadTombstones(d)

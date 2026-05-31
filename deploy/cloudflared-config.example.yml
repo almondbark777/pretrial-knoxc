@@ -13,8 +13,14 @@ credentials-file: /etc/cloudflared/<TUNNEL-ID>.json
 loglevel: info
 
 ingress:
-  # All traffic for this hostname goes to the local uvicorn process.
+  # All traffic for this hostname goes to the local app process.
   - hostname: ptr.example.com
     service: http://127.0.0.1:8000
+  # Netdata monitoring dashboard. Netdata stays bound to 127.0.0.1; cloudflared
+  # reaches it locally and Cloudflare Access is the gate (see deploy/MONITORING.md).
+  # Protect this hostname with an Access application + the SAME email-allowlist
+  # policy as ptr.example.com — without it the dashboard would be world-readable.
+  - hostname: netdata-ptr.example.com
+    service: http://127.0.0.1:19999
   # Catch-all: anything else gets a 404 (required last rule).
   - service: http_status:404

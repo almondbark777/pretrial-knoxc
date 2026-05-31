@@ -101,9 +101,12 @@ redeployed to ptr1 yet.
    `past-due-em-fees` skill: methodology ported to `internal/emfees`, his
    `memo_template.docx` embedded and filled in Go, served at `/reports/em-fees`
    (per-memo + zip + CSV). Parity-proven. **Still to do:** redeploy the binary to
-   ptr1 so it goes live there, and verify counts on real ptr1 data. Optional later:
-   a CSV-upload path for ad-hoc runs (and to pick up Switched-To/COURT columns the
-   daily import doesn't carry); xlsx export; splice overrides into the EM-fee read.
+   ptr1 so it goes live there, and verify counts on real ptr1 data. Supervisor
+   **field overrides are now spliced into the EM-fee read** (a corrected GPS
+   type/rate, name, case status, or referral/closed date reaches the report + the
+   show-cause letters — consistent with every other view). Optional later: a
+   CSV-upload path for ad-hoc runs (and to pick up Switched-To/COURT columns the
+   daily import doesn't carry); xlsx export.
 3. **Validate on real data**. The offline `db/kh222.db` is a stale snapshot, so its
    numbers (esp. missed-check-in counts) are NOT representative — re-check rosters and
    "feel" against live `ptr1` data after deploy.

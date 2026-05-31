@@ -101,15 +101,38 @@ WAL actively being written, real mount).
 
 ---
 
+## On-box restore proof — 2026-05-31
+
+Drive: `/dev/sda1` ext4, UUID `7a6a0d0a-3d21-4492-b90e-ad7a4d8102a2`, label `PTRbackup`,
+mounted at `/mnt/backup/ptr` (~916 GB, 870 GB free). `ptrapp:ptrapp` owner, mode 755.
+fstab entry: `UUID=7a6a0d0a... /mnt/backup/ptr ext4 defaults,nofail 0 2`.
+Timer: `ptr-backup.timer` enabled, `OnCalendar=*-*-* 11:45:00 UTC`.
+
+Backup run: `kh222-2026-05-31.db` (8,671,232 bytes). Restore-parity check (`sudo -u ptrapp`):
+
+```
+integrity: ok
+raw_blue_book    3959
+raw_check_ins    5000
+raw_payments     2826
+raw_gps_48_hours  778
+```
+
+---
+
 ## Status
 
 - 🟢 **Tooling written + mechanism proven locally** (online backup, integrity,
   restore-parity all PASS).
-- 🔴 **Not yet cleared on `ptr1`** — the drive isn't mounted and the timer isn't
-  installed there. The 🔴 from Phase 1 stays open until steps 1–4 run on the box
-  and the on-box restore proof is recorded here.
+- 🟢 **Cleared on `ptr1` — 2026-05-31.** Drive mounted, timer enabled, on-box
+  restore proof recorded above. The 🔴 from Phase 1 is closed.
+
+### Minor known warning
+`WARN: could not copy /etc/ptr-import.env` — the env file is at
+`/opt/ptr-knoxc/webapp/.env`, not `/etc/ptr-import.env`. Non-fatal (DB backup
+succeeds). Fix: update `ENV_FILE` default in `ptr-backup.sh` or add
+`Environment=ENV_FILE=/opt/ptr-knoxc/webapp/.env` to `ptr-backup.service`.
 
 ### Next step
-Run [ON ptr1] steps 1–4, record the on-box integrity_check + row counts here,
-then Phase 6 sign-off (which should also re-confirm the PHASE_4 G1–G4 fixes
-against ptr1's live data, where closed cases exist).
+Phase 6 sign-off: re-confirm PHASE_4 G1–G4 fixes against ptr1's live data
+(where closed cases exist), then deploy Phases 9 & 10 (committed, not yet on ptr1).

@@ -18,7 +18,7 @@ set -euo pipefail
 DB="${DB:-/opt/ptr-knoxc/db/kh222.db}"            # live database (path-driven)
 DEST="${DEST:-/mnt/backup/ptr}"                   # mount point of the backup drive
 PYTHON="${PYTHON:-/opt/ptr-knoxc/venv/bin/python3}"
-ENV_FILE="${ENV_FILE:-/etc/ptr-import.env}"
+ENV_FILE="${ENV_FILE:-/opt/ptr-knoxc/webapp/.env}"
 MIGRATIONS="${MIGRATIONS:-/opt/ptr-knoxc/db/migrations}"
 RETAIN_DAYS="${RETAIN_DAYS:-30}"
 

@@ -25,6 +25,7 @@ import (
 	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/handlers"
+	"pretrial-knoxc/internal/metrics"
 )
 
 func env(k, def string) string {
@@ -97,9 +98,12 @@ func main() {
 	const cacheTTL = 60 * time.Second
 	srv := handlers.New(database, a, tmpl, cacheTTL, importerRetired)
 
+	mtr := metrics.New(time.Now())
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(mtr.Middleware) // records every request; reads chi's matched route pattern
 	r.Use(securityHeaders)
 	r.Use(a.Middleware)
 
@@ -107,8 +111,11 @@ func main() {
 	staticDir := filepath.Join(base, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 
-	// Auth-free.
+	// Auth-free. /metrics is localhost-only by virtue of the 127.0.0.1 listener
+	// (not added to the cloudflared ingress), so Netdata on the same box scrapes
+	// it without a session; it exposes route names + counts, never PII.
 	r.Get("/health", srv.Health)
+	r.Get("/metrics", mtr.Handler)
 
 	// Auth pages.
 	r.Get("/login", srv.LoginPage)

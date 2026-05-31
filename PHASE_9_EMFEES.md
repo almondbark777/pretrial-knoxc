@@ -36,8 +36,12 @@ has the data already and "just knows" who's behind, no upload step.
   Python `fill_clusters`. Also builds the Open/ + Closed/ memo **zip**.
 - **`internal/db/emfees.go`** — feeds the engine from the raw tables and drops
   **tombstoned** people/cases first, so a supervisor-deleted person never generates
-  a dunning letter (same importer-proof guarantee as every other view). (Field
-  overrides are not yet spliced in — deliberate v1 cut.)
+  a dunning letter (same importer-proof guarantee as every other view). **Field
+  overrides are spliced into the blue-book rows by idn** (same as
+  BuildClients/LookupDatasets), so a corrected GPS type (rate), name (junk filter +
+  the letter), case status (Open/Closed split) or referral/closed date (billing
+  window) reaches the fee math and the show-cause letters — proven by
+  `TestEMFeesAppliesOverrides`.
 - **`internal/handlers/emfees.go` + `templates/report_emfees.html`** — the report:
   Open/Closed tables with totals + the skill's spot-check highlights (pink = 30+
   days behind / 2-yr span, yellow = 14+ / Referral-only start), a per-row `.docx`
@@ -91,4 +95,6 @@ the letter format is the office's own template, reused verbatim — never recrea
 - Optional later: an **upload-the-3-CSVs** path (runs the same `Compute`) for ad-hoc
   runs off a fresher SharePoint export than the daily import, and to pick up the
   Switched-To / COURT columns the current import schema doesn't carry.
-- Optional: splice field overrides into the EM-fee read; xlsx (not just CSV) export.
+- ✅ Field overrides now spliced into the EM-fee read (done). Optional: xlsx (not
+  just CSV) export; surface an "override (app)" badge on the report rows the way the
+  profile does.

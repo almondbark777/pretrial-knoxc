@@ -160,7 +160,7 @@ func (a *Authenticator) checkPassword(p string) bool {
 	return subtle.ConstantTimeCompare([]byte(p), []byte(a.password)) == 1
 }
 
-var publicPrefixes = []string{"/health", "/favicon.ico", "/static/", "/login", "/api/login", "/api/logout"}
+var publicPrefixes = []string{"/health", "/metrics", "/favicon.ico", "/static/", "/login", "/api/login", "/api/logout"}
 
 func isPublic(path string) bool {
 	for _, p := range publicPrefixes {
