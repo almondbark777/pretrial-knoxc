@@ -229,6 +229,7 @@ func (s *Server) ClientProfile(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "profile.html", map[string]any{
 		"User":              user,
 		"IsSupervisor":      s.Auth.IsSupervisor(user),
+		"CSRF":              s.Auth.CSRF(w, r),
 		"C":                 c,
 		"CI":                ci,
 		"PTR":               ptr,

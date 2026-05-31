@@ -30,7 +30,7 @@
 </p>
 {{if gt (len .Cases) 1}}
 <form method="get" action="/client_profile.html" class="muted" style="margin:6px 0">
-  <input type="hidden" name="idn" value="{{.C.IDN}}">
+  <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
   Case: <select name="case" onchange="this.form.submit()">
     <option value="" {{if eq .SelectedCase ""}}selected{{end}}>All cases</option>
     {{range .Cases}}<option value="{{.}}" {{if eq . $.SelectedCase}}selected{{end}}>{{.}}</option>{{end}}
@@ -85,7 +85,7 @@
 <h2 style="padding:0 20px">Field corrections <span class="muted">(supervisor · audited · override the imported value)</span></h2>
 <div style="padding:0 20px 10px">
   <form method="post" action="/admin/override" class="muted" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
-    <input type="hidden" name="idn" value="{{.C.IDN}}">
+    <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
     <label>Field <select name="field">{{range .OverridableFields}}<option value="{{.Key}}">{{.Label}}</option>{{end}}</select></label>
     <label>Corrected value <input type="text" name="value" placeholder="new value" required></label>
     <button type="submit">Apply override</button>
@@ -97,7 +97,7 @@
       <td>{{.Label}}</td><td class="risk">{{.Value}}</td><td>{{.Author}}</td><td class="muted">{{.UpdatedAt}}</td>
       <td><form method="post" action="/admin/override/clear" style="margin:0"
             onsubmit="return confirm('Clear the override on {{.Label}}? It reverts to the imported value.');">
-        <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="field" value="{{.Field}}">
+        <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="field" value="{{.Field}}">
         <button type="submit">clear</button></form></td>
     </tr>
     {{end}}
@@ -110,7 +110,7 @@
   <section>
     <h2>Notes <span class="muted">({{len .Extras.Notes}})</span></h2>
     <form method="post" action="/admin/note/add" style="display:flex;gap:6px;margin-bottom:8px">
-      <input type="hidden" name="idn" value="{{.C.IDN}}">
+      <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
       <input type="text" name="body" placeholder="Add a note…" required class="grow">
       <button type="submit">Add</button>
     </form>
@@ -119,7 +119,7 @@
         <div>{{.Body}}</div>
         <div class="muted entry-meta">{{.Author}} · {{.CreatedAt}}
           <form method="post" action="/admin/note/delete" onsubmit="return confirm('Delete this note?');">
-            <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
+            <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
             <button type="submit" aria-label="Delete">×</button></form>
         </div>
       </div>
@@ -129,7 +129,7 @@
   <section>
     <h2>Tags <span class="muted">({{len .Extras.Tags}})</span></h2>
     <form method="post" action="/admin/tag/add" style="display:flex;gap:6px;margin-bottom:8px">
-      <input type="hidden" name="idn" value="{{.C.IDN}}">
+      <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
       <input type="text" name="label" placeholder="Add a tag…" required class="grow">
       <button type="submit">Add</button>
     </form>
@@ -137,7 +137,7 @@
     {{range .Extras.Tags}}
       <span class="chip">{{.Label}}
         <form method="post" action="/admin/tag/delete" onsubmit="return confirm('Remove tag {{.Label}}?');">
-          <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
+          <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
           <button type="submit" aria-label="Delete">×</button></form>
       </span>
     {{else}}<span class="muted">No tags.</span>{{end}}
@@ -149,7 +149,7 @@
   <section>
     <h2>Court dates <span class="muted">({{len .Extras.CourtDates}})</span></h2>
     <form method="post" action="/admin/courtdate/add" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      <input type="hidden" name="idn" value="{{.C.IDN}}">
+      <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
       <input type="date" name="court_date" required>
       <input type="text" name="court" placeholder="Court / room" class="grow">
       <input type="text" name="notes" placeholder="Notes" class="grow">
@@ -160,7 +160,7 @@
         <div><strong>{{.CourtDate}}</strong>{{if .Court}} · {{.Court}}{{end}}{{if .Notes}} — {{.Notes}}{{end}}</div>
         <div class="muted entry-meta">{{.Author}}
           <form method="post" action="/admin/courtdate/delete" onsubmit="return confirm('Delete this court date?');">
-            <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
+            <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
             <button type="submit" aria-label="Delete">×</button></form>
         </div>
       </div>
@@ -170,7 +170,7 @@
   <section>
     <h2>Reminders <span class="muted">({{len .Extras.Reminders}})</span></h2>
     <form method="post" action="/admin/reminder/add" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      <input type="hidden" name="idn" value="{{.C.IDN}}">
+      <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
       <input type="text" name="body" placeholder="Reminder…" required class="grow">
       <input type="date" name="due_date">
       <input type="text" name="assigned_to" placeholder="Assign to">
@@ -181,7 +181,7 @@
         <div>{{if .Completed}}<span class="ok">✓</span> {{end}}{{.Body}}{{if .DueDate}} <span class="muted">· due {{.DueDate}}</span>{{end}}{{if .AssignedTo}} <span class="muted">· {{.AssignedTo}}</span>{{end}}</div>
         <div class="muted entry-meta">{{.CreatedBy}}
           <form method="post" action="/admin/reminder/delete" onsubmit="return confirm('Delete this reminder?');">
-            <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
+            <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
             <button type="submit" aria-label="Delete">×</button></form>
         </div>
       </div>
@@ -192,7 +192,7 @@
 <section style="padding:0 20px 40px">
   <h2>Violations <span class="muted">({{len .Extras.Violations}})</span></h2>
   <form method="post" action="/admin/violation/add" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-    <input type="hidden" name="idn" value="{{.C.IDN}}">
+    <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
     <input type="date" name="violation_date" required>
     <select name="category"><option value="">Category…</option><option>missed-checkin</option><option>failed-drug-screen</option><option>gps-tamper</option><option>new-arrest</option><option>other</option></select>
     <select name="severity"><option value="">Severity…</option><option>minor</option><option>major</option><option>critical</option></select>
@@ -209,7 +209,7 @@
       <td class="{{if eq .Severity "critical"}}risk{{else if eq .Severity "major"}}risk{{end}}">{{.Severity}}</td>
       <td>{{.Description}}</td><td>{{.ActionTaken}}</td><td>{{.Officer}}</td>
       <td><form method="post" action="/admin/violation/delete" style="margin:0" onsubmit="return confirm('Delete this violation?');">
-        <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
         <button type="submit" aria-label="Delete">×</button></form></td>
     </tr>
     {{end}}

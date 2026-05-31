@@ -9,8 +9,10 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"net/http"
 	"strings"
 
@@ -105,6 +107,53 @@ func (a *Authenticator) Logout(w http.ResponseWriter, r *http.Request) {
 	sess, _ := a.store.Get(r, sessionName)
 	sess.Options.MaxAge = -1
 	_ = sess.Save(r, w)
+}
+
+// ── CSRF (synchronizer token) ────────────────────────────────────────────────
+
+const csrfKey = "csrf"
+
+// CSRF returns this session's CSRF token, minting + persisting one on first use.
+// Form-rendering handlers call this and embed the value as a hidden field; the
+// CSRF middleware then checks it on state-changing POSTs. Works for both
+// session-cookie and Cf-Access users (the latter get a token-only session cookie).
+func (a *Authenticator) CSRF(w http.ResponseWriter, r *http.Request) string {
+	sess, _ := a.store.Get(r, sessionName)
+	tok, _ := sess.Values[csrfKey].(string)
+	if tok == "" {
+		tok = randToken()
+		sess.Values[csrfKey] = tok
+		_ = sess.Save(r, w)
+	}
+	return tok
+}
+
+// ValidCSRF reports whether the request's `csrf` form value matches the session
+// token (constant-time). A missing token on either side fails closed.
+func (a *Authenticator) ValidCSRF(r *http.Request) bool {
+	sess, err := a.store.Get(r, sessionName)
+	if err != nil {
+		return false
+	}
+	want, _ := sess.Values[csrfKey].(string)
+	got := r.FormValue("csrf")
+	if want == "" || got == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+// SetCookieSecure flips the session cookie's Secure flag (set via COOKIE_SECURE
+// when the browser↔edge hop is HTTPS, e.g. behind Cloudflare — recommended in
+// production). Left false by default so plain-HTTP local dev still works.
+func (a *Authenticator) SetCookieSecure(secure bool) { a.store.Options.Secure = secure }
+
+func randToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "" // fails ValidCSRF closed — never silently accepts
+	}
+	return hex.EncodeToString(b)
 }
 
 func (a *Authenticator) checkPassword(p string) bool {

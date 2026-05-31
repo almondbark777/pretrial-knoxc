@@ -91,6 +91,9 @@ func main() {
 
 	importerRetired := envBool("IMPORTER_RETIRED")
 	a := auth.New(password, secret, envList("ALLOWED_EMAILS"), envList("SUPERVISOR_EMAILS"))
+	if envBool("COOKIE_SECURE") {
+		a.SetCookieSecure(true) // browser↔Cloudflare hop is HTTPS; set Secure in prod
+	}
 	srv := handlers.New(database, a, tmpl, 60*time.Second, importerRetired)
 
 	r := chi.NewRouter()
@@ -127,31 +130,48 @@ func main() {
 	r.Get("/api/defendants", srv.APIDefendants)
 	r.Get("/api/refresh", srv.APIRefresh)
 
-	// Admin & data-entry (write/correction surface). Supervisor-gated routes
-	// enforce the role inside the handler; CRUD routes are open to any allowed
-	// officer. Everything here is audited.
-	r.Get("/admin/delete", srv.DeleteConfirm)          // confirmation screen (supervisor)
-	r.Post("/admin/delete", srv.Delete)                // perform delete (supervisor)
-	r.Post("/admin/restore", srv.Restore)              // un-tombstone (supervisor)
-	r.Get("/admin/deleted", srv.Deleted)               // tombstone list + restore (supervisor)
-	r.Post("/admin/override", srv.SetOverride)         // set field override (supervisor)
-	r.Post("/admin/override/clear", srv.ClearOverride) // clear override (supervisor)
+	// Admin & data-entry (write/correction surface). Every POST carries a CSRF
+	// token (csrfGuard). Supervisor-gated routes enforce the role inside the
+	// handler; CRUD routes are open to any allowed officer. Everything is audited.
+	r.Route("/admin", func(ar chi.Router) {
+		ar.Use(csrfGuard(a))
+		ar.Get("/delete", srv.DeleteConfirm)          // confirmation screen (supervisor)
+		ar.Post("/delete", srv.Delete)                // perform delete (supervisor)
+		ar.Post("/restore", srv.Restore)              // un-tombstone (supervisor)
+		ar.Get("/deleted", srv.Deleted)               // tombstone list + restore (supervisor)
+		ar.Post("/override", srv.SetOverride)         // set field override (supervisor)
+		ar.Post("/override/clear", srv.ClearOverride) // clear override (supervisor)
 
-	// Per-defendant extension CRUD (any allowed officer).
-	r.Post("/admin/note/add", srv.AddNote)
-	r.Post("/admin/note/delete", srv.DeleteNote)
-	r.Post("/admin/tag/add", srv.AddTag)
-	r.Post("/admin/tag/delete", srv.DeleteTag)
-	r.Post("/admin/courtdate/add", srv.AddCourtDate)
-	r.Post("/admin/courtdate/delete", srv.DeleteCourtDate)
-	r.Post("/admin/reminder/add", srv.AddReminder)
-	r.Post("/admin/reminder/delete", srv.DeleteReminder)
-	r.Post("/admin/violation/add", srv.AddViolation)
-	r.Post("/admin/violation/delete", srv.DeleteViolation)
+		// Per-defendant extension CRUD (any allowed officer).
+		ar.Post("/note/add", srv.AddNote)
+		ar.Post("/note/delete", srv.DeleteNote)
+		ar.Post("/tag/add", srv.AddTag)
+		ar.Post("/tag/delete", srv.DeleteTag)
+		ar.Post("/courtdate/add", srv.AddCourtDate)
+		ar.Post("/courtdate/delete", srv.DeleteCourtDate)
+		ar.Post("/reminder/add", srv.AddReminder)
+		ar.Post("/reminder/delete", srv.DeleteReminder)
+		ar.Post("/violation/add", srv.AddViolation)
+		ar.Post("/violation/delete", srv.DeleteViolation)
+	})
 
 	log.Printf("PTR server listening on %s (db=%s)", addr, dbPath)
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// csrfGuard rejects state-changing POSTs to /admin/* whose form CSRF token does
+// not match the session token (synchronizer-token pattern). GET/HEAD pass through.
+func csrfGuard(a *auth.Authenticator) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && !a.ValidCSRF(r) {
+				http.Error(w, "Invalid or missing CSRF token — reload the page and try again.", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

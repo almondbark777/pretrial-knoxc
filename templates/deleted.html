@@ -41,6 +41,7 @@
         <form method="post" action="/admin/restore" style="margin:0"
               onsubmit="return confirm('Restore IDN {{.IDN}}{{if .CaseNumber}} case {{.CaseNumber}}{{end}}?');">
           <input type="hidden" name="idn" value="{{.IDN}}">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}">
           {{if .CaseNumber}}<input type="hidden" name="case" value="{{.CaseNumber}}">{{end}}
           <button type="submit">Restore</button>
         </form>

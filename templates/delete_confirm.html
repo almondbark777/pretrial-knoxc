@@ -42,6 +42,7 @@
 <form method="post" action="/admin/delete" class="card" style="margin:20px"
       onsubmit="return confirm('Delete {{if .CaseTok}}case {{.CaseTok}} of {{end}}{{.Name}} (IDN {{.IDN}})? This affects every view.');">
   <input type="hidden" name="idn" value="{{.IDN}}">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
   {{if .CaseTok}}<input type="hidden" name="case" value="{{.CaseTok}}">{{end}}
   <label>Reason (optional, recorded in the audit log)
     <input type="text" name="reason" placeholder="e.g. duplicate / wrong person / data-entry error">

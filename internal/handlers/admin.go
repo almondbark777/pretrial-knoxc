@@ -80,6 +80,7 @@ func (s *Server) DeleteConfirm(w http.ResponseWriter, r *http.Request) {
 	rep := openRep(cases)
 	s.render(w, "delete_confirm.html", map[string]any{
 		"User":            user,
+		"CSRF":            s.Auth.CSRF(w, r),
 		"IDN":             idn,
 		"Name":            rep.Name,
 		"Status":          rep.Status,
@@ -162,7 +163,7 @@ func (s *Server) Deleted(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "deleted.html", map[string]any{
 		"User": user, "Tombstones": tombs, "Msg": r.URL.Query().Get("msg"),
-		"ImporterRetired": s.ImporterRetired,
+		"ImporterRetired": s.ImporterRetired, "CSRF": s.Auth.CSRF(w, r),
 	})
 }
 
