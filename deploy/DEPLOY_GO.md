@@ -43,6 +43,10 @@ sudo systemctl daemon-reload
 ```bash
 sudo systemctl restart ptr-webapp
 curl -s http://127.0.0.1:8000/health            # {"db":"up","ok":true}
+
+# Full automated smoke test (every page, exports, CSRF + auth gating). Basic auth,
+# so use a SUPERVISOR email + APP_PASSWORD:
+BASE=http://127.0.0.1:8000 EMAIL=you@knoxsheriff.org PW="$APP_PASSWORD" bash deploy/smoke.sh
 # Through the tunnel, in a browser (Cloudflare Access will gate you):
 #   /                     -> client tracker (landing) with "Admin & Data-Entry →"
 #   /dashboard            -> new app; KPIs + rosters; "← Client Tracker" back
