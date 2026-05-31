@@ -243,6 +243,41 @@ func ListOverrides(d *sql.DB, idn string) ([]models.Override, error) {
 	return out, rows.Err()
 }
 
+// ListAudit returns recent audit_log entries (newest first), optionally filtered
+// to one defendant idn. Tolerates a DB without the table (returns empty).
+func ListAudit(d *sql.DB, idn string, limit int) ([]models.AuditRow, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 200
+	}
+	if !tableExists(d, "audit_log") {
+		return nil, nil
+	}
+	q := `SELECT IFNULL(ts,''), IFNULL(user_id,''), action, table_name,
+	             IFNULL(row_id,''), IFNULL(col_name,''), IFNULL(old_value,''), IFNULL(new_value,'')
+	      FROM audit_log`
+	args := []any{}
+	if idn = strings.TrimSpace(idn); idn != "" {
+		q += " WHERE row_id = ?"
+		args = append(args, idn)
+	}
+	q += " ORDER BY audit_id DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := d.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.AuditRow
+	for rows.Next() {
+		var a models.AuditRow
+		if err := rows.Scan(&a.Ts, &a.User, &a.Action, &a.Table, &a.RowID, &a.Col, &a.OldValue, &a.NewValue); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 // LoadExtras gathers all of a defendant's app-owned data for the profile page.
 func LoadExtras(d *sql.DB, idn string) (models.DefendantExtras, error) {
 	var e models.DefendantExtras

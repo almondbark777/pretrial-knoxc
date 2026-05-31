@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit log — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  <nav class="nav"><a href="/" class="tracker-link">&larr; Client Tracker</a><a href="/dashboard">Dashboard</a><a href="/my_day.html">My Day</a><a href="/pretrial_app.html">Cases</a><a href="/analytics.html">Analytics</a><a href="/calendar.html">Calendar</a><a href="/admin/deleted">Deleted</a><a href="/admin/audit" class="active">Audit</a></nav>
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+</header>
+
+<h1>Audit log <span class="muted">({{len .Rows}}{{if not .IDN}} most recent{{end}})</span></h1>
+<p class="muted">
+  Every app write — deletes, restores, overrides, notes/tags/court-dates/reminders/violations — recorded in Eastern time.
+  {{if .IDN}}Filtered to IDN <strong>{{.IDN}}</strong>. <a href="/admin/audit">show all recent</a>.{{else}}Showing the latest {{.Limit}} entries.{{end}}
+</p>
+
+{{if .Rows}}
+<div class="table-scroll" style="padding:0 24px 44px">
+<table>
+  <thead><tr><th>When (ET)</th><th>User</th><th>Action</th><th>Target</th><th>Field / case</th><th>Old → New</th></tr></thead>
+  <tbody>
+  {{range .Rows}}
+    <tr>
+      <td class="muted" style="white-space:nowrap">{{.Ts}}</td>
+      <td>{{.User}}</td>
+      <td>{{if or (eq .Action "delete_person") (eq .Action "delete_case") (eq .Action "delete_person_physical") (eq .Action "delete_case_physical")}}<span class="badge-risk">{{.Action}}</span>{{else}}{{.Action}}{{end}}</td>
+      <td>{{if .RowID}}<a href="/admin/audit?idn={{.RowID}}">{{.RowID}}</a> <span class="muted">({{.Table}})</span>{{else}}<span class="muted">{{.Table}}</span>{{end}}</td>
+      <td>{{.Col}}</td>
+      <td>{{if .OldValue}}<span class="muted">{{.OldValue}}</span> → {{end}}{{.NewValue}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<p class="empty" style="padding:0 24px">No audit entries{{if .IDN}} for IDN {{.IDN}}{{end}} yet.</p>
+{{end}}
+</body>
+</html>

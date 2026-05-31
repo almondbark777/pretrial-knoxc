@@ -167,6 +167,24 @@ func (s *Server) Deleted(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Audit renders the audit-log viewer (supervisor only). GET /admin/audit?idn=
+// filters to one defendant's history; otherwise shows the most recent activity.
+func (s *Server) Audit(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.requireSupervisor(w, r)
+	if !ok {
+		return
+	}
+	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
+	rows, err := db.ListAudit(s.DB, idn, 200)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	s.render(w, "audit.html", map[string]any{
+		"User": user, "Rows": rows, "IDN": idn, "Limit": 200,
+	})
+}
+
 // ── Field overrides (supervisor-gated) ───────────────────────────────────────
 
 // SetOverride upserts a field override. POST /admin/override (idn, field, value)

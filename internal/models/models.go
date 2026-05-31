@@ -190,6 +190,18 @@ type Override struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// AuditRow is one audit_log entry for the supervisor audit viewer.
+type AuditRow struct {
+	Ts       string `json:"ts"`
+	User     string `json:"user"`
+	Action   string `json:"action"`
+	Table    string `json:"table"`
+	RowID    string `json:"rowId"`
+	Col      string `json:"col"`
+	OldValue string `json:"oldValue"`
+	NewValue string `json:"newValue"`
+}
+
 // DefendantExtras bundles a defendant's app-owned data for the profile page.
 type DefendantExtras struct {
 	Notes      []Note

@@ -146,6 +146,7 @@ func main() {
 		ar.Post("/delete", srv.Delete)                // perform delete (supervisor)
 		ar.Post("/restore", srv.Restore)              // un-tombstone (supervisor)
 		ar.Get("/deleted", srv.Deleted)               // tombstone list + restore (supervisor)
+		ar.Get("/audit", srv.Audit)                   // audit-log viewer (supervisor)
 		ar.Post("/override", srv.SetOverride)         // set field override (supervisor)
 		ar.Post("/override/clear", srv.ClearOverride) // clear override (supervisor)
 
