@@ -15,7 +15,7 @@
   <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
 </header>
 
-{{if .Msg}}<div class="toast"><span class="grow">{{.Msg}}</span><button type="button" class="toast-close" aria-label="Dismiss" onclick="this.closest('.toast').remove()">×</button></div>{{end}}
+{{if .Msg}}<div class="toast" role="status"><span class="grow">{{.Msg}}</span><button type="button" class="toast-close" aria-label="Dismiss" onclick="this.closest('.toast').remove()">×</button></div>{{end}}
 
 <ul id="results" class="results"></ul>
 

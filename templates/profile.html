@@ -12,7 +12,7 @@
   <span class="grow"></span><span class="muted">{{.Today}} · {{.User}}</span>
 </header>
 
-{{if .Msg}}<div class="toast"><span class="grow">{{.Msg}}</span><button type="button" class="toast-close" aria-label="Dismiss" onclick="this.closest('.toast').remove()">×</button></div>{{end}}
+{{if .Msg}}<div class="toast" role="status"><span class="grow">{{.Msg}}</span><button type="button" class="toast-close" aria-label="Dismiss" onclick="this.closest('.toast').remove()">×</button></div>{{end}}
 
 {{if .NotFound}}
   <p class="err">No client with IDN {{.NotFound}}. They may have been deleted{{if .IsSupervisor}} — see <a href="/admin/deleted">Deleted records</a>{{end}}.</p>
@@ -120,7 +120,7 @@
         <div class="muted entry-meta">{{.Author}} · {{.CreatedAt}}
           <form method="post" action="/admin/note/delete" onsubmit="return confirm('Delete this note?');">
             <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
-            <button type="submit">×</button></form>
+            <button type="submit" aria-label="Delete">×</button></form>
         </div>
       </div>
     {{else}}<p class="muted">No notes yet.</p>{{end}}
@@ -138,7 +138,7 @@
       <span class="chip">{{.Label}}
         <form method="post" action="/admin/tag/delete" onsubmit="return confirm('Remove tag {{.Label}}?');">
           <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
-          <button type="submit">×</button></form>
+          <button type="submit" aria-label="Delete">×</button></form>
       </span>
     {{else}}<span class="muted">No tags.</span>{{end}}
     </div>
@@ -161,7 +161,7 @@
         <div class="muted entry-meta">{{.Author}}
           <form method="post" action="/admin/courtdate/delete" onsubmit="return confirm('Delete this court date?');">
             <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
-            <button type="submit">×</button></form>
+            <button type="submit" aria-label="Delete">×</button></form>
         </div>
       </div>
     {{else}}<p class="muted">No court dates.</p>{{end}}
@@ -182,7 +182,7 @@
         <div class="muted entry-meta">{{.CreatedBy}}
           <form method="post" action="/admin/reminder/delete" onsubmit="return confirm('Delete this reminder?');">
             <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
-            <button type="submit">×</button></form>
+            <button type="submit" aria-label="Delete">×</button></form>
         </div>
       </div>
     {{else}}<p class="muted">No reminders.</p>{{end}}
@@ -210,7 +210,7 @@
       <td>{{.Description}}</td><td>{{.ActionTaken}}</td><td>{{.Officer}}</td>
       <td><form method="post" action="/admin/violation/delete" style="margin:0" onsubmit="return confirm('Delete this violation?');">
         <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="id" value="{{.ID}}">
-        <button type="submit">×</button></form></td>
+        <button type="submit" aria-label="Delete">×</button></form></td>
     </tr>
     {{end}}
   </tbody></table></div>
