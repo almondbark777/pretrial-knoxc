@@ -121,6 +121,7 @@ func main() {
 
 	// App (the new admin & data-entry / read-only surface).
 	r.Get("/dashboard", srv.Dashboard)
+	r.Get("/my_day.html", srv.MyDay)
 	r.Get("/pretrial_app.html", srv.CaseManagement)
 	r.Get("/analytics.html", srv.Analytics)
 	r.Get("/calendar.html", srv.Calendar)

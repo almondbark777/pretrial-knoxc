@@ -332,6 +332,53 @@ func calendarMonth(c *compute.Client, track time.Time, year int, month time.Mont
 	return title, days
 }
 
+// myDay builds the logged-in officer's personal worklist: among the clients THEY
+// supervise (open rep's Officer == their display name), the ones behind on GPS,
+// who missed a check-in this month, and whose next check-in window falls due
+// within 7 days. Reuses the roster fns (filtered by officer) so there's no
+// divergence. A user who supervises no one (e.g. an admin) gets an empty list.
+func myDay(clients map[string][]*compute.Client, track time.Time, officer string) models.MyDay {
+	md := models.MyDay{Officer: officer}
+	officerLC := strings.ToLower(strings.TrimSpace(officer))
+	mine := map[string]bool{}
+	for _, cases := range clients {
+		c := openRep(cases)
+		if c != nil && strings.ToLower(strings.TrimSpace(c.Officer)) == officerLC && officerLC != "" {
+			mine[c.IDN] = true
+			md.Caseload++
+		}
+	}
+	for _, x := range behindRoster(clients, track) {
+		if mine[x.IDN] {
+			md.Behind = append(md.Behind, x)
+		}
+	}
+	for _, x := range missedCheckInsRoster(clients, track) {
+		if mine[x.IDN] {
+			md.Missed = append(md.Missed, x)
+		}
+	}
+	weekEnd := track.AddDate(0, 0, 7)
+	for _, cases := range clients {
+		c := openRep(cases)
+		if c == nil || !mine[c.IDN] {
+			continue
+		}
+		ci := compute.ComputeCheckIns(*c, track)
+		if ci.NextDue != nil && !ci.NextDue.Deadline.After(weekEnd) {
+			lvl, _ := compute.ParseLevel(c.Level)
+			md.DueSoon = append(md.DueSoon, models.RosterRow{
+				IDN: c.IDN, Name: c.Name, Officer: c.Officer, Level: lvl,
+				Detail: "due " + ci.NextDue.Deadline.Format("Mon Jan 2") + " · " + ci.NextDue.Label,
+			})
+		}
+	}
+	sortByName(md.DueSoon)
+	sortByName(md.Behind)
+	sortByName(md.Missed)
+	return md
+}
+
 // rosterCalendarMonth aggregates events across ALL clients into per-day counts
 // for the roster-mode (team standup) calendar — Brief 2.9's second calendar mode.
 // One representative per IDN (open-preferred) is used so a multi-case person's

@@ -84,6 +84,16 @@ type CalDay struct {
 	Events []CalEvent
 }
 
+// MyDay is the logged-in officer's personal worklist: their caseload's
+// due-this-week / behind / missed items (reuses RosterRow).
+type MyDay struct {
+	Officer  string      `json:"officer"`  // display name matched against client.Officer
+	Caseload int         `json:"caseload"` // distinct clients supervised by this officer
+	DueSoon  []RosterRow `json:"dueSoon"`  // check-in window due within 7 days
+	Behind   []RosterRow `json:"behind"`   // behind on GPS
+	Missed   []RosterRow `json:"missed"`   // missed a check-in this month
+}
+
 // RosterDay is one cell of the roster-mode (team) calendar: aggregated counts
 // across all clients for that day. Day 0 == padding cell before the 1st.
 type RosterDay struct {

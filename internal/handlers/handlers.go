@@ -165,6 +165,24 @@ func (s *Server) Dashboard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ── My Day (the logged-in officer's personal worklist) ────────────────────────
+
+func (s *Server) MyDay(w http.ResponseWriter, r *http.Request) {
+	clients, err := s.clients()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	track := compute.TodayET()
+	user := auth.User(r)
+	s.render(w, "my_day.html", map[string]any{
+		"User":         user,
+		"IsSupervisor": s.Auth.IsSupervisor(user),
+		"Today":        track.Format("January 2, 2006"),
+		"MD":           myDay(clients, track, compute.FmtOfficer(user)),
+	})
+}
+
 // ── Live lookup search ────────────────────────────────────────────────────────
 
 func (s *Server) APILookup(w http.ResponseWriter, r *http.Request) {
