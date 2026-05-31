@@ -9,7 +9,12 @@
 The Go rewrite is **feature-complete, tested, hardened, documented — and DEPLOYED
 to `ptr1` (2026-05-31).** The Go binary is live (systemd `ptr-webapp`, `/health`
 green, on the real `kh222.db`, behind cloudflared + Access). The **show-cause
-letters are pending Alex's template** (framework ready; not recreated).
+letters are now built** (Past-Due EM Fees report) — a faithful port of Alex's
+`past-due-em-fees` skill that reuses his own memo template; parity-proven
+record-for-record against the canonical Python. **Data entry is also live in the
+code** (Phase 10): add clients, payments, and check-ins from the website, stored
+app-side and merged into every view (importer-proof). Neither Phase 9 nor 10 is
+redeployed to ptr1 yet.
 
 > **Deployed 2026-05-31** via `deploy/install-on-ptr1.sh` (bundle scp'd + run on the
 > box; key-auth set up for `alex@ptr1`). Pre-swap backups of the binary, unit, and DB
@@ -33,6 +38,15 @@ letters are pending Alex's template** (framework ready; not recreated).
 - [x] New admin/data-entry app at `/dashboard`, reached via a top-bar button;
       every new page has a "← Client Tracker" link back.
 
+**Data entry (Phase 10) — add records from the website**
+- [x] **Add a client** (`/admin/add_defendant`, "+ Add client" on the dashboard),
+      **add payments** and **add check-ins** to an existing client (profile forms).
+- [x] App-owned tables (`added_defendants/payments/check_ins`) **merged into every
+      read path** (BuildClients, the tracker feed, EM-fees) — importer-proof, so an
+      app-entered record shows + computes everywhere and survives the Sunday reload.
+      Tombstones suppress them; every write audited. (Officer-level; supervisor
+      delete is the backstop.) Paper trail: `PHASE_10_DATAENTRY.md`.
+
 **Admin & data-entry (Phase 7)**
 - [x] **Importer-proof delete**: `deleted_idns` tombstone filtered in `BuildClients`
       → person/case vanishes from every view and stays gone across the Sunday reload.
@@ -55,6 +69,12 @@ letters are pending Alex's template** (framework ready; not recreated).
 - [x] **CSV export** for the Behind/Missed rosters and the full case grid.
 - [x] **Printable reports** (`/reports`): print-ready Behind-on-GPS and Missed
       reports (letterhead + clean table; `@media print` → black-on-white document).
+- [x] **Past-Due EM Fees / show-cause letters** (`/reports/em-fees`) — faithful Go
+      port of Alex's `past-due-em-fees` skill (Phase 9): 5+ days behind on GPS fees,
+      Open/Closed split, totals + spot-check highlights, per-client memo (.docx) +
+      whole-batch zip, all rendered from the office's **own template** (reused, not
+      recreated). Parity-proven record-for-record vs. the canonical Python; the
+      generated memo is field-for-field identical to the skill's.
 
 **UX & hardening**
 - [x] Modern dark design system; responsive/mobile; accessibility (toast `role=status`,
@@ -77,10 +97,13 @@ letters are pending Alex's template** (framework ready; not recreated).
    pre-deploy DB copy exists so far — the open 🔴), and the
    `kh222.db → pretrial_release.db` rename (cosmetic; the unit currently points at
    `kh222.db`). Verify the UI + roster counts on the live data.
-2. **Show-cause letters** *(pending Alex's template/skill — do NOT recreate)*. The
-   **Behind-on-GPS report (`/reports/behind`) is the launchpad**: it's the exact list
-   the letters draw from. When the template arrives, add a "Generate letters" action
-   that renders one print-ready letter per behind client using *that* wording.
+2. **✅ DONE — Show-cause letters** (Past-Due EM Fees, Phase 9). Built from Alex's
+   `past-due-em-fees` skill: methodology ported to `internal/emfees`, his
+   `memo_template.docx` embedded and filled in Go, served at `/reports/em-fees`
+   (per-memo + zip + CSV). Parity-proven. **Still to do:** redeploy the binary to
+   ptr1 so it goes live there, and verify counts on real ptr1 data. Optional later:
+   a CSV-upload path for ad-hoc runs (and to pick up Switched-To/COURT columns the
+   daily import doesn't carry); xlsx export; splice overrides into the EM-fee read.
 3. **Validate on real data**. The offline `db/kh222.db` is a stale snapshot, so its
    numbers (esp. missed-check-in counts) are NOT representative — re-check rosters and
    "feel" against live `ptr1` data after deploy.

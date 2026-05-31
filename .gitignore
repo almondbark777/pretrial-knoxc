@@ -21,12 +21,23 @@ env/
 # --- Local DB copies / working scratch ---
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 .claude/
 
 # --- Source data with defendant PII (NEVER commit) ---
 db/csv_clean/
+# EM-fee parity golden (derived from the offline DB; carries IDNs). Regenerate
+# locally per PHASE_9_EMFEES.md; the parity test skips when it's absent.
+internal/db/testdata/emfees_golden.json
+
+# --- EM-fee skill working scratch (regenerable; never commit) ---
+.skill-unpacked/
+.parity-venv/
+.parity-tmp/
+*.skill
 
 # --- Build / deploy artifacts ---
 *.zip

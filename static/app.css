@@ -335,6 +335,32 @@ label{font-size:12.5px;color:var(--muted)}
 .report-list li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;margin:8px 0;background:linear-gradient(180deg,var(--card-2),var(--card));border:1px solid var(--line);border-radius:var(--r-lg)}
 .report-list .actions{display:flex;gap:8px;white-space:nowrap}
 
+/* ── Past-Due EM Fees report ─────────────────────────────────────────────── */
+.pill{display:inline-block;font-size:10.5px;font-weight:650;letter-spacing:.04em;text-transform:uppercase;color:var(--warn-ink);border:1px solid var(--line-2);border-radius:var(--r-pill);padding:1px 8px;vertical-align:middle}
+.emfee-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 24px 4px;max-width:var(--maxw)}
+.emfee-toolbar .grow{flex:1}
+.kpi-inline{font-size:13px;color:var(--muted)}
+.kpi-inline strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.kpi-inline.total strong{color:var(--warn-ink)}
+table.emfee{font-size:13px}
+table.emfee td .export,table.emfee .export{float:none}
+.emfee th.num,.emfee td.num{text-align:right}
+tr.row-flag-high>td{background:rgba(189,82,8,.16)}
+tr.row-flag-mid>td{background:rgba(230,180,40,.12)}
+.swatch{display:inline-block;width:11px;height:11px;border-radius:3px;border:1px solid var(--line-2);vertical-align:middle;margin:0 2px}
+.swatch.row-flag-high{background:rgba(189,82,8,.5)}
+.swatch.row-flag-mid{background:rgba(230,180,40,.45)}
+
+/* ── Add-client form ─────────────────────────────────────────────────────── */
+.form-grid{display:flex;flex-direction:column;gap:14px}
+.fg-row{display:flex;flex-wrap:wrap;gap:14px}
+.fg-row>label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);flex:1;min-width:170px}
+.fg-row>label input,.fg-row>label select{font-size:14px}
+.fg-row>label.check{flex-direction:row;align-items:center;gap:8px;min-width:120px;flex:0 0 auto}
+.fg-row>label.check input{width:auto}
+.req{color:var(--risk)}
+.fg-actions{display:flex;gap:10px;align-items:center;margin-top:4px}
+
 @media print{
   /* drop app chrome; render as a clean black-on-white document */
   .topbar,.nav,.no-print,.export,form,button,.pilllink{display:none!important}

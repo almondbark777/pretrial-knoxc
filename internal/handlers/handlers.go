@@ -157,6 +157,7 @@ func (s *Server) Dashboard(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "index.html", map[string]any{
 		"User":         user,
 		"IsSupervisor": s.Auth.IsSupervisor(user),
+		"ActiveNav":    "dashboard",
 		"Today":        track.Format("January 2, 2006"),
 		"Stats":        computeStats(clients, track),
 		"Behind":       behindRoster(clients, track),
@@ -178,6 +179,7 @@ func (s *Server) MyDay(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "my_day.html", map[string]any{
 		"User":         user,
 		"IsSupervisor": s.Auth.IsSupervisor(user),
+		"ActiveNav":    "myday",
 		"Today":        track.Format("January 2, 2006"),
 		"MD":           myDay(clients, track, compute.FmtOfficer(user)),
 	})
@@ -320,6 +322,7 @@ func (s *Server) CaseManagement(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "pretrial_app.html", map[string]any{
 		"User":         user,
 		"IsSupervisor": s.Auth.IsSupervisor(user),
+		"ActiveNav":    "cases",
 		"Today":        track.Format("January 2, 2006"),
 		"Rows":         defendantRows(clients, track),
 		"Stats":        computeStats(clients, track),
@@ -339,6 +342,7 @@ func (s *Server) Analytics(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "analytics.html", map[string]any{
 		"User":         user,
 		"IsSupervisor": s.Auth.IsSupervisor(user),
+		"ActiveNav":    "analytics",
 		"Today":        track.Format("January 2, 2006"),
 		"A":            analyticsData(clients, track),
 	})
@@ -369,7 +373,8 @@ func (s *Server) Calendar(w http.ResponseWriter, r *http.Request) {
 		rc := rosterCalendarMonth(clients, track, year, month)
 		s.render(w, "calendar.html", map[string]any{
 			"User": user, "IsSupervisor": s.Auth.IsSupervisor(user),
-			"Roster": true, "RC": rc, "Title": rc.Title,
+			"ActiveNav": "calendar",
+			"Roster":    true, "RC": rc, "Title": rc.Title,
 			"PrevMonth": prev, "NextMonth": next,
 		})
 		return

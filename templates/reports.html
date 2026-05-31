@@ -8,7 +8,7 @@
 <body>
 <header class="topbar">
   <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
-  <nav class="nav"><a href="/" class="tracker-link">&larr; Client Tracker</a><a href="/dashboard">Dashboard</a><a href="/my_day.html">My Day</a><a href="/pretrial_app.html">Cases</a><a href="/analytics.html">Analytics</a><a href="/calendar.html">Calendar</a><a href="/reports" class="active">Reports</a>{{if .IsSupervisor}}<a href="/admin/deleted">Deleted</a><a href="/admin/audit">Audit</a>{{end}}</nav>
+  {{template "sitenav" .}}
   <span class="grow"></span>
   <span class="muted">{{.User}}</span>
   <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
@@ -19,7 +19,11 @@
 
 <ul class="report-list">
   <li>
-    <div><strong>Behind on GPS Coverage</strong><br><span class="muted">Clients whose GPS payments are behind — source list for show-cause letters.</span></div>
+    <div><strong>Past-Due EM Fees</strong> <span class="pill">show-cause letters</span><br><span class="muted">Clients 5+ days behind on GPS monitoring fees (Open &amp; Closed). Generates a past-due memo (.docx) per person from the office template.</span></div>
+    <span class="actions"><a class="btn" href="/reports/em-fees">View / Memos</a><a class="btn btn-ghost" href="/export/em-fees.csv">CSV</a></span>
+  </li>
+  <li>
+    <div><strong>Behind on GPS Coverage</strong><br><span class="muted">Clients whose GPS coverage balance is negative (check-in / coverage view).</span></div>
     <span class="actions"><a class="btn" href="/reports/behind">View / Print</a><a class="btn btn-ghost" href="/export/behind.csv">CSV</a></span>
   </li>
   <li>
@@ -33,8 +37,8 @@
 </ul>
 
 <p class="muted" style="padding:0 24px;max-width:760px">
-  <strong>Show-cause letters</strong> for clients behind on GPS will generate from the
-  Behind-on-GPS report once the letter template is wired in.
+  <strong>Show-cause letters</strong> live on the <a href="/reports/em-fees">Past-Due EM Fees</a>
+  report: download one memo per client, or the whole batch as a zip with Open/ and Closed/ folders.
 </p>
 </body>
 </html>

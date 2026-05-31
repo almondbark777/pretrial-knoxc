@@ -214,12 +214,39 @@ type AuditRow struct {
 	NewValue string `json:"newValue"`
 }
 
+// AddedPayment is one app-entered payment (Phase 10 data entry), shown on the
+// profile so an officer can confirm or delete a mistaken entry. Imported payments
+// are not listed here — they surface via the computed fee summaries.
+type AddedPayment struct {
+	ID            int64  `json:"id"`
+	IDN           string `json:"idn"`
+	CaseNumber    string `json:"caseNumber"`
+	PaymentDate   string `json:"paymentDate"`
+	PaymentAmount string `json:"paymentAmount"`
+	PaymentType   string `json:"paymentType"`
+	Officer       string `json:"officer"`
+	Author        string `json:"author"`
+	CreatedAt     string `json:"createdAt"`
+}
+
+// AddedCheckIn is one app-entered check-in (Phase 10 data entry).
+type AddedCheckIn struct {
+	ID        int64  `json:"id"`
+	IDN       string `json:"idn"`
+	Date      string `json:"date"`
+	Type      string `json:"type"`
+	Author    string `json:"author"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // DefendantExtras bundles a defendant's app-owned data for the profile page.
 type DefendantExtras struct {
-	Notes      []Note
-	Tags       []Tag
-	CourtDates []CourtDate
-	Reminders  []Reminder
-	Violations []Violation
-	Overrides  []Override
+	Notes         []Note
+	Tags          []Tag
+	CourtDates    []CourtDate
+	Reminders     []Reminder
+	Violations    []Violation
+	Overrides     []Override
+	AddedPayments []AddedPayment
+	AddedCheckIns []AddedCheckIn
 }

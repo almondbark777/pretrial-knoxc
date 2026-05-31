@@ -125,6 +125,54 @@ CREATE TABLE IF NOT EXISTS reminders (
     created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_rem_idn ON reminders(idn);
+
+CREATE TABLE IF NOT EXISTS added_defendants (
+    add_id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn                 TEXT NOT NULL,
+    defendant           TEXT,
+    warrant_case_num    TEXT,
+    pretrial_level      TEXT,
+    case_status         TEXT,
+    supervising_officer TEXT,
+    referral_date       TEXT,
+    gps                 TEXT,
+    gps_type            TEXT,
+    charge_type         TEXT,
+    bond_amount         TEXT,
+    supervision_type    TEXT,
+    order_from          TEXT,
+    dma                 TEXT,
+    birthdate           TEXT,
+    closed_date         TEXT,
+    day_adjustment      TEXT,
+    author              TEXT,
+    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_added_def_idn ON added_defendants(idn);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_added_def ON added_defendants(idn, IFNULL(warrant_case_num, ''));
+
+CREATE TABLE IF NOT EXISTS added_payments (
+    add_id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn                            TEXT NOT NULL,
+    case_number                    TEXT,
+    payment_date                   TEXT,
+    payment_amount                 TEXT,
+    payment_type                   TEXT,
+    officer_that_collected_payment TEXT,
+    author                         TEXT,
+    created_at                     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_added_pay_idn ON added_payments(idn);
+
+CREATE TABLE IF NOT EXISTS added_check_ins (
+    add_id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn              TEXT NOT NULL,
+    date             TEXT,
+    type_of_check_in TEXT,
+    author           TEXT,
+    created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_added_ci_idn ON added_check_ins(idn);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to

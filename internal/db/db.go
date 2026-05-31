@@ -64,6 +64,15 @@ func queryMaps(d *sql.DB, table string) ([]map[string]string, error) {
 	return out, rows.Err()
 }
 
+// queryMapsIfExists is queryMaps that returns (nil, nil) when the table is absent,
+// so the added_* data-entry tables are optional on a DB that predates migration 004.
+func queryMapsIfExists(d *sql.DB, table string) ([]map[string]string, error) {
+	if !tableExists(d, table) {
+		return nil, nil
+	}
+	return queryMaps(d, table)
+}
+
 func asStr(v any) string {
 	switch t := v.(type) {
 	case nil:
@@ -124,6 +133,27 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 	gp, err := queryMaps(d, "raw_gps_48_hours")
 	if err != nil {
 		return nil, err
+	}
+
+	// App-added rows (Phase 10 data entry) are merged in alongside the imported
+	// rows so an app-entered defendant/payment/check-in is a first-class member of
+	// every view and computation, and survives the Sunday raw_* full reload. They
+	// share the raw_* column names, so this is a plain append; tombstones below
+	// still suppress them.
+	if extra, err := queryMapsIfExists(d, "added_defendants"); err != nil {
+		return nil, err
+	} else {
+		bb = append(bb, extra...)
+	}
+	if extra, err := queryMapsIfExists(d, "added_check_ins"); err != nil {
+		return nil, err
+	} else {
+		ci = append(ci, extra...)
+	}
+	if extra, err := queryMapsIfExists(d, "added_payments"); err != nil {
+		return nil, err
+	} else {
+		pm = append(pm, extra...)
 	}
 
 	// Admin suppression + corrections, loaded once per build (Phase 7). Tombstoned

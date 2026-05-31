@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Past-Due EM Fees — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar no-print">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  {{template "sitenav" .}}
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+</header>
+
+<div class="report-doc">
+  <div class="report-head">
+    <div class="agency">Knox County Sheriff's Office · Pre-Trial Services</div>
+    <h1 style="padding:0">Past-Due Electronic Monitoring Fees</h1>
+    <p class="muted" style="padding:0">Clients 5+ days behind on GPS monitoring fees · As of {{.AsOf}}</p>
+  </div>
+
+  <div class="emfee-toolbar no-print">
+    <span class="kpi-inline"><strong>{{.OpenCount}}</strong> Open · {{.OpenTotal}} behind</span>
+    <span class="kpi-inline"><strong>{{.ClosedCount}}</strong> Closed · {{.ClosedTotal}} behind</span>
+    <span class="kpi-inline total"><strong>{{.GrandTotal}}</strong> total</span>
+    <span class="grow"></span>
+    <a class="btn" href="/reports/em-fees/memos.zip?kind=all">Download all memos (.zip)</a>
+    <a class="btn btn-ghost" href="/export/em-fees.csv">CSV</a>
+    <button onclick="window.print()">Print</button>
+  </div>
+
+  <h2 style="margin:18px 24px 6px">Open cases <span class="muted">— {{.OpenCount}}</span>
+    {{if .Open}}<a class="export no-print" href="/reports/em-fees/memos.zip?kind=open">memos ⤓</a>{{end}}</h2>
+  {{if .Open}}
+  <div class="table-scroll">
+  <table class="emfee">
+    <thead><tr>
+      <th>Defendant</th><th>IDN</th><th>Case</th><th>Court</th><th>Type</th>
+      <th class="num">Rate</th><th>Install</th><th class="num">Days</th>
+      <th class="num">Owed</th><th class="num">Paid</th><th class="num">Behind</th><th class="num">Days&nbsp;behind</th>
+      <th class="no-print">Memo</th>
+    </tr></thead>
+    <tbody>
+    {{range .Open}}<tr class="{{.RowClass}}">
+      <td>{{.Name}}</td><td>{{.IDN}}</td><td>{{.Case}}</td><td>{{.Court}}</td>
+      <td>{{.Type}}{{if .SwitchT}} →{{.SwitchT}}{{end}}</td>
+      <td class="num">{{.Rate}}</td><td>{{.Start}}</td><td class="num">{{.Days}}</td>
+      <td class="num">{{.Owed}}</td><td class="num">{{.Paid}}</td><td class="num"><strong>{{.Behind}}</strong></td><td class="num">{{.DaysBehind}}</td>
+      <td class="no-print"><a class="export" href="/reports/em-fees/memo?kind=open&idn={{.IDN}}&case={{.Case}}">.docx ⤓</a></td>
+    </tr>{{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <p class="empty empty-ok" style="margin:0 24px">✓ No open cases are 5+ days behind.</p>
+  {{end}}
+
+  <h2 style="margin:24px 24px 6px">Closed cases <span class="muted">— {{.ClosedCount}}</span>
+    {{if .Closed}}<a class="export no-print" href="/reports/em-fees/memos.zip?kind=closed">memos ⤓</a>{{end}}</h2>
+  {{if .Closed}}
+  <p class="muted" style="margin:0 24px 8px;max-width:900px"><strong>Start dates are estimates</strong> —
+    <span class="swatch row-flag-high"></span> 2+ year span (likely overstated) ·
+    <span class="swatch row-flag-mid"></span> Referral-only start (no payment history). Review before sending.</p>
+  <div class="table-scroll">
+  <table class="emfee">
+    <thead><tr>
+      <th>Defendant</th><th>IDN</th><th>Case</th><th>Court</th><th>Type</th>
+      <th>Start</th><th>Closed</th><th class="num">Days</th>
+      <th class="num">Owed</th><th class="num">Paid</th><th class="num">Behind</th><th class="num">Days&nbsp;behind</th>
+      <th>Start&nbsp;source</th><th class="no-print">Memo</th>
+    </tr></thead>
+    <tbody>
+    {{range .Closed}}<tr class="{{.RowClass}}">
+      <td>{{.Name}}</td><td>{{.IDN}}</td><td>{{.Case}}</td><td>{{.Court}}</td><td>{{.Type}}</td>
+      <td>{{.Start}}</td><td>{{.End}}</td><td class="num">{{.Days}}</td>
+      <td class="num">{{.Owed}}</td><td class="num">{{.Paid}}</td><td class="num"><strong>{{.Behind}}</strong></td><td class="num">{{.DaysBehind}}</td>
+      <td>{{.StartSrc}}</td>
+      <td class="no-print"><a class="export" href="/reports/em-fees/memo?kind=closed&idn={{.IDN}}&case={{.Case}}">.docx ⤓</a></td>
+    </tr>{{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <p class="empty empty-ok" style="margin:0 24px">✓ No closed cases are behind (or none in this dataset — older 48-hour exports carry only active installs).</p>
+  {{end}}
+
+  <p class="muted no-print" style="margin:16px 24px;max-width:900px">
+    Daily rates: ALLIED $8 · SCRAM $15 · 5+ days behind. Daily-fee payments only
+    (install fees, PTR, and drug screens excluded). Memos render from the office's
+    own template (<code>memo_template.docx</code>); blank Court / Case fields are
+    left for the officer to complete.{{if .SkippedNoType}} {{.SkippedNoType}} GPS row(s) were
+    skipped for having no billable GPS type (IN CUSTODY / blank).{{end}}
+  </p>
+</div>
+</body>
+</html>

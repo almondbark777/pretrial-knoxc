@@ -162,7 +162,8 @@ func (s *Server) Deleted(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "deleted.html", map[string]any{
-		"User": user, "Tombstones": tombs, "Msg": r.URL.Query().Get("msg"),
+		"User": user, "IsSupervisor": true, "ActiveNav": "deleted",
+		"Tombstones": tombs, "Msg": r.URL.Query().Get("msg"),
 		"ImporterRetired": s.ImporterRetired, "CSRF": s.Auth.CSRF(w, r),
 	})
 }
@@ -181,7 +182,8 @@ func (s *Server) Audit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "audit.html", map[string]any{
-		"User": user, "Rows": rows, "IDN": idn, "Limit": 200,
+		"User": user, "IsSupervisor": true, "ActiveNav": "audit",
+		"Rows": rows, "IDN": idn, "Limit": 200,
 	})
 }
 

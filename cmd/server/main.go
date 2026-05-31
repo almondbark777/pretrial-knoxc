@@ -94,7 +94,8 @@ func main() {
 	if envBool("COOKIE_SECURE") {
 		a.SetCookieSecure(true) // browser↔Cloudflare hop is HTTPS; set Secure in prod
 	}
-	srv := handlers.New(database, a, tmpl, 60*time.Second, importerRetired)
+	const cacheTTL = 60 * time.Second
+	srv := handlers.New(database, a, tmpl, cacheTTL, importerRetired)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -136,11 +137,17 @@ func main() {
 	r.Get("/export/behind.csv", srv.ExportBehind)
 	r.Get("/export/missed.csv", srv.ExportMissed)
 	r.Get("/export/cases.csv", srv.ExportCases)
+	r.Get("/export/em-fees.csv", srv.ExportEMFees)
 
 	// Printable reports (clean black-on-white via print CSS).
 	r.Get("/reports", srv.Reports)
 	r.Get("/reports/behind", srv.ReportBehind)
 	r.Get("/reports/missed", srv.ReportMissed)
+
+	// Past-Due EM Fees report + memo generation (the show-cause letters).
+	r.Get("/reports/em-fees", srv.ReportEMFees)
+	r.Get("/reports/em-fees/memo", srv.EMFeeMemo)          // one filled .docx
+	r.Get("/reports/em-fees/memos.zip", srv.EMFeeMemosZip) // all memos (Open/ + Closed/)
 
 	// Admin & data-entry (write/correction surface). Every POST carries a CSRF
 	// token (csrfGuard). Supervisor-gated routes enforce the role inside the
@@ -154,6 +161,14 @@ func main() {
 		ar.Get("/audit", srv.Audit)                   // audit-log viewer (supervisor)
 		ar.Post("/override", srv.SetOverride)         // set field override (supervisor)
 		ar.Post("/override/clear", srv.ClearOverride) // clear override (supervisor)
+
+		// Data entry (any allowed officer): add a client, payments, check-ins.
+		ar.Get("/add_defendant", srv.AddDefendantForm)
+		ar.Post("/add_defendant", srv.AddDefendant)
+		ar.Post("/payment/add", srv.AddPayment)
+		ar.Post("/payment/delete", srv.DeleteAddedPayment)
+		ar.Post("/checkin/add", srv.AddCheckIn)
+		ar.Post("/checkin/delete", srv.DeleteAddedCheckIn)
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)

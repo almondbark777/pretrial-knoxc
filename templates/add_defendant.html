@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Client — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  {{template "sitenav" .}}
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+</header>
+
+{{if .Msg}}<div class="toast" role="status"><span class="grow">{{.Msg}}</span><button type="button" class="toast-close" aria-label="Dismiss" onclick="this.closest('.toast').remove()">×</button></div>{{end}}
+
+<h1>Add a client</h1>
+<p class="muted" style="max-width:760px">Creates a new defendant record in the app. It appears immediately in the tracker,
+rosters, and reports, and survives the daily import (it's stored app-side, not in the imported tables).
+A supervisor can delete it later if it was entered in error. <strong>IDN</strong> and <strong>Name</strong> are required.</p>
+
+<form method="post" action="/admin/add_defendant" class="form-grid" style="padding:0 24px 40px;max-width:880px">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+
+  <div class="fg-row">
+    <label>IDN <span class="req">*</span><input type="text" name="idn" required inputmode="numeric" placeholder="e.g. 1654321" autofocus></label>
+    <label>Name <span class="req">*</span><input type="text" name="defendant" required placeholder="LAST, FIRST MIDDLE"></label>
+  </div>
+
+  <div class="fg-row">
+    <label>Warrant / Case #<input type="text" name="warrant_case_num" placeholder="@1654321"></label>
+    <label>Pretrial level
+      <select name="pretrial_level">
+        <option value="">—</option><option>1</option><option>2</option><option>3</option>
+      </select>
+    </label>
+    <label>Status
+      <select name="case_status"><option>Open</option><option>Closed</option></select>
+    </label>
+  </div>
+
+  <div class="fg-row">
+    <label>Supervising officer<input type="text" name="supervising_officer" placeholder="First.Last@knoxsheriff.org or First Last"></label>
+    <label>Referral date<input type="date" name="referral_date"></label>
+  </div>
+
+  <div class="fg-row">
+    <label class="check"><input type="checkbox" name="gps" value="true"> On GPS</label>
+    <label>GPS type
+      <select name="gps_type">
+        <option value="">—</option><option>ALLIED</option><option>SCRAM</option><option>IN CUSTODY</option>
+      </select>
+    </label>
+    <label>Supervision type<input type="text" name="supervision_type" placeholder="e.g. Level 2"></label>
+  </div>
+
+  <div class="fg-row">
+    <label>Charge type<input type="text" name="charge_type"></label>
+    <label>Bond amount<input type="text" name="bond_amount" placeholder="$"></label>
+    <label>Order from<input type="text" name="order_from"></label>
+  </div>
+
+  <div class="fg-row">
+    <label>DMA<input type="text" name="dma"></label>
+    <label>Birthdate<input type="date" name="birthdate"></label>
+  </div>
+
+  <div class="fg-actions">
+    <button type="submit">Add client</button>
+    <a class="btn btn-ghost" href="/dashboard">Cancel</a>
+  </div>
+</form>
+</body>
+</html>

@@ -77,6 +77,25 @@ func LookupDatasets(d *sql.DB) (map[string]any, error) {
 		return nil, err
 	}
 
+	// Merge app-added rows (Phase 10) so the bundled tracker shows app-entered
+	// clients/payments/check-ins too. They share the raw_* column names, so the
+	// suppression/override/remap loops below treat them identically.
+	if extra, err := queryMapsIfExists(d, "added_defendants"); err != nil {
+		return nil, err
+	} else {
+		bbRaw = append(bbRaw, extra...)
+	}
+	if extra, err := queryMapsIfExists(d, "added_check_ins"); err != nil {
+		return nil, err
+	} else {
+		ciRaw = append(ciRaw, extra...)
+	}
+	if extra, err := queryMapsIfExists(d, "added_payments"); err != nil {
+		return nil, err
+	} else {
+		pmRaw = append(pmRaw, extra...)
+	}
+
 	// Blue book: per-row suppression + overrides, then remap.
 	bb := make([]map[string]string, 0, len(bbRaw))
 	for _, r := range bbRaw {

@@ -96,6 +96,55 @@
   </section>
 </div>
 
+<!-- ───── Record payment / check-in (any officer · audited) ───── -->
+<div class="grid">
+  <section>
+    <h2>Record payment</h2>
+    <form method="post" action="/admin/payment/add" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="date" name="payment_date" required>
+      <input type="text" name="payment_amount" inputmode="decimal" placeholder="$ amount" required style="max-width:120px">
+      <select name="payment_type" title="GPS/Allied/SCRAM count toward GPS coverage; PTR Fee toward PTR">
+        <option>GPS</option><option>Allied</option><option>SCRAM</option><option>SCRAM GPS</option><option>PTR Fee</option><option>Drug Screen</option><option>Other</option>
+      </select>
+      <input type="text" name="case_number" placeholder="Case # (optional)">
+      <button type="submit">Record</button>
+    </form>
+    {{if .Extras.AddedPayments}}
+    <div class="table-scroll"><table><thead><tr><th>Date</th><th>Type</th><th class="num">Amount</th><th>Case</th><th>By</th><th></th></tr></thead><tbody>
+      {{range .Extras.AddedPayments}}
+      <tr><td>{{.PaymentDate}}</td><td>{{.PaymentType}}</td><td class="num">{{.PaymentAmount}}</td><td>{{.CaseNumber}}</td><td class="muted">{{.Author}}</td>
+        <td><form method="post" action="/admin/payment/delete" style="margin:0" onsubmit="return confirm('Remove this payment entry?');">
+          <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
+          <button type="submit" aria-label="Delete">×</button></form></td></tr>
+      {{end}}
+    </tbody></table></div>
+    <p class="muted" style="margin:4px 0;font-size:12px">App-entered payments only — these are reflected in the fee totals above. Imported payments are not listed here.</p>
+    {{else}}<p class="muted">No app-entered payments. (Imported payments are reflected in the fee totals above.)</p>{{end}}
+  </section>
+
+  <section>
+    <h2>Record check-in</h2>
+    <form method="post" action="/admin/checkin/add" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input type="hidden" name="idn" value="{{.C.IDN}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="date" name="date" required>
+      <select name="type_of_check_in"><option>In Person</option><option>Phone</option><option>Office</option><option>Field</option><option>Other</option></select>
+      <button type="submit">Record</button>
+    </form>
+    {{if .Extras.AddedCheckIns}}
+    <div class="table-scroll"><table><thead><tr><th>Date</th><th>Type</th><th>By</th><th></th></tr></thead><tbody>
+      {{range .Extras.AddedCheckIns}}
+      <tr><td>{{.Date}}</td><td>{{.Type}}</td><td class="muted">{{.Author}}</td>
+        <td><form method="post" action="/admin/checkin/delete" style="margin:0" onsubmit="return confirm('Remove this check-in entry?');">
+          <input type="hidden" name="idn" value="{{$.C.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
+          <button type="submit" aria-label="Delete">×</button></form></td></tr>
+      {{end}}
+    </tbody></table></div>
+    <p class="muted" style="margin:4px 0;font-size:12px">App-entered check-ins — they satisfy the windows above.</p>
+    {{else}}<p class="muted">No app-entered check-ins. They'll satisfy the windows above once added.</p>{{end}}
+  </section>
+</div>
+
 <!-- ───── Data entry (extension data) ───── -->
 
 {{if .IsSupervisor}}

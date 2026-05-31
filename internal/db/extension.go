@@ -300,6 +300,12 @@ func LoadExtras(d *sql.DB, idn string) (models.DefendantExtras, error) {
 	if e.Overrides, err = ListOverrides(d, idn); err != nil {
 		return e, err
 	}
+	if e.AddedPayments, err = ListAddedPayments(d, idn); err != nil {
+		return e, err
+	}
+	if e.AddedCheckIns, err = ListAddedCheckIns(d, idn); err != nil {
+		return e, err
+	}
 	return e, nil
 }
 

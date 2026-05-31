@@ -8,7 +8,7 @@
 <body>
 <header class="topbar">
   <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
-  <nav class="nav"><a href="/" class="tracker-link">&larr; Client Tracker</a><a href="/dashboard" class="active">Dashboard</a><a href="/my_day.html">My Day</a><a href="/pretrial_app.html">Cases</a><a href="/analytics.html">Analytics</a><a href="/calendar.html">Calendar</a><a href="/reports">Reports</a>{{if .IsSupervisor}}<a href="/admin/deleted">Deleted</a><a href="/admin/audit">Audit</a>{{end}}</nav>
+  {{template "sitenav" .}}
   <span class="grow"></span>
   <input id="q" placeholder="Search name or IDN…" oninput="search(this.value)">
   <span class="muted" title="As-of date · signed in">{{.Today}} · {{.User}}</span>
@@ -26,6 +26,8 @@
   <div class="kpi risk"><span>{{.Stats.BehindGPS}}</span>⚠ Behind on GPS</div>
   <div class="kpi warn"><span>{{.Stats.MissedMonth}}</span>⚠ Missed this month</div>
 </section>
+
+<p style="padding:4px 24px 0"><a class="btn" href="/admin/add_defendant">+ Add client</a></p>
 
 <div class="grid">
   <section>
