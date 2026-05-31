@@ -222,6 +222,13 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 			CheckIns:  ciMap[idn],
 			Payments:  pmMap[idn],
 			Overrides: ovIdn,
+
+			ChargeType:      norm(r["charge_type"]),
+			BondAmount:      norm(r["bond_amount"]),
+			SupervisionType: norm(r["supervision_type"]),
+			OrderFrom:       norm(r["order_from"]),
+			DMA:             norm(r["dma"]),
+			Birthdate:       norm(r["birthdate"]),
 		}
 		if gpRec != nil {
 			c.GpInstall = norm(gpRec["gps_install_date"])

@@ -44,6 +44,23 @@
 {{if .C.Overrides}}<p class="banner">⚠ App field override(s) active on this record — values below differ from the imported (SharePoint) data. {{if .IsSupervisor}}Manage them in the Corrections panel.{{end}}</p>{{end}}
 {{if .Waived}}<p class="banner">⚠ GPS fees appear WAIVED per notes.</p>{{end}}
 
+<section style="padding:0 24px 8px">
+  <h2>Case info</h2>
+  <table class="kv"><tbody>
+    <tr><td>Pretrial level</td><td>{{if .C.Level}}{{.C.Level}}{{else}}<span class="missing">⚠ MISSING — drives check-in &amp; fee schedule</span>{{end}}{{if index .C.Overrides "pretrial_level"}} <span class="badge-risk">override</span>{{end}}</td></tr>
+    <tr><td>Referral date</td><td>{{if .C.RefOK}}{{fmtDate .C.RefD}}{{else}}<span class="missing">⚠ MISSING — anchor for all windows &amp; fees</span>{{end}}{{if index .C.Overrides "referral_date"}} <span class="badge-risk">override</span>{{end}}</td></tr>
+    <tr><td>Status</td><td>{{if .C.Status}}{{.C.Status}}{{else}}<span class="muted">—</span>{{end}}{{if index .C.Overrides "case_status"}} <span class="badge-risk">override</span>{{end}}</td></tr>
+    {{if .C.ClosedOK}}<tr><td>Closed date</td><td>{{fmtDate .C.ClosedD}}</td></tr>{{end}}
+    {{if .C.SupervisionType}}<tr><td>Supervision type</td><td>{{.C.SupervisionType}}</td></tr>{{end}}
+    {{if .C.ChargeType}}<tr><td>Charge type</td><td>{{.C.ChargeType}}</td></tr>{{end}}
+    {{if .C.OrderFrom}}<tr><td>Order from</td><td>{{.C.OrderFrom}}</td></tr>{{end}}
+    {{if .C.BondAmount}}<tr><td>Bond amount</td><td>{{.C.BondAmount}}</td></tr>{{end}}
+    {{if .C.DMA}}<tr><td>DMA</td><td>{{.C.DMA}}</td></tr>{{end}}
+    {{if .C.Birthdate}}<tr><td>Birthdate</td><td>{{.C.Birthdate}}</td></tr>{{end}}
+    <tr><td>Officer</td><td>{{if .C.Officer}}{{.C.Officer}}{{else}}<span class="muted">—</span>{{end}}{{if index .C.Overrides "supervising_officer"}} <span class="badge-risk">override</span>{{end}}</td></tr>
+  </tbody></table>
+</section>
+
 <div class="grid">
   <section>
     <h2>Check-ins

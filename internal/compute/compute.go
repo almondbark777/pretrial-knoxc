@@ -180,6 +180,15 @@ type Client struct {
 	GpSwitchedDate string
 	GpNotes        string
 
+	// Imported case-info fields — display only, not read by the math. Shown on
+	// the profile's Case Info panel (blank non-critical fields are hidden).
+	ChargeType      string
+	BondAmount      string
+	SupervisionType string
+	OrderFrom       string
+	DMA             string
+	Birthdate       string
+
 	RefD     time.Time
 	RefOK    bool
 	ClosedD  time.Time
