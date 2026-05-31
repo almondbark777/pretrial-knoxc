@@ -69,7 +69,8 @@ sudo chmod 600 "$ENV" 2>/dev/null || true
 say "6. install Go systemd unit (pointed at the CURRENT db path)"
 sudo cp "$SRC/ptr-webapp-go.service" "/etc/systemd/system/$SVC.service"
 sudo sed -i "s#^Environment=SQLITE_DB_PATH=.*#Environment=SQLITE_DB_PATH=$DB#" "/etc/systemd/system/$SVC.service"
-grep SQLITE_DB_PATH "/etc/systemd/system/$SVC.service" | sed 's/^/  /'
+sudo chmod 644 "/etc/systemd/system/$SVC.service"
+sudo grep -E 'ExecStart|SQLITE_DB_PATH' "/etc/systemd/system/$SVC.service" | sed 's/^/  /' || true
 sudo systemctl daemon-reload
 
 say "7. restart + health"
