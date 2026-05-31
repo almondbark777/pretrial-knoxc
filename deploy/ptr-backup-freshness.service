@@ -1,0 +1,10 @@
+# Daily check that a recent DB backup actually exists. Install at
+# /etc/systemd/system/ptr-backup-freshness.service. Runs as root so it can read
+# the backup drive regardless of file ownership. Paired with the .timer.
+[Unit]
+Description=PTR backup freshness check (alert if backups go stale/missing)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ptr-backup-freshness.sh

@@ -18,7 +18,10 @@ set -euo pipefail
 DB="${DB:-/opt/ptr-knoxc/db/kh222.db}"            # live database (path-driven)
 DEST="${DEST:-/mnt/backup/ptr}"                   # mount point of the backup drive
 PYTHON="${PYTHON:-/opt/ptr-knoxc/venv/bin/python3}"
-ENV_FILE="${ENV_FILE:-/opt/ptr-knoxc/webapp/.env}"
+# Space-separated label:path pairs of config/secret files to snapshot beside the
+# DB, so a bare-metal restore has the app + import settings, not just the data.
+# Override via the unit's Environment= if paths change.
+CONFIG_FILES="${CONFIG_FILES:-app.env:/opt/ptr-knoxc/webapp/.env import.env:/etc/ptr-import.env}"
 MIGRATIONS="${MIGRATIONS:-/opt/ptr-knoxc/db/migrations}"
 RETAIN_DAYS="${RETAIN_DAYS:-30}"
 
@@ -54,10 +57,18 @@ if [ "$ic" != "ok" ]; then
   rm -f "$out"
   exit 1
 fi
+chmod 600 "$out" 2>/dev/null || true   # the DB holds defendant PII — keep it private
 
-# 3) Capture the config + schema alongside the DB in the dated set.
-cp -f "$ENV_FILE" "$DEST/ptr-import.env-${stamp}" 2>/dev/null \
-  || echo "WARN: could not copy $ENV_FILE" >&2
+# 3) Capture the config/secret files + schema alongside the DB in the dated set.
+#    Each lands as <label>-<stamp>, chmod 600 (these hold secrets).
+for pair in $CONFIG_FILES; do
+  label="${pair%%:*}"; path="${pair#*:}"
+  if cp -f "$path" "$DEST/${label}-${stamp}" 2>/dev/null; then
+    chmod 600 "$DEST/${label}-${stamp}" 2>/dev/null || true
+  else
+    echo "WARN: could not copy config $path (label=$label)" >&2
+  fi
+done
 if [ -d "$MIGRATIONS" ]; then
   tar -czf "$DEST/migrations-${stamp}.tar.gz" \
     -C "$(dirname "$MIGRATIONS")" "$(basename "$MIGRATIONS")" \
@@ -66,7 +77,7 @@ fi
 
 # 4) Prune anything older than RETAIN_DAYS (cheap — DB is ~8 MB; root has ~86 GB).
 find "$DEST" -maxdepth 1 -type f \
-  \( -name "${dbname}-*.db" -o -name "ptr-import.env-*" -o -name "migrations-*.tar.gz" \) \
+  \( -name "${dbname}-*.db" -o -name "*.env-*" -o -name "migrations-*.tar.gz" \) \
   -mtime +"$RETAIN_DAYS" -print -delete
 
 bytes="$(stat -c %s "$out" 2>/dev/null || echo '?')"

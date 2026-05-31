@@ -63,3 +63,7 @@ Thumbs.db
 # deploy bundle (build artifact)
 ptr1-deploy.tar.gz
 *.tar.gz
+
+# deploy bundle build output
+deploy/dist/
+/server-linux

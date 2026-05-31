@@ -1,0 +1,13 @@
+# Fires the freshness check daily at 14:00 UTC — a few hours after the backup
+# timer (11:45 UTC) so a same-day run has completed. Persistent=true makes it
+# catch up if the box was off. Install at /etc/systemd/system/ptr-backup-freshness.timer
+# then: systemctl enable --now ptr-backup-freshness.timer
+[Unit]
+Description=Run the PTR backup freshness check daily
+
+[Timer]
+OnCalendar=*-*-* 14:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

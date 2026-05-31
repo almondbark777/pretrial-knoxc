@@ -100,23 +100,42 @@ ssh -L 19999:127.0.0.1:19999 alex@ptr1
 # then open http://localhost:19999
 ```
 
-### Alert notifications (email / Slack / ntfy)
+### Alert notifications (phone push — the "tell me without me looking" piece)
 
-By default Netdata raises alarms but only shows them in the dashboard. To get
-pinged, edit the notify config on ptr1:
+A dashboard only helps when you look at it; a push notification is what reaches
+you when you're away. By default Netdata raises alarms but only shows them in the
+dashboard — turn on a notifier to get pushed.
+
+**`install-netdata.sh` offers this for you (step 7):** it prompts for an **ntfy
+topic** and, if you give one, wires up phone-push alerts and sends a test. ntfy is
+the lowest-friction option — free, instant phone push, no mail server, no account.
+Just install the **ntfy app**, and subscribe to the same topic name.
+
+> **Posture note:** the free public server `ntfy.sh` is a third party, and the
+> alarm text passes through it (low-sensitivity — e.g. "ptr-webapp down", "disk at
+> 90%", never defendant data). If even that crosses a line for you, two
+> in-perimeter alternatives: **self-host ntfy** (a tiny container on ptr1 or
+> another office box; point `DEFAULT_RECIPIENT_NTFY` at it), or use **email** to
+> your @knoxsheriff.org address (needs a local MTA like `msmtp`). Pick a long,
+> hard-to-guess topic name regardless — anyone who knows a public ntfy topic can
+> read its alerts.
+
+To set it up by hand or change it later, edit the notify config on ptr1
+(`/etc/netdata` for a package install, `/opt/netdata/etc/netdata` for a static one):
 
 ```bash
-cd /etc/netdata
+cd /etc/netdata          # or /opt/netdata/etc/netdata
 sudo ./edit-config health_alarm_notify.conf
 ```
 
-Easiest options:
-- **Email** — set `SEND_EMAIL="YES"` and `DEFAULT_RECIPIENT_EMAIL="you@knoxsheriff.org"`
-  (needs a working local MTA, e.g. `msmtp`).
-- **ntfy / Slack / Discord** — set the corresponding `SEND_*="YES"` and webhook/topic
-  URL. ntfy is the lowest-friction (free, phone push, no MTA).
+Then set one of:
+- **ntfy** — `SEND_NTFY="YES"`, `DEFAULT_RECIPIENT_NTFY="https://ntfy.sh/<your-topic>"`
+- **Email** — `SEND_EMAIL="YES"`, `DEFAULT_RECIPIENT_EMAIL="you@knoxsheriff.org"` (needs an MTA)
+- **Slack / Discord** — set the matching `SEND_*="YES"` + webhook URL
 
-Then `sudo systemctl restart netdata`. Send a test: `sudo /usr/libexec/netdata/plugins.d/alarm-notify.sh test`.
+Apply with `sudo systemctl restart netdata`. Send a test (path also depends on
+install type): `sudo /usr/libexec/netdata/plugins.d/alarm-notify.sh test` (or under
+`/opt/netdata/usr/libexec/...`).
 
 ### Adding a custom app alarm
 

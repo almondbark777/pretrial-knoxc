@@ -1,0 +1,12 @@
+# Generic ntfy failure notifier. Templated by the FAILED unit's name, e.g.
+# another unit declares:  OnFailure=ptr-alert@%n.service
+# and this pushes a high-priority ntfy alert. Install at
+# /etc/systemd/system/ptr-alert@.service. Needs /etc/ptr-alert.env (NTFY_URL).
+[Unit]
+Description=Push ntfy alert that %i failed
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ptr-alert.env
+# sh -c so $NTFY_URL expands; %i is the failed unit name (filled by systemd).
+ExecStart=/bin/sh -c 'curl -fsS -m 15 -H "Title: ptr1: %i FAILED" -H "Priority: high" -H "Tags: rotating_light" -d "%i failed on ptr1. Check: journalctl -u %i -n 50 --no-pager" "$NTFY_URL"'

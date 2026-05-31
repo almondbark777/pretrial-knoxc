@@ -15,10 +15,26 @@
 # After this runs, see deploy/MONITORING.md for viewing + alert-notification setup.
 set -euo pipefail
 
-NDDIR=/etc/netdata
 APP_METRICS_URL="http://127.0.0.1:8000/metrics"
+NDDIR=""   # detected after install — varies by install method (see find_nddir)
 
 say(){ printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
+
+# find_nddir locates Netdata's config dir. Native packages use /etc/netdata; the
+# kickstart static build uses /opt/netdata/etc/netdata. The edit-config script
+# lives in the config dir on every install, so it's the reliable marker.
+find_nddir(){
+  for d in /etc/netdata /opt/netdata/etc/netdata; do
+    if [ -x "$d/edit-config" ] || [ -f "$d/netdata.conf" ] || [ -d "$d" ]; then
+      echo "$d"; return
+    fi
+  done
+  echo /etc/netdata
+}
+
+# find_exe returns the first existing path among its args (for tools whose
+# location also depends on install method), else empty.
+find_exe(){ for p in "$@"; do [ -x "$p" ] && { echo "$p"; return; }; done; }
 
 say "0. sudo"
 sudo -v
@@ -33,7 +49,10 @@ else
   sudo sh /tmp/netdata-kickstart.sh --stable-channel --disable-telemetry --non-interactive
 fi
 
-# The config dir may not exist until the daemon has run once.
+# Detect where THIS install put its config (native /etc/netdata vs static
+# /opt/netdata/etc/netdata) — writing to the wrong dir would silently no-op.
+NDDIR="$(find_nddir)"
+echo "  config dir: $NDDIR"
 sudo mkdir -p "$NDDIR/go.d"
 
 say "2. bind dashboard to localhost only"
@@ -105,14 +124,55 @@ else
   echo "  ⚠ Netdata API not responding on 127.0.0.1:19999 — check: journalctl -u netdata -n 40 --no-pager"
 fi
 
+say "7. (optional) phone-push alerts via ntfy"
+# ntfy is the lowest-friction phone alert: no MTA, no account. Free public server
+# is ntfy.sh; alarm text is low-sensitivity (e.g. "ptr-webapp down", "disk 90%"),
+# but it IS a third party — self-host ntfy or use email instead if you prefer
+# (see deploy/MONITORING.md). Skippable: blank answer (or no TTY) = no change.
+NTFY_TOPIC=""
+read -r -p "  ntfy topic for phone alerts (pick a long, hard-to-guess name; blank = skip): " NTFY_TOPIC 2>/dev/null || true
+if [ -n "${NTFY_TOPIC:-}" ]; then
+  NOTIFY="$NDDIR/health_alarm_notify.conf"
+  # Materialize the editable copy without launching $EDITOR (EDITOR=true = no-op).
+  if [ ! -f "$NOTIFY" ] && [ -x "$NDDIR/edit-config" ]; then
+    sudo sh -c "cd '$NDDIR' && EDITOR=true ./edit-config health_alarm_notify.conf" >/dev/null 2>&1 || true
+  fi
+  if [ -f "$NOTIFY" ]; then
+    set_kv(){ # key value — replace existing assignment or append
+      if sudo grep -qE "^[[:space:]]*$1=" "$NOTIFY"; then
+        sudo sed -i -E "s|^[[:space:]]*$1=.*|$1=\"$2\"|" "$NOTIFY"
+      else
+        echo "$1=\"$2\"" | sudo tee -a "$NOTIFY" >/dev/null
+      fi
+    }
+    set_kv SEND_NTFY YES
+    set_kv DEFAULT_RECIPIENT_NTFY "https://ntfy.sh/$NTFY_TOPIC"
+    sudo systemctl restart netdata || true
+    echo "  ntfy enabled -> https://ntfy.sh/$NTFY_TOPIC"
+    echo "  Subscribe in the ntfy phone app (Add subscription -> topic: $NTFY_TOPIC)."
+    AN="$(find_exe /usr/libexec/netdata/plugins.d/alarm-notify.sh /opt/netdata/usr/libexec/netdata/plugins.d/alarm-notify.sh)"
+    if [ -n "$AN" ] && sudo "$AN" test >/dev/null 2>&1; then
+      echo "  test alert sent — check your phone."
+    else
+      echo "  (couldn't auto-send a test; trigger one from the dashboard or wait for a real alarm.)"
+    fi
+  else
+    echo "  couldn't create $NOTIFY automatically — set ntfy by hand (see deploy/MONITORING.md)."
+  fi
+else
+  echo "  skipped — you can enable phone/email/Slack alerts later (see deploy/MONITORING.md)."
+fi
+
 cat <<'EONOTE'
 
 == done ==
-View the dashboard (it is NOT public — bound to localhost):
+View the dashboard from OUTSIDE the office via Cloudflare Access (chosen path):
+  set up the netdata-ptr.<domain> hostname per deploy/MONITORING.md, then browse
+  https://netdata-ptr.<domain> with your @knoxsheriff.org login. Nothing new
+  leaves the box — it rides your existing tunnel + Access gate.
 
-  From your PC:   ssh -L 19999:127.0.0.1:19999 alex@ptr1
-  Then browse:    http://localhost:19999
+Quick deep-dive fallback (no Cloudflare changes):
+  ssh -L 19999:127.0.0.1:19999 alex@ptr1   then   http://localhost:19999
 
-To expose it behind Cloudflare Access instead, and to wire up alert
-notifications (email / Slack / ntfy), see deploy/MONITORING.md.
+Netdata stays bound to 127.0.0.1 either way. Full notes: deploy/MONITORING.md.
 EONOTE
