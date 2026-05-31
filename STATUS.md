@@ -1,20 +1,17 @@
 # Project status — Knox County Pre-Trial (Go app)
 
-> Handoff / checkpoint as of 2026-05-31. Single-glance "what's done, what's left."
+> Last updated 2026-05-31. Single-glance "what's done, what's left."
 > Deeper detail lives in `PTR_MASTER_OVERHAUL_BRIEF.md` (spec, parent folder), the
 > append-only `PHASE_*.md` paper trail, `README.md`, and `deploy/DEPLOY_GO.md`.
 
 ## TL;DR
 
-The Go rewrite is **feature-complete, tested, hardened, documented — and DEPLOYED
-to `ptr1` (2026-05-31).** The Go binary is live (systemd `ptr-webapp`, `/health`
-green, on the real `kh222.db`, behind cloudflared + Access). The **show-cause
-letters are now built** (Past-Due EM Fees report) — a faithful port of Alex's
-`past-due-em-fees` skill that reuses his own memo template; parity-proven
-record-for-record against the canonical Python. **Data entry is also live in the
-code** (Phase 10): add clients, payments, and check-ins from the website, stored
-app-side and merged into every view (importer-proof). Neither Phase 9 nor 10 is
-redeployed to ptr1 yet.
+The Go rewrite is **feature-complete, tested, hardened, documented, deployed, and
+monitored.** The Go binary is live on `ptr1` (systemd `ptr-webapp`, `/health` green,
+`kh222.db`, behind cloudflared + Access). **Show-cause letters** (Phase 9, EM fees)
+and **website data entry** (Phase 10, add clients/payments/check-ins) are both live
+on the box. **Automated daily backups** (Phase 5) run at 11:45 UTC to the dedicated
+backup drive. **Netdata monitoring** is running with phone push alerts via ntfy.
 
 > **Deployed 2026-05-31** via `deploy/install-on-ptr1.sh` (bundle scp'd + run on the
 > box; key-auth set up for `alex@ptr1`). Pre-swap backups of the binary, unit, and DB
@@ -83,37 +80,37 @@ redeployed to ptr1 yet.
       security headers (nosniff, `X-Frame-Options: SAMEORIGIN`, Referrer-Policy).
 
 **Quality / ops / docs**
-- [x] 34 test functions (compute, db, handlers, auth) — `go vet`/`gofmt`/`go test` green.
+- [x] 34+ test functions (compute, db, handlers, auth, metrics) — `go vet`/`gofmt`/`go test` green.
 - [x] `deploy/DEPLOY_GO.md` cutover guide + `deploy/smoke.sh` post-deploy check.
 - [x] `README.md` rewritten as the Go-app front door; `webapp/.env.example` documents
       all env vars; `.gitattributes` enforces LF.
+
+**Monitoring & backups (Phase 5 + ops)**
+- [x] **Automated daily backups** to dedicated drive (`/dev/sda1` ext4, 916 GB, UUID
+      `7a6a0d0a-...`, mounted `/mnt/backup/ptr`). WAL-safe online snapshot via Python
+      stdlib; `integrity_check` on every backup; 30-day retention. Timer: 11:45 UTC
+      (~30 min after daily import). On-box restore proof: `raw_blue_book` 3959,
+      `raw_check_ins` 5000, `raw_payments` 2826, `raw_gps_48_hours` 778. Phase 5 🔴 closed.
+- [x] **Netdata** host+service dashboard (CPU/RAM/disk/IO + ptr systemd units). Bound
+      to `127.0.0.1:19999`; view via SSH tunnel or Cloudflare Access.
+- [x] **`/metrics` endpoint** (Prometheus-text, auth-free, localhost-only) — request
+      counts, latency histogram, in-flight, uptime, goroutines, memory. Scraped by
+      Netdata go.d prometheus job.
+- [x] **Phone push alerts** via ntfy (topic `ptr-alerts-kc2847xq`) — Netdata alarms
+      (down service, disk/RAM pressure) delivered to phone. No account required.
 
 ---
 
 ## ⬜ What still needs to be done
 
-1. **✅ DONE — Deploy to `ptr1`** (2026-05-31). Live via `deploy/install-on-ptr1.sh`.
-   Still worth doing soon: **Phase 5 automated backups** on `ptr1` (only a manual
-   pre-deploy DB copy exists so far — the open 🔴), and the
-   `kh222.db → pretrial_release.db` rename (cosmetic; the unit currently points at
-   `kh222.db`). Verify the UI + roster counts on the live data.
-2. **✅ DONE — Show-cause letters** (Past-Due EM Fees, Phase 9). Built from Alex's
-   `past-due-em-fees` skill: methodology ported to `internal/emfees`, his
-   `memo_template.docx` embedded and filled in Go, served at `/reports/em-fees`
-   (per-memo + zip + CSV). Parity-proven. **Still to do:** redeploy the binary to
-   ptr1 so it goes live there, and verify counts on real ptr1 data. Supervisor
-   **field overrides are now spliced into the EM-fee read** (a corrected GPS
-   type/rate, name, case status, or referral/closed date reaches the report + the
-   show-cause letters — consistent with every other view). Optional later: a
-   CSV-upload path for ad-hoc runs (and to pick up Switched-To/COURT columns the
-   daily import doesn't carry); xlsx export.
-3. **Validate on real data**. The offline `db/kh222.db` is a stale snapshot, so its
-   numbers (esp. missed-check-in counts) are NOT representative — re-check rosters and
-   "feel" against live `ptr1` data after deploy.
-4. **Two-server HA** *(production scale-up)*. Design locked in `PHASE_8_HA.md`:
-   **rqlite, 3 nodes** (two app servers + a tiny witness) + Cloudflare LB failover.
-   Bounded code change (queries already native SQLite; only the connection layer +
-   the importer's write path move). Do at the end of the testing phase.
+1. **Validate on real data.** The offline `db/kh222.db` used for testing is a stale
+   snapshot — re-check roster counts, EM-fee report totals, and general "feel" against
+   live `ptr1` data now that the full binary is deployed.
+2. **`kh222.db → pretrial_release.db` rename** (cosmetic). Update
+   `Environment=DB=` in `ptr-backup.service` and `Environment=SQLITE_DB_PATH=` in
+   the webapp unit at the same time. See `PHASE_5_BACKUP.md` §5.
+3. **Two-server HA** *(production scale-up)*. Design locked in `PHASE_8_HA.md`:
+   rqlite 3-node + Cloudflare LB failover. Do at the end of the testing phase.
 
 ### Nice-to-have / optional (not blocking)
 - Roster-calendar weekly/column totals; per-officer split on the Behind report.

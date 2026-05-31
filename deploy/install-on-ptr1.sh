@@ -48,12 +48,16 @@ else
   sudo cp -a "$DB" "$BK/db.$STAMP.sqlite" && echo "  DB file-copy -> db.$STAMP.sqlite (sqlite3 not installed)"
 fi
 
-say "4. install binary + templates + static"
+say "4. install binary + templates + static + deploy scripts"
 sudo install -m0755 "$SRC/server" "$APP/server"
 sudo rm -rf "$APP/templates" "$APP/static"
 sudo cp -r "$SRC/templates" "$SRC/static" "$APP/"
 if id ptrapp >/dev/null 2>&1; then OWN=ptrapp:ptrapp; else OWN=root:root; fi
 sudo chown -R "$OWN" "$APP/server" "$APP/templates" "$APP/static"
+sudo mkdir -p "$APP/deploy"
+for script in ptr-backup.sh install-netdata.sh; do
+  [ -f "$SRC/$script" ] && sudo install -m0755 "$SRC/$script" "$APP/deploy/$script" && echo "  installed $script"
+done
 echo "  installed (owner $OWN)"
 
 say "5. update .env (idempotent; existing keys left as-is)"
