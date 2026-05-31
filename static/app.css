@@ -326,6 +326,35 @@ label{font-size:12.5px;color:var(--muted)}
   .shell-sub{display:none}
 }
 
+/* ── printable reports ─────────────────────────────────────────────────────── */
+.report-head{margin:18px 24px 8px;max-width:var(--maxw)}
+.report-head .agency{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.report-doc{max-width:var(--maxw);margin:0 auto}
+.report-doc table{width:100%;margin:0 24px}
+.report-list{list-style:none;margin:0;padding:0 24px;max-width:760px}
+.report-list li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;margin:8px 0;background:linear-gradient(180deg,var(--card-2),var(--card));border:1px solid var(--line);border-radius:var(--r-lg)}
+.report-list .actions{display:flex;gap:8px;white-space:nowrap}
+
+@media print{
+  /* drop app chrome; render as a clean black-on-white document */
+  .topbar,.nav,.no-print,.export,form,button,.pilllink{display:none!important}
+  body{background:#fff!important;color:#000!important}
+  a{color:#000!important;text-decoration:none}
+  h1,h2,h3,p,td,th,.muted,.risk,.ok,.warn,.faint{color:#000!important}
+  .report-head{margin:0 0 12px}
+  .report-doc{margin:0;max-width:none}
+  .report-doc table,.cal{margin:0}
+  table{border-collapse:collapse;width:100%}
+  thead{display:table-header-group}             /* repeat header on each page */
+  th,td{border:1px solid #999!important;background:#fff!important;color:#000!important;padding:4px 8px}
+  th{background:#eee!important}
+  tr{page-break-inside:avoid}
+  .badge-risk,.badge,.badge-ok,.badge-warn,.chip{border:1px solid #000!important;background:#fff!important;color:#000!important}
+  .kpi,.card,.cal-d{box-shadow:none!important;border:1px solid #999!important;background:#fff!important;color:#000!important}
+  .kpi span{color:#000!important}
+  @page{margin:1.4cm}
+}
+
 /* ── motion / a11y ───────────────────────────────────────────────────────── */
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}

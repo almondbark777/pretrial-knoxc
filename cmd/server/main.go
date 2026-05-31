@@ -137,6 +137,11 @@ func main() {
 	r.Get("/export/missed.csv", srv.ExportMissed)
 	r.Get("/export/cases.csv", srv.ExportCases)
 
+	// Printable reports (clean black-on-white via print CSS).
+	r.Get("/reports", srv.Reports)
+	r.Get("/reports/behind", srv.ReportBehind)
+	r.Get("/reports/missed", srv.ReportMissed)
+
 	// Admin & data-entry (write/correction surface). Every POST carries a CSRF
 	// token (csrfGuard). Supervisor-gated routes enforce the role inside the
 	// handler; CRUD routes are open to any allowed officer. Everything is audited.

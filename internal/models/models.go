@@ -190,6 +190,18 @@ type Override struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// Report is a generic printable/exportable tabular report (rendered by
+// report.html). The same shape backs Behind-on-GPS, Missed-Check-Ins, etc.
+type Report struct {
+	Title    string     `json:"title"`
+	Subtitle string     `json:"subtitle"`
+	AsOf     string     `json:"asOf"`
+	Columns  []string   `json:"columns"`
+	Rows     [][]string `json:"rows"`
+	CSVPath  string     `json:"csvPath"` // link to the matching CSV export, if any
+	Note     string     `json:"note"`    // optional footnote (e.g. show-cause-letter status)
+}
+
 // AuditRow is one audit_log entry for the supervisor audit viewer.
 type AuditRow struct {
 	Ts       string `json:"ts"`

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
+  <nav class="nav"><a href="/" class="tracker-link">&larr; Client Tracker</a><a href="/dashboard">Dashboard</a><a href="/my_day.html">My Day</a><a href="/pretrial_app.html">Cases</a><a href="/analytics.html">Analytics</a><a href="/calendar.html">Calendar</a><a href="/reports" class="active">Reports</a>{{if .IsSupervisor}}<a href="/admin/deleted">Deleted</a><a href="/admin/audit">Audit</a>{{end}}</nav>
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
+</header>
+
+<h1>Reports</h1>
+<p class="muted">Print-ready and exportable. Open a report and use your browser's Print (or “Save as PDF”); the CSV opens in Excel.</p>
+
+<ul class="report-list">
+  <li>
+    <div><strong>Behind on GPS Coverage</strong><br><span class="muted">Clients whose GPS payments are behind — source list for show-cause letters.</span></div>
+    <span class="actions"><a class="btn" href="/reports/behind">View / Print</a><a class="btn btn-ghost" href="/export/behind.csv">CSV</a></span>
+  </li>
+  <li>
+    <div><strong>Missed Check-Ins — This Month</strong><br><span class="muted">Open clients with no check-in this calendar month (L1 excluded).</span></div>
+    <span class="actions"><a class="btn" href="/reports/missed">View / Print</a><a class="btn btn-ghost" href="/export/missed.csv">CSV</a></span>
+  </li>
+  <li>
+    <div><strong>Full Case Grid</strong><br><span class="muted">Every client with level, status, officer, GPS, and balances.</span></div>
+    <span class="actions"><a class="btn btn-ghost" href="/export/cases.csv">CSV</a></span>
+  </li>
+</ul>
+
+<p class="muted" style="padding:0 24px;max-width:760px">
+  <strong>Show-cause letters</strong> for clients behind on GPS will generate from the
+  Behind-on-GPS report once the letter template is wired in.
+</p>
+</body>
+</html>

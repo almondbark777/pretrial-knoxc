@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.R.Title}} — Knox County Pre-Trial</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar no-print">
+  <a href="/reports" class="pilllink">&larr; Reports</a>
+  <span class="grow"></span>
+  <span class="muted">{{.User}}</span>
+  {{if .R.CSVPath}}<a class="export" href="{{.R.CSVPath}}">CSV ⤓</a>{{end}}
+  <button onclick="window.print()">Print</button>
+</header>
+
+<div class="report-doc">
+  <div class="report-head">
+    <div class="agency">Knox County Sheriff's Office · Pre-Trial Services</div>
+    <h1 style="padding:0">{{.R.Title}}</h1>
+    <p class="muted" style="padding:0">{{.R.Subtitle}} · As of {{.R.AsOf}} · {{len .R.Rows}} record(s)</p>
+  </div>
+
+  {{if .R.Rows}}
+  <table>
+    <thead><tr>{{range .R.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+    <tbody>
+    {{range .R.Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="empty empty-ok" style="margin:0 24px">✓ Nothing to report — the list is empty.</p>
+  {{end}}
+
+  {{if .R.Note}}<p class="muted no-print" style="margin:14px 24px">{{.R.Note}}</p>{{end}}
+</div>
+</body>
+</html>
