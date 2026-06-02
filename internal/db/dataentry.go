@@ -151,8 +151,9 @@ func AddPayment(d *sql.DB, idn, caseNumber, date, amount, ptype, officer, by str
 		strings.TrimSpace(ptype), strings.TrimSpace(officer), nz(by))
 }
 
-// AddCheckIn records a check-in against an existing IDN.
-func AddCheckIn(d *sql.DB, idn, date, ctype, by string) error {
+// AddCheckIn records a check-in against an existing IDN. note is an optional
+// free-text annotation on this specific check-in (e.g. GPS fitment details).
+func AddCheckIn(d *sql.DB, idn, date, ctype, note, by string) error {
 	idn = strings.TrimSpace(idn)
 	if idn == "" {
 		return errEmptyIDN
@@ -164,8 +165,8 @@ func AddCheckIn(d *sql.DB, idn, date, ctype, by string) error {
 	return txAddWithAudit(d,
 		AuditEvent{User: by, Action: "checkin_add", Table: "added_check_ins", RowID: idn,
 			NewValue: clip(strings.TrimSpace(ctype) + " " + date)},
-		`INSERT INTO added_check_ins (idn, date, type_of_check_in, author) VALUES (?,?,?,?)`,
-		idn, date, strings.TrimSpace(ctype), nz(by))
+		`INSERT INTO added_check_ins (idn, date, type_of_check_in, note, author) VALUES (?,?,?,?,?)`,
+		idn, date, strings.TrimSpace(ctype), strings.TrimSpace(note), nz(by))
 }
 
 func DeleteAddedPayment(d *sql.DB, id int64, by string) error {
@@ -208,7 +209,7 @@ func ListAddedCheckIns(d *sql.DB, idn string) ([]models.AddedCheckIn, error) {
 		return nil, nil
 	}
 	rows, err := d.Query(
-		`SELECT add_id, idn, IFNULL(date,''), IFNULL(type_of_check_in,''), IFNULL(author,''), IFNULL(created_at,'')
+		`SELECT add_id, idn, IFNULL(date,''), IFNULL(type_of_check_in,''), IFNULL(note,''), IFNULL(author,''), IFNULL(created_at,'')
 		 FROM added_check_ins WHERE TRIM(idn) = ? ORDER BY add_id DESC`, strings.TrimSpace(idn))
 	if err != nil {
 		return nil, err
@@ -217,7 +218,7 @@ func ListAddedCheckIns(d *sql.DB, idn string) ([]models.AddedCheckIn, error) {
 	var out []models.AddedCheckIn
 	for rows.Next() {
 		var c models.AddedCheckIn
-		if err := rows.Scan(&c.ID, &c.IDN, &c.Date, &c.Type, &c.Author, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.IDN, &c.Date, &c.Type, &c.Note, &c.Author, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS court_dates (
     court_date    TEXT NOT NULL,
     court         TEXT NULL,
     notes         TEXT NULL,
+    outcome       TEXT NULL,
+    next_date     TEXT NULL,
     author        TEXT NULL,
     created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -169,6 +171,7 @@ CREATE TABLE IF NOT EXISTS added_check_ins (
     idn              TEXT NOT NULL,
     date             TEXT,
     type_of_check_in TEXT,
+    note             TEXT,
     author           TEXT,
     created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -187,7 +190,46 @@ func EnsureSchema(d *sql.DB) error {
 			return err
 		}
 	}
+	// Additive column migrations for DBs created before these columns existed
+	// (CREATE IF NOT EXISTS won't alter an existing table). Court hearing outcome
+	// + next date (the FTA-tracking fields).
+	if err := addColumnIfMissing(d, "court_dates", "outcome", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(d, "court_dates", "next_date", "TEXT"); err != nil {
+		return err
+	}
+	// Per-check-in note (fitment details etc.) on app-entered check-ins.
+	if err := addColumnIfMissing(d, "added_check_ins", "note", "TEXT"); err != nil {
+		return err
+	}
 	return nil
+}
+
+// addColumnIfMissing runs an idempotent ALTER TABLE … ADD COLUMN, skipping it
+// when the column already exists (SQLite has no ADD COLUMN IF NOT EXISTS).
+func addColumnIfMissing(d *sql.DB, table, col, decl string) error {
+	rows, err := d.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == col {
+			return nil // already present
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = d.Exec("ALTER TABLE " + table + " ADD COLUMN " + col + " " + decl)
+	return err
 }
 
 // ── Tombstones (read side, consumed by BuildClients) ────────────────────────

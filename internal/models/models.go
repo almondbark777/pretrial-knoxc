@@ -11,6 +11,12 @@ type RosterRow struct {
 	Level   int     `json:"level"`
 	Detail  string  `json:"detail"` // human summary (e.g. "behind $264 / 33 days")
 	Amount  float64 `json:"amount"` // surplus dollars (negative = behind), or 0
+
+	// Fee breakdown (populated by behindRoster; zero on the missed-check-in roster)
+	// for the console's owed/paid/behind columns (Build-Spec §5.8).
+	Owed   float64 `json:"owed"`   // GPS dollars owed to date
+	Paid   float64 `json:"paid"`   // GPS dollars paid to date
+	Waived bool    `json:"waived"` // fee-waiver note present on the GPS record
 }
 
 // Stats is the dashboard summary.
@@ -135,13 +141,16 @@ type Tag struct {
 	CreatedAt string `json:"createdAt"`
 }
 
-// CourtDate is one upcoming court date for a defendant.
+// CourtDate is one upcoming court date for a defendant. Outcome/NextDate are
+// filled after the hearing (FTA-tracking; empty until logged).
 type CourtDate struct {
 	ID        int64  `json:"id"`
 	IDN       string `json:"idn"`
 	CourtDate string `json:"courtDate"`
 	Court     string `json:"court"`
 	Notes     string `json:"notes"`
+	Outcome   string `json:"outcome"`
+	NextDate  string `json:"nextDate"`
 	Author    string `json:"author"`
 	CreatedAt string `json:"createdAt"`
 }
@@ -235,6 +244,7 @@ type AddedCheckIn struct {
 	IDN       string `json:"idn"`
 	Date      string `json:"date"`
 	Type      string `json:"type"`
+	Note      string `json:"note"` // optional per-check-in note (e.g. GPS fitment details)
 	Author    string `json:"author"`
 	CreatedAt string `json:"createdAt"`
 }

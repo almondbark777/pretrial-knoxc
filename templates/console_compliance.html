@@ -1,0 +1,40 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Compliance</h1>
+    <div class="sub">The two cross-client rosters the office runs on — computed from the same server-side math as the tracker.</div>
+  </div>
+  <div class="right"><span class="asof">{{if .IsToday}}✓ matches tracker as of {{.MatchTime}} EST{{else}}as of {{.Today}} · historical view{{end}}</span>
+    <button class="btn ghost sm" onclick="window.print()">Print</button></div>
+</div>
+
+<div class="panel" style="margin-bottom:18px">
+  <div class="h"><h2>Behind on GPS</h2><span class="grow"></span><span class="count">{{len .Behind}}</span>
+    <a class="btn ghost sm" href="/export/behind.csv" style="margin-left:10px">Export CSV ⤓</a></div>
+  <div class="tscroll">
+    {{if .Behind}}<table class="data">
+      <thead><tr><th>Client</th><th>Officer</th><th>Level</th><th class="num">Owed</th><th class="num">Paid</th><th class="num">Behind</th><th>Fees</th></tr></thead>
+      <tbody>{{range .Behind}}<tr data-href="/console/clients/{{.IDN}}" onclick="location.href='/console/clients/{{.IDN}}'">
+        <td><div class="namecell"><span class="av">{{initials .Name}}</span><span class="nm">{{.Name}}</span></div></td>
+        <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td>
+        <td class="num">{{money .Owed}}</td><td class="num">{{money .Paid}}</td>
+        <td class="num risk-t">{{money .Amount}}</td>
+        <td>{{if .Waived}}<span class="chip neutral">waived</span>{{else}}<span class="chip risk"><span class="g">⚠</span> behind</span>{{end}}</td></tr>{{end}}</tbody>
+    </table>{{else}}<div class="emptybox"><div class="big">✓</div>All clear — nobody is behind on GPS.</div>{{end}}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="h"><h2>Missed Check-Ins this month</h2><span class="grow"></span><span class="count">{{len .Missed}}</span>
+    <a class="btn ghost sm" href="/export/missed.csv" style="margin-left:10px">Export CSV ⤓</a></div>
+  <div class="tscroll">
+    {{if .Missed}}<table class="data">
+      <thead><tr><th>Client</th><th>Officer</th><th>Level</th><th>Detail</th></tr></thead>
+      <tbody>{{range .Missed}}<tr data-href="/console/clients/{{.IDN}}" onclick="location.href='/console/clients/{{.IDN}}'">
+        <td><div class="namecell"><span class="av">{{initials .Name}}</span><span class="nm">{{.Name}}</span></div></td>
+        <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody>
+    </table>{{else}}<div class="emptybox"><div class="big">✓</div>Everyone has checked in this month.</div>{{end}}
+  </div>
+</div>
+<p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">Both rosters are the current standing as of the selected date (system go-live · {{.Epoch}}). L1 clients are excluded from the monthly Missed roster and the 3-day grace is honored, matching the tracker (Brief 2.8).</p>
+{{template "c_bot" .}}

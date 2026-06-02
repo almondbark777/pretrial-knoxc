@@ -49,8 +49,9 @@ func (s *Server) AddDefendant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.clearCache()
-	redirectMsg(w, r, "/client_profile.html?idn="+url.QueryEscape(strings.TrimSpace(nd.IDN)),
-		"Client added: "+strings.TrimSpace(nd.Name)+" (IDN "+strings.TrimSpace(nd.IDN)+").")
+	idn := strings.TrimSpace(nd.IDN)
+	redirectMsg(w, r, safeNext(r, "/client_profile.html?idn="+url.QueryEscape(idn)),
+		"Client added: "+strings.TrimSpace(nd.Name)+" (IDN "+idn+").")
 }
 
 // AddPayment records a payment on an existing client's profile.
@@ -79,7 +80,7 @@ func (s *Server) DeleteAddedPayment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) AddCheckIn(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	idn, back := profileBack(r)
-	err := db.AddCheckIn(s.DB, idn, r.FormValue("date"), r.FormValue("type_of_check_in"), auth.User(r))
+	err := db.AddCheckIn(s.DB, idn, r.FormValue("date"), r.FormValue("type_of_check_in"), r.FormValue("note"), auth.User(r))
 	s.afterWrite(w, r, back, err, "Check-in recorded.")
 }
 

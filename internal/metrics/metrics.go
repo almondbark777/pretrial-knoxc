@@ -19,6 +19,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"pretrial-knoxc/internal/build"
 )
 
 // latency histogram buckets in seconds (cumulative, Prometheus-style "le").
@@ -125,6 +127,12 @@ func (m *Metrics) Handler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+
+	// Build identity — always 1; the running build is the `version` label. Lets a
+	// scraper confirm which binary is live (did the deploy take?).
+	fmt.Fprintln(w, "# HELP ptr_build_info Build identity (value always 1; read the version label).")
+	fmt.Fprintln(w, "# TYPE ptr_build_info gauge")
+	writeLine(w, "ptr_build_info", fmt.Sprintf("version=%q", build.Version), 1)
 
 	fmt.Fprintln(w, "# HELP ptr_http_requests_total Total HTTP requests by route, method, status class.")
 	fmt.Fprintln(w, "# TYPE ptr_http_requests_total counter")

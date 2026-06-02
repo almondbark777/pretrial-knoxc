@@ -35,7 +35,7 @@ func (s *Server) ExportBehind(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	track := compute.TodayET()
+	track := s.trackFrom(r) // honor the console's as-of date so the file matches the on-screen roster
 	rows := [][]string{}
 	for _, x := range behindRoster(clients, track) {
 		rows = append(rows, []string{
@@ -43,7 +43,7 @@ func (s *Server) ExportBehind(w http.ResponseWriter, r *http.Request) {
 			strconv.FormatFloat(x.Amount, 'f', 2, 64), x.Detail,
 		})
 	}
-	writeCSV(w, "behind-gps-"+stamp()+".csv",
+	writeCSV(w, "behind-gps-"+track.Format("2006-01-02")+".csv",
 		[]string{"Name", "IDN", "Officer", "Level", "Surplus $ (negative = behind)", "Detail"}, rows)
 }
 
@@ -54,12 +54,12 @@ func (s *Server) ExportMissed(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	track := compute.TodayET()
+	track := s.trackFrom(r) // honor the console's as-of date so the file matches the on-screen roster
 	rows := [][]string{}
 	for _, x := range missedCheckInsRoster(clients, track) {
 		rows = append(rows, []string{x.Name, x.IDN, x.Officer, levelLabel(x.Level), x.Detail})
 	}
-	writeCSV(w, "missed-checkins-"+stamp()+".csv",
+	writeCSV(w, "missed-checkins-"+track.Format("2006-01-02")+".csv",
 		[]string{"Name", "IDN", "Officer", "Level", "Detail"}, rows)
 }
 
@@ -70,7 +70,7 @@ func (s *Server) ExportCases(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	track := compute.TodayET()
+	track := s.trackFrom(r) // honor the console's as-of date so the file matches the on-screen roster
 	rows := [][]string{}
 	for _, d := range defendantRows(clients, track) {
 		rows = append(rows, []string{
@@ -80,7 +80,7 @@ func (s *Server) ExportCases(w http.ResponseWriter, r *http.Request) {
 			strconv.Itoa(d.MissedCount), yesNo(d.MissedMonth),
 		})
 	}
-	writeCSV(w, "cases-"+stamp()+".csv", []string{
+	writeCSV(w, "cases-"+track.Format("2006-01-02")+".csv", []string{
 		"Name", "IDN", "Level", "Status", "Officer", "Cases",
 		"GPS Active", "GPS Vendor", "Behind GPS", "PTR Balance", "Missed (total)", "Missed This Month",
 	}, rows)

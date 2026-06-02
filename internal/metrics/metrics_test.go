@@ -52,4 +52,8 @@ func TestMiddlewareAndHandler(t *testing.T) {
 			t.Fatalf("missing runtime series %q:\n%s", want, body)
 		}
 	}
+	// Build-info series present, carrying the link-time version (default "dev").
+	if !strings.Contains(body, `ptr_build_info{version="dev"} 1`) {
+		t.Fatalf("missing/incorrect ptr_build_info:\n%s", body)
+	}
 }

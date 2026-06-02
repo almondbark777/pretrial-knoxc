@@ -67,3 +67,6 @@ ptr1-deploy.tar.gz
 # deploy bundle build output
 deploy/dist/
 /server-linux
+
+# PTR tracker bundle edit scratch (unpack/repack workspace)
+_tracker_work/

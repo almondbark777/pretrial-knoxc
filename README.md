@@ -17,7 +17,7 @@ delete bad data. Replaces a SharePoint + Excel workflow.
 **Build / run / test**
 ```bash
 go build ./cmd/server          # -> ./server  (single binary, pure-Go SQLite, no CGO)
-GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o server ./cmd/server   # for ptr1
+bash deploy/build-bundle.sh    # for ptr1: cross-compile (version-stamped) + tarball
 go test ./...                  # compute + db + handlers + auth
 APP_BASE_DIR=. SQLITE_DB_PATH=db/kh222.db APP_PASSWORD=dev go run ./cmd/server
 ```

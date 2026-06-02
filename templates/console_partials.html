@@ -1,0 +1,280 @@
+{{/* ─────────────────────────────────────────────────────────────────────────
+   Shared chrome for the professional case console (/console).
+   c_top   — doctype + head + sidebar + topbar + opening <main>
+   c_bot   — closes the frame + demo modals + toast host + shared scripts
+   chip    — the Wong-safe status chip primitive (color + icon + text)
+   ───────────────────────────────────────────────────────────────────────── */}}
+
+{{define "chip"}}<span class="chip {{.Tone}}">{{if .Icon}}<span class="g">{{.Icon}}</span>{{end}}{{.Label}}</span>{{end}}
+
+{{/* lvlchip renders a pretrial-level chip from a bare int (1/2/3/other). */}}
+{{define "lvlchip"}}{{if eq . 1}}<span class="chip ok">Level 1</span>{{else if eq . 2}}<span class="chip warn">Level 2</span>{{else if eq . 3}}<span class="chip risk">Level 3</span>{{else}}<span class="chip neutral">Level —</span>{{end}}{{end}}
+
+{{define "c_top"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knox County Pre-Trial — Case Console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231f4e79'/><text x='16' y='22' font-size='15' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial,sans-serif'>PT</text></svg>">
+<link rel="stylesheet" href="/static/console.css">
+<script>/* set theme before paint to avoid a flash */try{var _t=localStorage.getItem('ptc-theme');if(_t)document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
+</head>
+<body class="console">
+<div class="capp">
+  <aside class="csidebar">
+    <div class="cbrand">
+      <div class="mark">PT</div>
+      <div class="txt"><b>Pretrial Services</b><small>Case Console</small></div>
+    </div>
+    <nav class="cnav">
+      <a href="/console"{{if eq .ActiveNav "dashboard"}} class="active"{{end}} title="Dashboard"><span class="ico">◫</span><span class="label">Dashboard</span></a>
+      <a href="/console/clients"{{if eq .ActiveNav "clients"}} class="active"{{end}} title="Clients"><span class="ico">≣</span><span class="label">Clients</span></a>
+      <a href="/console/calendar"{{if eq .ActiveNav "calendar"}} class="active"{{end}} title="Calendar"><span class="ico">▦</span><span class="label">Calendar</span></a>
+      <a href="/console/compliance"{{if eq .ActiveNav "compliance"}} class="active"{{end}} title="Compliance"><span class="ico">⚑</span><span class="label">Compliance</span></a>
+      <a href="/console/reports"{{if eq .ActiveNav "reports"}} class="active"{{end}} title="Reports"><span class="ico">▥</span><span class="label">Reports</span></a>
+      <a href="/console/admin"{{if eq .ActiveNav "admin"}} class="active"{{end}} title="Admin"><span class="ico">⚙</span><span class="label">Admin</span></a>
+      <span class="spacer"></span>
+      <a href="/" class="back" title="Back to the Client Tracker"><span class="ico">←</span><span class="label">Client Tracker</span></a>
+    </nav>
+    <div class="foot">Knox County Pre-Trial<br>Case Management Console</div>
+  </aside>
+
+  <div class="cmain">
+    <header class="ctopbar">
+      <div class="csearch">
+        <span class="mag">⌕</span>
+        <input id="csearch-input" type="text" placeholder="Search clients by name or IDN…  ( / )" autocomplete="off" aria-label="Search clients">
+        <div class="res" id="csearch-res" role="listbox"></div>
+      </div>
+      <div class="ctools">
+        <div class="casof{{if not .IsToday}} active{{end}}" title="As-of date — re-runs all compliance math for the whole console (defaults to today EST)">
+          <span class="lbl">As of</span>
+          <input type="date" id="asof-input" value="{{.AsOfInput}}" aria-label="As-of date">
+          {{if not .IsToday}}<button class="asof-reset" id="asof-reset" title="Reset to today" aria-label="Reset to today">×</button>{{end}}
+        </div>
+        <button class="iconbtn" id="themebtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+        <div class="cuser">
+          <div class="menu">
+            <button class="avatar" id="userbtn" title="{{.User}}" aria-label="User menu">{{initials .UserName}}</button>
+            <div class="pop" id="userpop">
+              <a class="who" style="pointer-events:none"><b>{{.UserName}}</b></a>
+              <a href="/dashboard">Classic admin view</a>
+              <a href="/">← Client Tracker</a>
+              <button type="button" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login')">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="ccontent">{{end}}
+
+{{define "c_bot"}}</main>
+  </div>
+</div>
+
+{{/* demo write-action modal (note / check-in / reminder / court / coming-soon) */}}
+<div class="backdrop" id="actionModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="mh"><h3 id="am-title">Action</h3><button type="button" class="x" onclick="closeAction()" aria-label="Close">×</button></div>
+    <div class="mb" id="am-body"></div>
+    <div class="mf" id="am-foot"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+{{/* keyboard-shortcut help overlay (opened with "?") */}}
+<div class="backdrop" id="kbdModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div class="mh"><h3>Keyboard shortcuts</h3><button type="button" class="x" onclick="document.getElementById('kbdModal').classList.remove('show');document.getElementById('kbdModal').setAttribute('aria-hidden','true')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <table class="kbd-list">
+        <tr><td><kbd>/</kbd></td><td>Focus the search box</td></tr>
+        <tr><td><kbd>g</kbd> <span class="kbd-then">then</span> <kbd>d</kbd> <kbd>c</kbd> <kbd>k</kbd> <kbd>m</kbd> <kbd>r</kbd> <kbd>a</kbd></td><td>Go to Dashboard · Clients · Calendar · Compliance · Reports · Admin</td></tr>
+        <tr><td><kbd>n</kbd></td><td>New note <span class="muted">(on a client record)</span></td></tr>
+        <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Close any dialog</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── toast ───────────────────────────────────────────────────────────────── */
+function ptToast(title, msg, tone){
+  var host=document.getElementById('toasts');
+  var el=document.createElement('div');
+  el.className='toast'+(tone?(' '+tone):'');
+  var icon=tone==='warn'?'◷':(tone==='info'?'ℹ':'✓');
+  el.innerHTML='<div class="ti">'+icon+'</div><div class="grow"><div class="tt"></div><div class="tm"></div></div>';
+  el.querySelector('.tt').textContent=title;
+  el.querySelector('.tm').textContent=msg||'';
+  host.appendChild(el);
+  setTimeout(function(){el.style.transition='opacity .4s,transform .4s';el.style.opacity='0';el.style.transform='translateX(20px)';setTimeout(function(){el.remove()},400)},4200);
+}
+
+/* ── theme toggle ─────────────────────────────────────────────────────────── */
+(function(){
+  var btn=document.getElementById('themebtn');
+  if(!btn)return;
+  btn.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme')==='dark'?'':'dark';
+    if(cur){document.documentElement.setAttribute('data-theme','dark');}else{document.documentElement.removeAttribute('data-theme');}
+    try{localStorage.setItem('ptc-theme',cur);}catch(e){}
+  });
+})();
+
+/* ── as-of (track-date) control: sets a cookie + reloads; whole console re-runs
+      the compliance math against the chosen date. Reset clears it back to today. */
+(function(){
+  var inp=document.getElementById('asof-input');
+  if(inp){
+    inp.addEventListener('change',function(){
+      if(inp.value){document.cookie='ptc_asof='+inp.value+';path=/;max-age=604800';}
+      else{document.cookie='ptc_asof=;path=/;max-age=0';}
+      location.reload();
+    });
+  }
+  var rb=document.getElementById('asof-reset');
+  if(rb){rb.addEventListener('click',function(){document.cookie='ptc_asof=;path=/;max-age=0';location.reload();});}
+})();
+
+/* ── keyboard shortcuts (Brief §6): "/" focus search (handled below), g+letter
+      jumps between sections, "n" opens a new note on a client record. */
+(function(){
+  var seq='';
+  document.addEventListener('keydown',function(e){
+    var tag=((document.activeElement||{}).tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea'||tag==='select')return;
+    if(e.metaKey||e.ctrlKey||e.altKey)return;
+    if(e.key==='?'){e.preventDefault();var km=document.getElementById('kbdModal');if(km){km.classList.add('show');km.setAttribute('aria-hidden','false');}return;}
+    if(e.key==='n'&&window.openAction&&document.querySelector('.rechead')){
+      e.preventDefault();
+      var h=document.querySelector('.rechead h1');
+      openAction('note',h?h.textContent:'this client');return;
+    }
+    if(e.key==='g'){seq='g';setTimeout(function(){seq='';},800);return;}
+    if(seq==='g'){
+      var map={d:'/console',c:'/console/clients',k:'/console/calendar',m:'/console/compliance',r:'/console/reports',a:'/console/admin'};
+      if(map[e.key]){location.href=map[e.key];}
+      seq='';
+    }
+  });
+})();
+
+/* ── user menu ────────────────────────────────────────────────────────────── */
+(function(){
+  var b=document.getElementById('userbtn'),p=document.getElementById('userpop');
+  if(!b)return;
+  b.addEventListener('click',function(e){e.stopPropagation();p.classList.toggle('show')});
+  document.addEventListener('click',function(){p.classList.remove('show')});
+})();
+
+/* ── global search ────────────────────────────────────────────────────────── */
+(function(){
+  var inp=document.getElementById('csearch-input'),box=document.getElementById('csearch-res');
+  if(!inp)return;
+  var timer, items=[], sel=-1;
+  function close(){box.classList.remove('show');box.innerHTML='';items=[];sel=-1}
+  function render(hits){
+    if(!hits.length){box.innerHTML='<div class="empty">No matches</div>';box.classList.add('show');return}
+    box.innerHTML=hits.map(function(h){return '<a role="option" href="/console/clients/'+h.idn+'"><div class="nm">'+esc(h.name)+'</div><div class="mt">IDN '+esc(h.idn)+' · L'+h.level+' · '+esc(h.officer||'—')+'</div></a>'}).join('');
+    box.classList.add('show');
+    items=Array.prototype.slice.call(box.querySelectorAll('a'));sel=-1;
+  }
+  function esc(s){return (''+s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  inp.addEventListener('input',function(){
+    clearTimeout(timer);var q=inp.value.trim();
+    if(q.length<2){close();return}
+    timer=setTimeout(function(){
+      fetch('/api/lookup?q='+encodeURIComponent(q)).then(function(r){return r.json()}).then(render).catch(function(){});
+    },170);
+  });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){close();inp.blur();return}
+    if(!items.length)return;
+    if(e.key==='ArrowDown'){e.preventDefault();sel=(sel+1)%items.length;mark()}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=(sel-1+items.length)%items.length;mark()}
+    else if(e.key==='Enter'){e.preventDefault();(items[sel]||items[0]).click()}
+  });
+  function mark(){items.forEach(function(a,i){a.classList.toggle('sel',i===sel)})}
+  document.addEventListener('click',function(e){if(!box.contains(e.target)&&e.target!==inp)close()});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='/'&&document.activeElement!==inp&&!/input|textarea|select/i.test((document.activeElement||{}).tagName||'')){e.preventDefault();inp.focus()}
+  });
+})();
+
+/* ── demo write-action modal ──────────────────────────────────────────────── */
+function _now(){var d=new Date();var p=function(n){return (n<10?'0':'')+n};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())}
+var ACTIONS={
+  note:{title:'Add Note',submit:'Save note',toast:['Note saved','Recorded on the client record.'],
+    body:function(n){return '<div class="note-hint">Demo: this opens the real note form. In this build it confirms with a toast rather than writing.</div><div class="fld"><label>Note</label><textarea placeholder="Type a note about '+n+'…" autofocus></textarea></div>'}},
+  checkin:{title:'Log Check-in',submit:'Save check-in',toast:['Check-in logged','Compliance state updated on the record.'],
+    body:function(n){return '<div class="fld"><label>Type</label><select><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>'+
+      '<div class="fld"><label>Date &amp; time</label><input type="datetime-local" value="'+_now()+'"></div>'+
+      '<div class="fld"><label>Outcome</label><select><option>Compliant</option><option>Non-compliant</option><option>No-show</option></select></div>'+
+      '<div class="fld"><label>Notes</label><textarea placeholder="Optional notes…"></textarea></div>'+
+      '<div class="fld"><label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" style="width:auto"> Flag as violation</label></div>'}},
+  reminder:{title:'Send Court Reminder',submit:'Log reminder',tone:'warn',toast:['Reminder logged (not sent)','v1 is log-only — no SMS/email provider is wired yet.'],
+    body:function(n){return '<div class="note-hint">v1 is <b>log-only</b>: the reminder is recorded and marked “logged (not sent).” A provider (SMS/email) can be wired later with no UI change.</div>'+
+      '<div class="fld"><label>Channel</label><select><option>SMS</option><option>Email</option><option>Phone call</option></select></div>'+
+      '<div class="fld"><label>Lead time</label><select><option>24 hours before</option><option>48 hours before</option><option>1 week before</option></select></div>'+
+      '<div class="fld"><label>Message</label><textarea>Reminder: you have a court date scheduled. Please contact your officer with questions.</textarea></div>'}},
+  court:{title:'Add Court Date',submit:'Save court date',toast:['Court date added','Added to the client’s Court tab.'],
+    body:function(n){return '<div class="fld"><label>Event type</label><select><option>Arraignment</option><option>Preliminary hearing</option><option>Pretrial conference</option><option>Trial</option></select></div>'+
+      '<div class="fld"><label>Date &amp; time</label><input type="datetime-local"></div>'+
+      '<div class="fld"><label>Location</label><input type="text" placeholder="Courtroom / division"></div>'+
+      '<div class="fld"><label>Notes</label><textarea></textarea></div>'}},
+  soon:{title:'Coming soon',submit:null,toast:['Coming soon','This action is part of a later build milestone.'],
+    body:function(n){return '<div class="note-hint">This control is wired into the UI but its write path lands in a later milestone. Read views are fully live.</div>'}}
+};
+function openAction(kind,name){
+  var a=ACTIONS[kind]||ACTIONS.soon; name=name||'this client';
+  document.getElementById('am-title').textContent=a.title;
+  document.getElementById('am-body').innerHTML=a.body(name);
+  var foot=document.getElementById('am-foot');
+  foot.innerHTML='<button type="button" class="btn ghost" onclick="closeAction()">Cancel</button>'+
+    (a.submit?('<button type="button" class="btn" id="am-submit">'+a.submit+'</button>'):'');
+  var s=document.getElementById('am-submit');
+  if(s)s.addEventListener('click',function(){closeAction();ptToast(a.toast[0],a.toast[1],a.tone||'')});
+  else ptToast(a.toast[0],a.toast[1],a.tone||'');
+  var m=document.getElementById('actionModal');m.classList.add('show');m.setAttribute('aria-hidden','false');
+}
+function closeAction(){var m=document.getElementById('actionModal');m.classList.remove('show');m.setAttribute('aria-hidden','true')}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAction()});
+document.getElementById('actionModal').addEventListener('click',function(e){if(e.target.id==='actionModal')closeAction()});
+/* keyboard-shortcut overlay: close on backdrop click or Esc */
+(function(){var km=document.getElementById('kbdModal');if(!km)return;
+  function close(){km.classList.remove('show');km.setAttribute('aria-hidden','true')}
+  km.addEventListener('click',function(e){if(e.target.id==='kbdModal')close()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+})();
+
+/* prevent accidental double-submit on real write forms (POST /admin/*): once a
+   form starts submitting, disable its submit button so a second click can't fire
+   a duplicate POST. Fires only after HTML5 validation passes (the submit event),
+   and after a tick so form data is already collected; the button carries no
+   name/value, so disabling never drops a field. */
+document.addEventListener('submit',function(e){
+  var f=e.target;
+  if(!f||!/\/admin\//.test(f.getAttribute('action')||''))return;
+  var btn=f.querySelector('button[type="submit"],button:not([type]),input[type="submit"]');
+  if(btn&&!btn.disabled){setTimeout(function(){
+    btn.disabled=true;
+    if(btn.tagName==='BUTTON'&&!btn.dataset.saving){btn.dataset.saving='1';btn.textContent='Saving…';}
+  },0);}
+},true);
+
+/* ── accessibility: keyboard-navigable rows + aria-current on active nav ───── */
+(function(){
+  var an=document.querySelector('.cnav a.active');
+  if(an){an.setAttribute('aria-current','page');var lbl=(an.querySelector('.label')||an).textContent.trim();if(lbl)document.title=lbl+' · PTR Case Console';}
+  document.querySelectorAll('tr[data-href]').forEach(function(tr){
+    tr.setAttribute('tabindex','0'); tr.setAttribute('role','link');
+    tr.addEventListener('keydown',function(e){if(e.key==='Enter'){location.href=tr.dataset.href;}});
+  });
+})();
+{{if .Msg}}document.addEventListener('DOMContentLoaded',function(){ptToast({{.Msg}},'');});{{end}}
+</script>
+</body>
+</html>{{end}}

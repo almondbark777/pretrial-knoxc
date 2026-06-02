@@ -52,3 +52,15 @@ func TodayET() time.Time {
 // just the date). Used to stamp audit_log rows in Eastern time, per the brief —
 // reuses the same resolved location as TodayET.
 func NowET() time.Time { return time.Now().In(nyLoc) }
+
+// StatsEpoch is the system go-live date. Aggregate "activity" tallies on the
+// console (e.g. the number of violations logged) count only events on or after
+// this date, so the overall stats reflect the production era rather than migrated
+// history. Per-client records still show each client's full history; current-state
+// counts (active roster, behind-on-GPS, balances) reflect the present moment.
+// Surfaced in the UI as StatsEpochLabel.
+func StatsEpoch() time.Time { return Noon(2026, 6, 1) }
+
+// StatsEpochLabel is the human-readable go-live date shown next to epoch-scoped
+// stats so the reporting period is unambiguous.
+const StatsEpochLabel = "Jun 1, 2026"

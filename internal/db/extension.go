@@ -85,7 +85,8 @@ func DeleteTag(d *sql.DB, id int64, by string) error {
 
 func ListCourtDates(d *sql.DB, idn string) ([]models.CourtDate, error) {
 	rows, err := d.Query(
-		`SELECT court_date_id, idn, court_date, IFNULL(court,''), IFNULL(notes,''), IFNULL(author,''), IFNULL(created_at,'')
+		`SELECT court_date_id, idn, court_date, IFNULL(court,''), IFNULL(notes,''),
+		        IFNULL(outcome,''), IFNULL(next_date,''), IFNULL(author,''), IFNULL(created_at,'')
 		   FROM court_dates WHERE idn = ? ORDER BY court_date`, idn)
 	if err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func ListCourtDates(d *sql.DB, idn string) ([]models.CourtDate, error) {
 	var out []models.CourtDate
 	for rows.Next() {
 		var c models.CourtDate
-		if err := rows.Scan(&c.ID, &c.IDN, &c.CourtDate, &c.Court, &c.Notes, &c.Author, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.IDN, &c.CourtDate, &c.Court, &c.Notes, &c.Outcome, &c.NextDate, &c.Author, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -109,6 +110,30 @@ func AddCourtDate(d *sql.DB, idn, courtDate, court, notes, author string) error 
 	return txAddWithAudit(d, AuditEvent{User: author, Action: "courtdate_add", Table: "court_dates", RowID: idn, NewValue: courtDate},
 		`INSERT INTO court_dates (idn, court_date, court, notes, author) VALUES (?, ?, ?, ?, ?)`,
 		idn, courtDate, nz(court), nz(notes), nz(author))
+}
+
+// SetCourtOutcome records a hearing's result (and optional next date) on an
+// existing court_dates row — the FTA-tracking after-the-hearing step (§5.6).
+func SetCourtOutcome(d *sql.DB, id int64, outcome, nextDate, by string) error {
+	if id == 0 || strings.TrimSpace(outcome) == "" {
+		return errEmptyField
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var idn sql.NullString
+	_ = tx.QueryRow("SELECT idn FROM court_dates WHERE court_date_id = ?", id).Scan(&idn)
+	if _, err := tx.Exec("UPDATE court_dates SET outcome = ?, next_date = ? WHERE court_date_id = ?",
+		outcome, nz(nextDate), id); err != nil {
+		return err
+	}
+	if err := WriteAudit(tx, AuditEvent{User: by, Action: "courtdate_outcome", Table: "court_dates",
+		RowID: idn.String, Col: "outcome", NewValue: clip(outcome)}); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func DeleteCourtDate(d *sql.DB, id int64, by string) error {
@@ -187,6 +212,60 @@ func AddViolation(d *sql.DB, idn, date, category, severity, description, actionT
 
 func DeleteViolation(d *sql.DB, id int64, by string) error {
 	return txDeleteByID(d, "violations", "violation_id", id, by, "violation_delete")
+}
+
+// ── Global lists (cross-client, for dashboard KPIs / alert feed) ─────────────
+
+// ListAllCourtDates returns every app-entered court date across all defendants,
+// soonest first. Tolerant of a DB without the table (returns nil). Dates are TEXT
+// in mixed formats — callers parse with compute.ParseDay and filter as needed.
+func ListAllCourtDates(d *sql.DB) ([]models.CourtDate, error) {
+	if !tableExists(d, "court_dates") {
+		return nil, nil
+	}
+	rows, err := d.Query(
+		`SELECT court_date_id, idn, court_date, IFNULL(court,''), IFNULL(notes,''),
+		        IFNULL(outcome,''), IFNULL(next_date,''), IFNULL(author,''), IFNULL(created_at,'')
+		   FROM court_dates ORDER BY court_date`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.CourtDate
+	for rows.Next() {
+		var c models.CourtDate
+		if err := rows.Scan(&c.ID, &c.IDN, &c.CourtDate, &c.Court, &c.Notes, &c.Outcome, &c.NextDate, &c.Author, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// ListAllViolations returns every recorded violation across all defendants,
+// newest first. Tolerant of a DB without the table (returns nil).
+func ListAllViolations(d *sql.DB) ([]models.Violation, error) {
+	if !tableExists(d, "violations") {
+		return nil, nil
+	}
+	rows, err := d.Query(
+		`SELECT violation_id, idn, violation_date, IFNULL(category,''), IFNULL(severity,''),
+		        IFNULL(description,''), IFNULL(action_taken,''), IFNULL(officer,''), IFNULL(created_at,'')
+		   FROM violations ORDER BY violation_date DESC, violation_id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.Violation
+	for rows.Next() {
+		var v models.Violation
+		if err := rows.Scan(&v.ID, &v.IDN, &v.ViolationDate, &v.Category, &v.Severity,
+			&v.Description, &v.ActionTaken, &v.Officer, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 // ── Admin views: tombstones + overrides ──────────────────────────────────────

@@ -1,0 +1,412 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http/httptest"
+	"net/url"
+	"regexp"
+	"strings"
+	"testing"
+
+	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/db"
+	"pretrial-knoxc/internal/models"
+)
+
+// The console is a presentation layer over the SAME server-side math as the
+// tracker / existing dashboard. These tests pin that: the console's headline
+// numbers and roster membership must equal what the shared roster functions
+// produce — no divergence, no reimplemented rule.
+
+func TestConsoleDashboardParity(t *testing.T) {
+	d := testDB(t)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	stats := computeStats(clients, adminTrack)
+	dash := consoleDashboard(clients, adminTrack, nil, nil, "")
+
+	if dash.KPIs.ActiveClients != stats.Open {
+		t.Errorf("ActiveClients = %d, want Open %d", dash.KPIs.ActiveClients, stats.Open)
+	}
+	if dash.KPIs.OverdueCheckIns != stats.MissedMonth {
+		t.Errorf("OverdueCheckIns = %d, want MissedMonth %d", dash.KPIs.OverdueCheckIns, stats.MissedMonth)
+	}
+	if dash.KPIs.OpenViolations != 0 {
+		t.Errorf("OpenViolations = %d, want 0 (no violations passed)", dash.KPIs.OpenViolations)
+	}
+	// Alerts are capped at 40 and sorted by severity (descending).
+	if len(dash.Alerts) > 40 {
+		t.Errorf("alerts not capped: %d", len(dash.Alerts))
+	}
+	for i := 1; i < len(dash.Alerts); i++ {
+		if dash.Alerts[i-1].sev < dash.Alerts[i].sev {
+			t.Errorf("alerts not sorted by severity at %d", i)
+			break
+		}
+	}
+	// Every behind-roster client appears as a risk alert (until the 40 cap).
+	behind := behindRoster(clients, adminTrack)
+	if len(behind) > 0 && len(dash.Alerts) == 0 {
+		t.Errorf("behind roster has %d but no alerts surfaced", len(behind))
+	}
+}
+
+// A court appearance on the dashboard's Today's Schedule must be attributed to the
+// client's supervising officer, so it survives the "My caseload" filter (which
+// hides rows with Mine=false). Regression for the hardcoded Mine:false bug.
+func TestConsoleDashboardCourtMine(t *testing.T) {
+	track := compute.Noon(2026, 6, 1)
+	clients := map[string][]*compute.Client{
+		"1": {{IDN: "1", Name: "Client One", Status: "Open", Officer: "Alice Smith",
+			Level: "2", RefD: compute.Noon(2026, 1, 1), RefOK: true}},
+	}
+	courts := []models.CourtDate{{IDN: "1", CourtDate: "2026-06-01", Court: "Room 1"}}
+
+	courtItem := func(d ConsoleDashboard) *ConsoleSched {
+		for i := range d.Schedule {
+			if d.Schedule[i].Time == "Court" {
+				return &d.Schedule[i]
+			}
+		}
+		return nil
+	}
+
+	// Signed in as the supervising officer → the court item is "mine".
+	mineCi := courtItem(consoleDashboard(clients, track, courts, nil, "Alice Smith"))
+	if mineCi == nil {
+		t.Fatal("expected a court schedule item")
+	}
+	if !mineCi.Mine {
+		t.Error("court item should be Mine for the supervising officer")
+	}
+	// Signed in as a different officer → not mine.
+	otherCi := courtItem(consoleDashboard(clients, track, courts, nil, "Bob Jones"))
+	if otherCi == nil {
+		t.Fatal("expected a court schedule item")
+	}
+	if otherCi.Mine {
+		t.Error("court item should not be Mine for a different officer")
+	}
+}
+
+// Same attribution rule for violation alerts: a violation on an officer's own
+// client must be Mine so it survives the "My caseload" filter.
+func TestConsoleDashboardViolationMine(t *testing.T) {
+	track := compute.Noon(2026, 6, 1)
+	clients := map[string][]*compute.Client{
+		"1": {{IDN: "1", Name: "Client One", Status: "Open", Officer: "Alice Smith",
+			Level: "2", RefD: compute.Noon(2026, 1, 1), RefOK: true}},
+	}
+	viols := []models.Violation{{IDN: "1", Category: "Curfew", Description: "late"}}
+	violAlert := func(d ConsoleDashboard) *ConsoleAlert {
+		for i := range d.Alerts {
+			if d.Alerts[i].Chip.Label == "Violation" {
+				return &d.Alerts[i]
+			}
+		}
+		return nil
+	}
+	if a := violAlert(consoleDashboard(clients, track, nil, viols, "Alice Smith")); a == nil || !a.Mine {
+		t.Errorf("violation alert should be Mine for the supervising officer, got %+v", a)
+	}
+	if a := violAlert(consoleDashboard(clients, track, nil, viols, "Bob Jones")); a == nil || a.Mine {
+		t.Errorf("violation alert should not be Mine for a different officer, got %+v", a)
+	}
+}
+
+func TestConsoleClientRowsParity(t *testing.T) {
+	d := testDB(t)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	rows := consoleClientRows(clients, adminTrack, nil)
+	if len(rows) != len(defendantRows(clients, adminTrack)) {
+		t.Errorf("row count %d != defendantRows %d", len(rows), len(defendantRows(clients, adminTrack)))
+	}
+	// "Behind on GPS" compliance chip must agree with the behind roster.
+	behind := map[string]bool{}
+	for _, r := range behindRoster(clients, adminTrack) {
+		behind[r.IDN] = true
+	}
+	for _, row := range rows {
+		isBehindChip := row.Compliance.Label == "Behind on GPS"
+		if isBehindChip != behind[row.IDN] {
+			t.Errorf("IDN %s: behind-chip=%v but roster=%v", row.IDN, isBehindChip, behind[row.IDN])
+		}
+		if isBehindChip && row.Compliance.Tone != "risk" {
+			t.Errorf("IDN %s behind chip tone = %q, want risk", row.IDN, row.Compliance.Tone)
+		}
+		if row.Initials == "" {
+			t.Errorf("IDN %s has empty initials", row.IDN)
+		}
+	}
+}
+
+// The roster's Next Court / Next Check-in columns must carry ISO sort keys so the
+// table sorts chronologically, not alphabetically by month name. Missing dates
+// fall back to the far-future sentinel so they sort last.
+func TestConsoleClientRowsDateSortKeys(t *testing.T) {
+	d := testDB(t)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	rows := consoleClientRows(clients, adminTrack, nil) // nil court map → every Next Court blank
+	iso := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	for _, r := range rows {
+		if !iso.MatchString(r.NextCheckInSort) {
+			t.Errorf("IDN %s NextCheckInSort=%q not ISO-sortable", r.IDN, r.NextCheckInSort)
+		}
+		if (r.NextCheckIn == "—") != (r.NextCheckInSort == blankDateSort) {
+			t.Errorf("IDN %s check-in display/sort disagree: %q / %q", r.IDN, r.NextCheckIn, r.NextCheckInSort)
+		}
+		// No court map was supplied, so every Next Court is blank → sentinel.
+		if r.NextCourt != "—" || r.NextCourtSort != blankDateSort {
+			t.Errorf("IDN %s expected blank court cell, got %q / %q", r.IDN, r.NextCourt, r.NextCourtSort)
+		}
+	}
+	// And a populated court map must yield a chronological ISO key, not "Jan 2".
+	cc := courtCell{Display: "Jan 2", Sort: "2026-01-02"}
+	court := map[string]courtCell{}
+	for idn := range clients {
+		court[idn] = cc
+		break
+	}
+	if len(court) == 1 {
+		got := consoleClientRows(clients, adminTrack, court)
+		var found bool
+		for _, r := range got {
+			if r.NextCourt == "Jan 2" {
+				found = true
+				if r.NextCourtSort != "2026-01-02" {
+					t.Errorf("populated court cell sort = %q, want ISO 2026-01-02", r.NextCourtSort)
+				}
+			}
+		}
+		if !found {
+			t.Error("expected one row to pick up the seeded court date")
+		}
+	}
+}
+
+func TestConsoleRecordParity(t *testing.T) {
+	d := testDB(t)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	behind := behindRoster(clients, adminTrack)
+	if len(behind) == 0 {
+		t.Skip("no behind-on-GPS clients in fixture at adminTrack")
+	}
+	idn := behind[0].IDN
+	cases := clients[idn]
+	c := openRep(cases)
+	ci := compute.ComputeCheckIns(*c, adminTrack)
+	ptr := compute.ComputePTRFees(*c, adminTrack, "")
+	gps := compute.ComputeGPS(*c, adminTrack, nil, "")
+	rec := consoleRecord(c, cases, adminTrack, ci, ptr, gps, models.DefendantExtras{})
+
+	// The record must carry the exact computed numbers (single source of truth).
+	if rec.GPS.SurplusDollars == nil || *rec.GPS.SurplusDollars >= 0 {
+		t.Errorf("behind client surplus should be negative, got %v", rec.GPS.SurplusDollars)
+	}
+	if rec.PTR.Balance != ptr.Balance {
+		t.Errorf("record PTR balance %v != computed %v", rec.PTR.Balance, ptr.Balance)
+	}
+	// A GPS condition must be present and flagged behind (risk) for this client.
+	var gpsCond *ConsoleCondition
+	for i := range rec.Conditions {
+		if rec.Conditions[i].Name == "GPS electronic monitoring" {
+			gpsCond = &rec.Conditions[i]
+		}
+	}
+	if gpsCond == nil {
+		t.Fatalf("expected a GPS condition for a GPS-active client")
+	}
+	if !rec_isWaived(c) && gpsCond.Chip.Tone != "risk" {
+		t.Errorf("behind GPS condition tone = %q, want risk", gpsCond.Chip.Tone)
+	}
+	if len(rec.Summary) == 0 {
+		t.Errorf("record summary is empty")
+	}
+}
+
+// The roster ships to the browser as a compact JSON array (client-side windowing);
+// this pins the short-key contract the template's JS depends on, and that
+// json.Marshal escapes < so the blob is safe to embed inside a <script> tag.
+func TestRosterRowsJSON(t *testing.T) {
+	rows := []ConsoleClientRow{
+		{IDN: "1", Name: "ABBOTT <b>", Initials: "AB", CaseNo: "@1", Level: 3,
+			StatusChip: Chip{Label: "Active"}, NextCourt: "Jan 2", NextCourtSort: "2026-01-02",
+			NextCheckIn: "Jun 5", NextCheckInSort: "2026-06-05", CheckInOverdue: true,
+			Compliance: Chip{Label: "Behind on GPS"}, GpsActive: true, Officer: "Alice Smith",
+			Search: "abbott 1 @1 alice smith"},
+	}
+	blob := string(rosterRowsJSON(rows))
+
+	// Safe to embed in <script>: Go escapes < to <, so no literal '<' survives.
+	if strings.Contains(blob, "<") {
+		t.Errorf("blob has an unescaped '<' (unsafe in <script>): %s", blob)
+	}
+
+	var got []map[string]any
+	if err := json.Unmarshal([]byte(blob), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, blob)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	r := got[0]
+	for k, want := range map[string]string{
+		"i": "1", "n": "ABBOTT <b>", "a": "AB", "c": "@1", "st": "Active",
+		"nc": "Jan 2", "ncs": "2026-01-02", "ci": "Jun 5", "cis": "2026-06-05",
+		"cm": "Behind on GPS", "o": "Alice Smith", "s": "abbott 1 @1 alice smith",
+	} {
+		if r[k] != want {
+			t.Errorf("key %q = %v, want %q", k, r[k], want)
+		}
+	}
+	if r["l"].(float64) != 3 {
+		t.Errorf("l = %v, want 3", r["l"])
+	}
+	if r["ov"] != true || r["g"] != true {
+		t.Errorf("ov/g = %v/%v, want true/true", r["ov"], r["g"])
+	}
+}
+
+// Aggregate violation tallies count only from the go-live epoch; pre-go-live,
+// undated, and unparseable rows are dropped. Per-client history is unaffected
+// (this filter is only applied to the dashboard aggregate).
+func TestViolationsSinceEpoch(t *testing.T) {
+	vs := []models.Violation{
+		{IDN: "1", ViolationDate: "2026-06-01"}, // on the epoch → kept
+		{IDN: "2", ViolationDate: "2026-07-15"}, // after → kept
+		{IDN: "3", ViolationDate: "2026-05-31"}, // before go-live → dropped
+		{IDN: "4", ViolationDate: ""},           // undated → dropped
+		{IDN: "5", ViolationDate: "not-a-date"}, // unparseable → dropped
+	}
+	got := violationsSinceEpoch(vs)
+	if len(got) != 2 {
+		t.Fatalf("kept %d, want 2 (%+v)", len(got), got)
+	}
+	ids := map[string]bool{}
+	for _, v := range got {
+		ids[v.IDN] = true
+	}
+	if !ids["1"] || !ids["2"] {
+		t.Errorf("expected IDNs 1 and 2 kept, got %+v", got)
+	}
+}
+
+func TestChipHelpers(t *testing.T) {
+	cases := []struct {
+		level int
+		tone  string
+	}{{1, "ok"}, {2, "warn"}, {3, "risk"}, {0, "neutral"}}
+	for _, tc := range cases {
+		if got := levelChip(tc.level).Tone; got != tc.tone {
+			t.Errorf("levelChip(%d).Tone = %q, want %q", tc.level, got, tc.tone)
+		}
+	}
+	if statusChip("Open").Tone != "info" {
+		t.Errorf("Open status should be info-toned")
+	}
+	if statusChip("Closed - dismissed").Label != "Closed" {
+		t.Errorf("closed status label = %q", statusChip("Closed - dismissed").Label)
+	}
+	if c := complianceChip(true, false, 0, true); c.Tone != "risk" || c.Label != "Behind on GPS" {
+		t.Errorf("behind compliance chip = %+v", c)
+	}
+	if c := complianceChip(false, false, 0, true); c.Tone != "ok" || c.Icon != "✓" {
+		t.Errorf("compliant chip = %+v", c)
+	}
+	if c := complianceChip(false, false, 0, false); c.Label != "No referral" {
+		t.Errorf("no-referral chip = %+v", c)
+	}
+}
+
+func TestProfileBackNext(t *testing.T) {
+	mk := func(next string) string {
+		body := "idn=123&next=" + url.QueryEscape(next)
+		r := httptest.NewRequest("POST", "/admin/note/add", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		_, to := profileBack(r)
+		return to
+	}
+	if to := mk("/console/clients/123"); to != "/console/clients/123" {
+		t.Errorf("same-origin next not honored: %q", to)
+	}
+	for _, bad := range []string{"https://evil.com", "//evil.com", ""} {
+		if to := mk(bad); !strings.HasPrefix(to, "/client_profile.html") {
+			t.Errorf("next %q should fall back to profile, got %q", bad, to)
+		}
+	}
+}
+
+func TestConsoleRecordActivitySorted(t *testing.T) {
+	c := &compute.Client{IDN: "1", Name: "Test Client", Status: "Open", Level: "2",
+		RefD: compute.Noon(2026, 1, 1), RefOK: true}
+	track := compute.Noon(2026, 6, 1)
+	ci := compute.ComputeCheckIns(*c, track)
+	ptr := compute.ComputePTRFees(*c, track, "")
+	gps := compute.ComputeGPS(*c, track, nil, "")
+	extras := models.DefendantExtras{Notes: []models.Note{
+		{IDN: "1", Author: "alex.bentley@knoxsheriff.org", Body: "newest note", CreatedAt: "2026-12-31 09:00:00"},
+	}}
+	rec := consoleRecord(c, []*compute.Client{c}, track, ci, ptr, gps, extras)
+	if len(rec.Activity) == 0 {
+		t.Fatal("activity empty")
+	}
+	if !strings.HasPrefix(rec.Activity[0].Title, "Note") {
+		t.Errorf("newest note should sort to top, got %q", rec.Activity[0].Title)
+	}
+}
+
+func TestPct(t *testing.T) {
+	if got := pct(50, 200); got != "25.0%" {
+		t.Errorf("pct(50,200) = %q, want 25.0%%", got)
+	}
+	if got := pct(1, 0); got != "—" {
+		t.Errorf("pct(1,0) = %q, want em-dash", got)
+	}
+	if got := pct(0, 0); got != "—" {
+		t.Errorf("pct(0,0) = %q, want em-dash", got)
+	}
+}
+
+func TestDistinctOfficers(t *testing.T) {
+	clients := map[string][]*compute.Client{
+		"1": {{IDN: "1", Officer: "Bravo Officer", Status: "Open"}},
+		"2": {{IDN: "2", Officer: "Alpha Officer", Status: "Open"}},
+		"3": {{IDN: "3", Officer: "Alpha Officer", Status: "Open"}}, // dup
+		"4": {{IDN: "4", Officer: "", Status: "Open"}},              // empty excluded
+	}
+	got := distinctOfficers(clients)
+	want := []string{"Alpha Officer", "Bravo Officer"} // sorted, deduped
+	if len(got) != len(want) {
+		t.Fatalf("distinctOfficers = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("distinctOfficers[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestInitials(t *testing.T) {
+	cases := map[string]string{
+		"Alex Bentley":        "AB",
+		"ABBOTT, ROBERT LEON": "AL", // first word + last word
+		"Cher":                "C",
+		"":                    "?",
+	}
+	for in, want := range cases {
+		if got := initials(in); got != want {
+			t.Errorf("initials(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

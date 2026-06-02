@@ -204,27 +204,34 @@ type Client struct {
 	Overrides map[string]string
 }
 
-// Window is one required check-in window.
+// Window is one required check-in window. Per office policy a window requires
+// BOTH an in-person and a phone check-in at the level's cadence, so Satisfied is
+// true only when both occurred; SatisfiedInPerson / SatisfiedPhone expose which
+// half is met (so the UI can show "phone done, in-person still due", etc.).
 type Window struct {
-	Type      string    `json:"type"` // initial | month | week
-	Start     time.Time `json:"start"`
-	End       time.Time `json:"end"`
-	Deadline  time.Time `json:"deadline"`
-	Satisfied bool      `json:"satisfied"`
-	Missed    bool      `json:"missed"`
-	Label     string    `json:"label"`
+	Type              string    `json:"type"` // initial | month | week
+	Start             time.Time `json:"start"`
+	End               time.Time `json:"end"`
+	Deadline          time.Time `json:"deadline"`
+	Satisfied         bool      `json:"satisfied"` // both in-person AND phone present
+	SatisfiedInPerson bool      `json:"satisfiedInPerson"`
+	SatisfiedPhone    bool      `json:"satisfiedPhone"`
+	Missed            bool      `json:"missed"`
+	Label             string    `json:"label"`
 }
 
 // CheckInResult mirrors computeCheckIns' return shape.
 type CheckInResult struct {
-	Level       int        `json:"level"` // 0 == unknown/null
-	RefDate     *time.Time `json:"refDate"`
-	Today       time.Time  `json:"today"` // effective end
-	Windows     []Window   `json:"windows"`
-	Missed      []Window   `json:"missed"`
-	LastCheckIn *time.Time `json:"lastCheckIn"`
-	NextDue     *Window    `json:"nextDue"`
-	Error       string     `json:"error,omitempty"`
+	Level        int        `json:"level"` // 0 == unknown/null
+	RefDate      *time.Time `json:"refDate"`
+	Today        time.Time  `json:"today"` // effective end
+	Windows      []Window   `json:"windows"`
+	Missed       []Window   `json:"missed"`
+	LastCheckIn  *time.Time `json:"lastCheckIn"`  // any type
+	LastInPerson *time.Time `json:"lastInPerson"` // last in-person visit (nil if none)
+	LastPhone    *time.Time `json:"lastPhone"`    // last phone/virtual contact (nil if none)
+	NextDue      *Window    `json:"nextDue"`
+	Error        string     `json:"error,omitempty"`
 }
 
 // MonthOwed is one $20 PTR-fee month.
@@ -275,33 +282,50 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 		effEnd = c.ClosedD
 	}
 
-	// All valid check-in dates, ascending.
-	var allCi []time.Time
+	// Valid check-in dates, split by type. Policy: a window needs BOTH an in-person
+	// and a phone check-in, so the two are tracked separately (a phone call alone no
+	// longer satisfies a window — the Ivan-Littlejohn case). allCi keeps every type
+	// for the "last check-in (any)" figure.
+	var allCi, inPersonCi, phoneCi []time.Time
 	for _, ci := range c.CheckIns {
-		if ci.DOK {
-			allCi = append(allCi, ci.D)
+		if !ci.DOK {
+			continue
+		}
+		allCi = append(allCi, ci.D)
+		switch ip, ph := CheckInKind(ci.Type); {
+		case ip:
+			inPersonCi = append(inPersonCi, ci.D)
+		case ph:
+			phoneCi = append(phoneCi, ci.D)
 		}
 	}
 	sortTimes(allCi)
-	var lastCheckIn *time.Time
-	if len(allCi) > 0 {
-		lc := allCi[len(allCi)-1]
-		lastCheckIn = &lc
-	}
+	sortTimes(inPersonCi)
+	sortTimes(phoneCi)
+	lastCheckIn := lastOf(allCi)
+	lastInPerson := lastOf(inPersonCi)
+	lastPhone := lastOf(phoneCi)
 
 	initialDeadline := addDays(ref, 3)
-	initialMade := anyInRange(allCi, ref, initialDeadline)
+	initIP := anyInRange(inPersonCi, ref, initialDeadline)
+	initPH := anyInRange(phoneCi, ref, initialDeadline)
+	initialMade := initIP && initPH
 	initialMissed := !initialMade && gt(effEnd, initialDeadline)
 
 	windows := []Window{{
 		Type: "initial", Start: ref, End: initialDeadline, Deadline: initialDeadline,
-		Satisfied: initialMade, Missed: initialMissed, Label: "Initial (3-day)",
+		Satisfied: initialMade, SatisfiedInPerson: initIP, SatisfiedPhone: initPH,
+		Missed: initialMissed, Label: "Initial (3-day)",
 	}}
 
 	refCopy := ref
+	result := func(lvl int) CheckInResult {
+		return CheckInResult{Level: lvl, RefDate: &refCopy, Today: effEnd, Windows: windows,
+			Missed: missedOf(windows), LastCheckIn: lastCheckIn, LastInPerson: lastInPerson,
+			LastPhone: lastPhone, NextDue: nextDue(windows, effEnd)}
+	}
 	if level == 1 {
-		return CheckInResult{Level: level, RefDate: &refCopy, Today: effEnd, Windows: windows,
-			Missed: missedOf(windows), LastCheckIn: lastCheckIn, NextDue: nextDue(windows, effEnd)}
+		return result(level)
 	}
 
 	if level == 2 {
@@ -309,18 +333,20 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 		for le(cur, effEnd) {
 			monthEnd := lastOfMonth(cur)
 			windowEnd := minTime(monthEnd, effEnd)
-			hit := anyInRange(allCi, cur, windowEnd)
+			ip := anyInRange(inPersonCi, cur, windowEnd)
+			ph := anyInRange(phoneCi, cur, windowEnd)
+			hit := ip && ph
 			monthClosed := ge(effEnd, monthEnd) || (c.ClosedOK && le(c.ClosedD, monthEnd))
 			isFuture := gt(cur, effEnd)
 			windows = append(windows, Window{
 				Type: "month", Start: cur, End: monthEnd, Deadline: monthEnd,
-				Satisfied: hit, Missed: !hit && monthClosed && !isFuture,
-				Label: cur.Format("January 2006"),
+				Satisfied: hit, SatisfiedInPerson: ip, SatisfiedPhone: ph,
+				Missed: !hit && monthClosed && !isFuture,
+				Label:  cur.Format("January 2006"),
 			})
 			cur = nextMonth(cur)
 		}
-		return CheckInResult{Level: level, RefDate: &refCopy, Today: effEnd, Windows: windows,
-			Missed: missedOf(windows), LastCheckIn: lastCheckIn, NextDue: nextDue(windows, effEnd)}
+		return result(level)
 	}
 
 	// Level 3 (or GPS-as-L3, or unknown level — exactly like the JS else branch).
@@ -330,13 +356,16 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 		guard++
 		weekFri := addDays(weekMon, 4)
 		windowEnd := minTime(weekFri, effEnd)
-		hit := anyInRange(allCi, weekMon, windowEnd)
+		ip := anyInRange(inPersonCi, weekMon, windowEnd)
+		ph := anyInRange(phoneCi, weekMon, windowEnd)
+		hit := ip && ph
 		weekClosed := ge(effEnd, weekFri)
 		isFuture := gt(weekMon, effEnd)
 		windows = append(windows, Window{
 			Type: "week", Start: weekMon, End: weekFri, Deadline: weekFri,
-			Satisfied: hit, Missed: !hit && weekClosed && !isFuture,
-			Label: "Week of " + weekMon.Format("Jan 02"),
+			Satisfied: hit, SatisfiedInPerson: ip, SatisfiedPhone: ph,
+			Missed: !hit && weekClosed && !isFuture,
+			Label:  "Week of " + weekMon.Format("Jan 02"),
 		})
 		weekMon = addDays(weekMon, 7)
 	}
@@ -344,8 +373,43 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 	if outLevel == 0 && c.GpsActive {
 		outLevel = 3
 	}
-	return CheckInResult{Level: outLevel, RefDate: &refCopy, Today: effEnd, Windows: windows,
-		Missed: missedOf(windows), LastCheckIn: lastCheckIn, NextDue: nextDue(windows, effEnd)}
+	return result(outLevel)
+}
+
+// CheckInKind classifies a check-in's type string into in-person vs phone. The
+// imported data uses "In Person"; the app dropdown uses "In-person"/"Phone"/
+// "Virtual". Remote contacts (phone/virtual/video/tele) are NOT in-person.
+// Unknown/junk types (rare) satisfy neither bucket.
+func CheckInKind(typ string) (inPerson, phone bool) {
+	n := lettersOnly(strings.ToLower(typ))
+	switch {
+	case strings.Contains(n, "inperson"), strings.Contains(n, "office"), strings.Contains(n, "walkin"):
+		return true, false
+	case strings.Contains(n, "phone"), strings.Contains(n, "text"), strings.Contains(n, "call"),
+		strings.Contains(n, "virtual"), strings.Contains(n, "video"), strings.Contains(n, "tele"):
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func lettersOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// lastOf returns a pointer to the last element of a sorted slice, or nil.
+func lastOf(ts []time.Time) *time.Time {
+	if len(ts) == 0 {
+		return nil
+	}
+	v := ts[len(ts)-1]
+	return &v
 }
 
 func anyInRange(dates []time.Time, start, end time.Time) bool {

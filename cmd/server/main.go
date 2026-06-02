@@ -7,14 +7,19 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	_ "time/tzdata" // embed tz database so America/New_York works on any host
@@ -23,6 +28,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"pretrial-knoxc/internal/auth"
+	"pretrial-knoxc/internal/build"
+	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/handlers"
 	"pretrial-knoxc/internal/metrics"
@@ -103,6 +110,11 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	// Gzip responses (html/css/js/json) when the client accepts it. The roster page
+	// ships a few hundred KB of JSON; compression cuts that ~85% on the wire, which
+	// matters most on slow office LANs / low-end machines. Applied before the metrics
+	// middleware so duration still covers the full handler.
+	r.Use(middleware.Compress(5))
 	r.Use(mtr.Middleware) // records every request; reads chi's matched route pattern
 	r.Use(securityHeaders)
 	r.Use(a.Middleware)
@@ -126,6 +138,18 @@ func main() {
 	// lives at /dashboard, reached via a top-bar button. Keeps the two separate.
 	r.Get("/", srv.Home)
 	r.Get("/api/lookup_data", srv.APILookupData)
+
+	// Professional case console (the NEW second dashboard — runs alongside
+	// /dashboard for side-by-side comparison; commercial-inspired direction).
+	r.Get("/console", srv.Console)
+	r.Get("/console/clients", srv.ConsoleClients)
+	r.Get("/console/clients/new", srv.ConsoleIntake) // static segment wins over {idn}
+	r.Get("/console/clients/{idn}", srv.ConsoleRecordPage)
+	r.Get("/console/calendar", srv.ConsoleCalendar)
+	r.Get("/console/compliance", srv.ConsoleCompliance)
+	r.Get("/console/reports", srv.ConsoleReports)
+	r.Get("/console/admin", srv.ConsoleAdmin)
+	r.Get("/api/clients/{idn}", srv.APIClientByID)
 
 	// App (the new admin & data-entry / read-only surface).
 	r.Get("/dashboard", srv.Dashboard)
@@ -184,16 +208,36 @@ func main() {
 		ar.Post("/tag/delete", srv.DeleteTag)
 		ar.Post("/courtdate/add", srv.AddCourtDate)
 		ar.Post("/courtdate/delete", srv.DeleteCourtDate)
+		ar.Post("/courtdate/outcome", srv.SetCourtOutcome)
 		ar.Post("/reminder/add", srv.AddReminder)
 		ar.Post("/reminder/delete", srv.DeleteReminder)
 		ar.Post("/violation/add", srv.AddViolation)
 		ar.Post("/violation/delete", srv.DeleteViolation)
 	})
 
-	log.Printf("PTR server listening on %s (db=%s)", addr, dbPath)
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatal(err)
+	httpSrv := &http.Server{Addr: addr, Handler: r}
+
+	// Serve in the background so main can wait for a shutdown signal.
+	go func() {
+		log.Printf("PTR server listening on %s (db=%s, version=%s)", addr, dbPath, build.Version)
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	// Graceful shutdown on SIGINT/SIGTERM (systemd sends SIGTERM on stop/restart):
+	// stop accepting connections, let in-flight requests finish, then the deferred
+	// database.Close() runs — a clean SQLite close instead of an abrupt kill.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+	log.Println("shutdown signal received; draining in-flight requests…")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpSrv.Shutdown(ctx); err != nil {
+		log.Printf("graceful shutdown timed out: %v", err)
 	}
+	log.Println("server stopped")
 }
 
 // securityHeaders sets conservative, low-risk response headers on every response.
@@ -237,6 +281,30 @@ func baseDir() string {
 	return "."
 }
 
+// moneyFmt renders a dollar amount as "$1,234.50" (negative → "-$1,234.50").
+func moneyFmt(f float64) string {
+	neg := f < 0
+	if neg {
+		f = -f
+	}
+	s := fmt.Sprintf("%.2f", f)
+	dot := strings.IndexByte(s, '.')
+	intp, frac := s[:dot], s[dot:]
+	var b strings.Builder
+	n := len(intp)
+	for i := 0; i < n; i++ {
+		if i > 0 && (n-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteByte(intp[i])
+	}
+	out := "$" + b.String() + frac
+	if neg {
+		out = "-" + out
+	}
+	return out
+}
+
 func tmplFuncs() template.FuncMap {
 	return template.FuncMap{
 		"fmtDate": func(t time.Time) string {
@@ -264,5 +332,65 @@ func tmplFuncs() template.FuncMap {
 			return *p
 		},
 		"isNil": func(p *float64) bool { return p == nil },
+		"lower": strings.ToLower,
+		// money / moneyP / intP / boolP render the compute layer's numbers (incl.
+		// nil pointers == "missing") as clean currency / counts for the console.
+		"money":  func(f float64) string { return moneyFmt(f) },
+		"moneyi": func(i int) string { return moneyFmt(float64(i)) },
+		"moneyP": func(p *float64) string {
+			if p == nil {
+				return "—"
+			}
+			return moneyFmt(*p)
+		},
+		"intP": func(p *int) string {
+			if p == nil {
+				return "—"
+			}
+			return strconv.Itoa(*p)
+		},
+		"boolP": func(p *bool) bool { return p != nil && *p },
+		// evclass maps a calendar event Kind to its console .ev color class.
+		// officer renders an email as a display name; shortdate normalizes a
+		// mixed-format timestamp string to "Jan 2, 2006".
+		"officer": compute.FmtOfficer,
+		"shortdate": func(s string) string {
+			if t, ok := compute.ParseDay(s); ok {
+				return t.Format("Jan 2, 2006")
+			}
+			return s
+		},
+		"evclass": func(kind string) string {
+			switch {
+			case strings.HasPrefix(kind, "checkin"):
+				return "checkin"
+			case kind == "payment" || kind == "ptr-fee":
+				return "payment"
+			case kind == "gps-install" || kind == "gps-switch":
+				return "gps"
+			case kind == "missed":
+				return "missed"
+			case kind == "due":
+				return "due"
+			case kind == "closed":
+				return "closed"
+			case kind == "referral":
+				return "referral"
+			}
+			return ""
+		},
+		// initials renders an avatar monogram from a display name ("Alex Bentley" → "AB").
+		"initials": func(name string) string {
+			fields := strings.Fields(strings.TrimSpace(name))
+			if len(fields) == 0 {
+				return "?"
+			}
+			out := string([]rune(fields[0])[:1])
+			if len(fields) > 1 {
+				last := fields[len(fields)-1]
+				out += string([]rune(last)[:1])
+			}
+			return strings.ToUpper(out)
+		},
 	}
 }

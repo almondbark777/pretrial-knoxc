@@ -1,0 +1,325 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Clients</h1>
+    <div class="sub">Searchable, filterable caseload — the main entry point to every record</div>
+  </div>
+  <div class="right"><span class="asof">{{.Stats.Open}} active · {{.Stats.Total}} total</span></div>
+</div>
+
+<div class="filters">
+  <input type="text" id="f-name" placeholder="Filter by name, IDN, case #…">
+  <select id="f-status"><option value="">All statuses</option><option value="active">Active</option><option value="closed">Closed</option></select>
+  <select id="f-level"><option value="">All levels</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="0">Unknown</option></select>
+  <select id="f-officer"><option value="">All officers</option><option value="mine">My caseload</option></select>
+  <select id="f-comp"><option value="">Compliance: any</option><option value="behind">Behind on GPS</option><option value="missed">Missed check-in</option><option value="ok">Compliant</option></select>
+  <select id="f-gps"><option value="">GPS: any</option><option value="1">GPS active</option><option value="0">No GPS</option></select>
+  <span class="count" id="f-count"></span>
+  <span style="flex:1"></span>
+  <button type="button" class="btn ghost" id="exportBtn" title="Download the filtered roster as CSV">Export CSV ⤓</button>
+  <a class="btn" href="/console/clients/new">+ New Intake</a>
+</div>
+
+<div class="bulkbar" id="bulkbar" role="region" aria-label="Bulk actions">
+  <span class="bb-count" id="bulk-count">0 selected</span>
+  <a href="#" class="bb-link" id="bulk-selall" style="display:none">Select all filtered</a>
+  <span style="flex:1"></span>
+  <button type="button" class="btn ghost sm" id="bulk-export">Export selected ⤓</button>
+  <button type="button" class="btn ghost sm" id="bulk-checkin">✓ Check-in selected</button>
+  <button type="button" class="btn sm" id="bulk-clear">Clear</button>
+</div>
+
+<div class="tablewrap">
+  <div class="tscroll">
+    <table class="data" id="ctable">
+      <thead><tr>
+        <th class="cbcol"><input type="checkbox" id="cb-all" aria-label="Select all clients on this page"></th>
+        <th data-col="1" data-type="text">Client <span class="arr">↕</span></th>
+        <th data-col="2" data-type="text">Case # <span class="arr">↕</span></th>
+        <th data-col="3" data-type="num">Level <span class="arr">↕</span></th>
+        <th data-col="4" data-type="text">Status <span class="arr">↕</span></th>
+        <th data-col="5" data-type="text">Next Court <span class="arr">↕</span></th>
+        <th data-col="6" data-type="text">Next Check-in <span class="arr">↕</span></th>
+        <th data-col="7" data-type="text">Compliance <span class="arr">↕</span></th>
+        <th data-col="8" data-type="text">Officer <span class="arr">↕</span></th>
+        <th aria-label="Quick actions"></th>
+      </tr></thead>
+      {{/* Rows are windowed: only the visible page is rendered into the DOM by JS
+            from the compact ROWS array below, so a multi-thousand-row roster stays
+            light on low-end office PCs. */}}
+      <tbody id="ctbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="pager" id="pager">
+  <button type="button" class="btn ghost sm" id="pgPrev">‹ Prev</button>
+  <span id="pgInfo" class="muted"></span>
+  <button type="button" class="btn ghost sm" id="pgNext">Next ›</button>
+</div>
+
+<div class="backdrop" id="qcModal"><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/checkin/add">
+    <div class="mh"><h3 id="qcTitle">Log Check-in</h3><button type="button" class="x" onclick="document.getElementById('qcModal').classList.remove('show')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" id="qcIdn"><input type="hidden" name="next" value="/console/clients">
+      <div class="fld"><label>Type</label><select name="type_of_check_in"><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>
+      <div class="fld"><label>Date</label><input type="date" name="date" value="{{.AsOfInput}}" required></div>
+      <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, etc.)</span></label><textarea name="note" placeholder="Optional — fitment / observations"></textarea></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="document.getElementById('qcModal').classList.remove('show')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>
+  </form>
+</div></div>
+
+<style>
+.qc{width:1%;white-space:nowrap}
+.qc-btn{opacity:0;background:var(--panel);color:var(--brand);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:5px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:opacity var(--t)}
+html[data-theme="dark"] .qc-btn{color:var(--accent-ink)}
+table.data tbody tr:hover .qc-btn,.qc-btn:focus{opacity:1}
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:14px 0 4px}
+.pager #pgInfo{font-size:12.5px}
+.pager .btn[disabled]{opacity:.4;cursor:not-allowed}
+.cbcol{width:1%;white-space:nowrap;text-align:center;padding-left:14px}
+.rcb,#cb-all{width:16px;height:16px;cursor:pointer;accent-color:var(--brand);vertical-align:middle}
+table.data tbody tr.selected,table.data tbody tr.selected:hover{background:var(--brand-soft)}
+.bulkbar{display:none;align-items:center;gap:14px;margin:10px 0 0;padding:10px 16px;background:var(--brand-soft);border:1px solid var(--line-2);border-radius:var(--r-sm);animation:bbIn .18s ease}
+.bulkbar.show{display:flex}
+.bulkbar .bb-count{font-weight:700;color:var(--brand)}
+html[data-theme="dark"] .bulkbar .bb-count,html[data-theme="dark"] .bulkbar .bb-link{color:var(--accent-ink)}
+.bulkbar .bb-link{font-size:12.5px;font-weight:600;color:var(--brand);text-decoration:underline;cursor:pointer}
+@keyframes bbIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.empty-row td{padding:0}
+.empty-row:hover{background:transparent;cursor:default}
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:12px;padding:56px 20px;color:var(--muted);text-align:center;font-size:14px}
+.empty-state .es-ic{font-size:30px;opacity:.45;line-height:1}
+</style>
+<script>
+/* ── Windowed roster ──────────────────────────────────────────────────────────
+   The full roster ships once as a compact JSON array; filter/sort/paging all run
+   in memory and ONLY the current 50-row page is materialized into the DOM. This
+   keeps the node count flat (~50 rows) regardless of caseload size, so the page
+   stays responsive on low-end office hardware. */
+const ROWS = {{.RowsJSON}};
+const F = {q:{{.Fq}},status:{{.Fstatus}},level:{{.Flevel}},officer:{{.Fofficer}},comp:{{.Fcomp}},gps:{{.Fgps}}};
+const USERNAME = ({{.UserName}}||'').toLowerCase();
+
+function qcheck(idn,name){
+  document.getElementById('qcIdn').value=idn;
+  document.getElementById('qcTitle').textContent='Log Check-in — '+name;
+  document.getElementById('qcModal').classList.add('show');
+}
+document.getElementById('qcModal').addEventListener('click',function(e){if(e.target.id==='qcModal')this.classList.remove('show')});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('qcModal').classList.remove('show')});
+
+document.addEventListener('DOMContentLoaded',function(){
+  var PAGE=50, page=0, view=ROWS.slice(), sel=new Set(), pageRows=[];
+  var sortCol=null, sortDir=1;
+  var byId={}; ROWS.forEach(function(r){byId[r.i]=r});
+
+  var tbody=document.getElementById('ctbody');
+  var fName=document.getElementById('f-name'),fStatus=document.getElementById('f-status'),
+      fLevel=document.getElementById('f-level'),fOff=document.getElementById('f-officer'),
+      fComp=document.getElementById('f-comp'),fGps=document.getElementById('f-gps'),
+      count=document.getElementById('f-count');
+  var pgPrev=document.getElementById('pgPrev'),pgNext=document.getElementById('pgNext'),
+      pgInfo=document.getElementById('pgInfo'),pager=document.getElementById('pager');
+  var cbAll=document.getElementById('cb-all'),bulkbar=document.getElementById('bulkbar'),
+      bulkCount=document.getElementById('bulk-count'),bulkSelAll=document.getElementById('bulk-selall');
+
+  /* ── render helpers ──────────────────────────────────────────────────────── */
+  function esc(s){return (''+(s==null?'':s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function chip(tone,icon,label){return '<span class="chip '+tone+'">'+(icon?'<span class="g">'+icon+'</span>':'')+esc(label)+'</span>'}
+  function lvlChip(l){return l===1?chip('ok','','Level 1'):l===2?chip('warn','','Level 2'):l===3?chip('risk','','Level 3'):chip('neutral','','Level —')}
+  function statusChip(label){return chip(label==='Active'?'info':'neutral','',label||'Unknown')}
+  function compChip(label){
+    switch(label){
+      case 'Behind on GPS': return chip('risk','⚠',label);
+      case 'Missed check-in': return chip('risk','⚠',label);
+      case 'Past missed': return chip('warn','⚠',label);
+      case 'Compliant': return chip('ok','✓',label);
+      case 'No referral': return chip('neutral','◯',label);
+      default: return chip('neutral','',label||'—');
+    }
+  }
+  function levelLabel(l){return (l>=1&&l<=3)?('Level '+l):'Level —'}
+  function compKey(label){return label==='Behind on GPS'?'behind':label==='Missed check-in'?'missed':label==='Compliant'?'ok':'other'}
+  function statusKey(label){return label==='Active'?'active':(label==='Closed'?'closed':'other')}
+
+  function rowHTML(r){
+    return '<tr data-idn="'+esc(r.i)+'" data-href="/console/clients/'+esc(r.i)+'" tabindex="0">'
+      +'<td class="cbcol"><input type="checkbox" class="rcb" aria-label="Select '+esc(r.n)+'"></td>'
+      +'<td><div class="namecell"><span class="av">'+esc(r.a)+'</span><span class="nm">'+esc(r.n)+'</span></div></td>'
+      +'<td>'+esc(r.c)+'</td>'
+      +'<td>'+lvlChip(r.l)+'</td>'
+      +'<td>'+statusChip(r.st)+'</td>'
+      +'<td>'+esc(r.nc)+'</td>'
+      +'<td'+(r.ov?' class="overdue"':'')+'>'+esc(r.ci)+(r.ov?' ⚠':'')+'</td>'
+      +'<td>'+compChip(r.cm)+'</td>'
+      +'<td>'+esc(r.o)+'</td>'
+      +'<td class="qc"><button type="button" class="qc-btn" title="Log a check-in">✓ Check-in</button></td>'
+      +'</tr>';
+  }
+
+  /* ── filter + sort (operate on the data, not the DOM) ────────────────────── */
+  function reflow(){
+    var q=fName.value.trim().toLowerCase(), st=fStatus.value, lv=fLevel.value,
+        cmp=fComp.value, gps=fGps.value, mine=fOff.value==='mine';
+    view=ROWS.filter(function(r){
+      if(q && r.s.indexOf(q)<0)return false;
+      if(st && statusKey(r.st)!==st)return false;
+      if(lv!=='' && String(r.l)!==lv)return false;
+      if(cmp && compKey(r.cm)!==cmp)return false;
+      if(gps!=='' && (r.g?'1':'0')!==gps)return false;
+      if(mine && (r.o||'').toLowerCase()!==USERNAME)return false;
+      return true;
+    });
+    applySort(); page=0; renderPage();
+  }
+  function colGet(col){
+    switch(col){case 1:return function(r){return r.n};case 2:return function(r){return r.c};
+      case 3:return function(r){return r.l};case 4:return function(r){return r.st};
+      case 5:return function(r){return r.ncs};case 6:return function(r){return r.cis};
+      case 7:return function(r){return r.cm};case 8:return function(r){return r.o};
+      default:return function(r){return r.n}}
+  }
+  function applySort(){
+    if(sortCol===null){ // default: overdue first, then name
+      view.sort(function(a,b){if(a.ov!==b.ov)return a.ov?-1:1;return a.s<b.s?-1:a.s>b.s?1:0});
+      return;
+    }
+    var g=colGet(sortCol), num=(sortCol===3);
+    view.sort(function(a,b){
+      var x=g(a),y=g(b);
+      if(num)return (parseFloat(x||0)-parseFloat(y||0))*sortDir;
+      x=(''+x).toLowerCase(); y=(''+y).toLowerCase();
+      return (x<y?-1:x>y?1:0)*sortDir;
+    });
+  }
+
+  /* ── selection bar ───────────────────────────────────────────────────────── */
+  function updateHeader(){
+    var n=pageRows.filter(function(r){return sel.has(r.i)}).length;
+    cbAll.checked=pageRows.length>0&&n===pageRows.length;
+    cbAll.indeterminate=n>0&&n<pageRows.length;
+  }
+  function updateBar(){
+    var n=sel.size;
+    bulkbar.classList.toggle('show',n>0);
+    bulkCount.textContent=n+' selected';
+    if(n>0&&n<view.length){bulkSelAll.style.display='';bulkSelAll.textContent='Select all '+view.length+' filtered';}
+    else bulkSelAll.style.display='none';
+  }
+
+  /* ── render the current page ─────────────────────────────────────────────── */
+  function renderPage(){
+    var n=view.length, pages=Math.max(1,Math.ceil(n/PAGE));
+    if(page>=pages)page=pages-1; if(page<0)page=0;
+    var start=page*PAGE, end=Math.min(start+PAGE,n);
+    pageRows=view.slice(start,end);
+    if(n===0){
+      tbody.innerHTML='<tr class="empty-row"><td colspan="10"><div class="empty-state"><div class="es-ic">🔍</div><div>No clients match your filters.</div><button type="button" class="btn ghost sm es-clear">Clear all filters</button></div></td></tr>';
+    }else{
+      var html=''; for(var i=start;i<end;i++)html+=rowHTML(view[i]);
+      tbody.innerHTML=html;
+      var trs=tbody.querySelectorAll('tr[data-idn]');
+      for(var k=0;k<trs.length;k++){
+        var on=sel.has(trs[k].dataset.idn);
+        if(on){trs[k].classList.add('selected');var cb=trs[k].querySelector('.rcb');if(cb)cb.checked=true;}
+      }
+    }
+    count.textContent=n+' of '+ROWS.length+' shown';
+    pgInfo.textContent=n?('Showing '+(start+1)+'–'+end+' of '+n):'No matches';
+    pgPrev.disabled=(page===0); pgNext.disabled=(page>=pages-1);
+    pager.style.display=(n>PAGE)?'flex':'none';
+    updateHeader(); updateBar();
+  }
+
+  /* ── event delegation on the tbody (one set of listeners, not 50×N) ──────── */
+  tbody.addEventListener('click',function(e){
+    if(e.target.closest('.es-clear')){clearAll();return;}
+    var tr=e.target.closest('tr[data-idn]'); if(!tr)return;
+    if(e.target.closest('.cbcol'))return; // checkbox handled by change
+    if(e.target.closest('.qc-btn')){e.stopPropagation();var r=byId[tr.dataset.idn];qcheck(tr.dataset.idn,r?r.n:'');return;}
+    location.href=tr.dataset.href;
+  });
+  tbody.addEventListener('change',function(e){
+    if(!e.target.classList||!e.target.classList.contains('rcb'))return;
+    var tr=e.target.closest('tr[data-idn]'); if(!tr)return;
+    if(e.target.checked)sel.add(tr.dataset.idn); else sel.delete(tr.dataset.idn);
+    tr.classList.toggle('selected',e.target.checked);
+    updateHeader(); updateBar();
+  });
+  tbody.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){var tr=e.target.closest('tr[data-idn]');if(tr)location.href=tr.dataset.href}
+  });
+
+  /* ── filters ─────────────────────────────────────────────────────────────── */
+  function filterReflow(){sel.clear();reflow();} // changing a filter clears selection
+  [fName,fStatus,fLevel,fOff,fComp,fGps].forEach(function(el){el.addEventListener('input',filterReflow)});
+  function clearAll(){fName.value='';fStatus.value='';fLevel.value='';fOff.value='';fComp.value='';fGps.value='';filterReflow();}
+
+  /* ── header select-all + bulk actions ────────────────────────────────────── */
+  cbAll.addEventListener('change',function(){
+    var on=cbAll.checked;
+    pageRows.forEach(function(r){if(on)sel.add(r.i);else sel.delete(r.i)});
+    tbody.querySelectorAll('tr[data-idn]').forEach(function(tr){
+      var s2=sel.has(tr.dataset.idn);var cb=tr.querySelector('.rcb');if(cb)cb.checked=s2;tr.classList.toggle('selected',s2);
+    });
+    updateBar();
+  });
+  bulkSelAll.addEventListener('click',function(e){e.preventDefault();view.forEach(function(r){sel.add(r.i)});renderPage()});
+  document.getElementById('bulk-clear').addEventListener('click',function(){sel.clear();renderPage()});
+  document.getElementById('bulk-export').addEventListener('click',function(){exportRows(view.filter(function(r){return sel.has(r.i)}),'selected')});
+  document.getElementById('bulk-checkin').addEventListener('click',function(){
+    var n=sel.size, plural=(n===1?'':'s');
+    bulkDemo('Bulk check-in — '+n+' client'+plural,
+      '<div class="note-hint">Demo: this would log a check-in for the '+n+' selected client'+plural+' in one step. Single check-ins already persist to the record; the bulk write path lands in a later milestone.</div>',
+      'Check-ins logged (demo)', n+' selected client'+plural+' would be marked checked-in.');
+  });
+  function bulkDemo(title,bodyHtml,tt,tm){
+    document.getElementById('am-title').textContent=title;
+    document.getElementById('am-body').innerHTML=bodyHtml;
+    document.getElementById('am-foot').innerHTML='<button type="button" class="btn ghost" onclick="closeAction()">Cancel</button><button type="button" class="btn" id="am-bulk-go">Confirm</button>';
+    document.getElementById('am-bulk-go').addEventListener('click',function(){closeAction();ptToast(tt,tm,'info')});
+    var m=document.getElementById('actionModal');m.classList.add('show');m.setAttribute('aria-hidden','false');
+  }
+
+  /* ── paging ──────────────────────────────────────────────────────────────── */
+  pgPrev.addEventListener('click',function(){page--;renderPage();window.scrollTo(0,0)});
+  pgNext.addEventListener('click',function(){page++;renderPage();window.scrollTo(0,0)});
+
+  /* ── CSV export (from the data, no DOM scraping) ─────────────────────────── */
+  function exportRows(list,tag){
+    function q(s){s=(''+(s||'')).replace(/\s+/g,' ').trim();return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+    var lines=[['Name','IDN','Case','Level','Status','Next Court','Next Check-in','Compliance','Officer'].join(',')];
+    list.forEach(function(r){lines.push([r.n,r.i,r.c,levelLabel(r.l),r.st,r.nc,r.ci,r.cm,r.o].map(q).join(','))});
+    var blob=new Blob([lines.join('\n')],{type:'text/csv'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='clients-'+(tag?tag+'-':'')+list.length+'.csv';document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},100);
+    ptToast('Export ready',list.length+' client'+(list.length===1?'':'s')+' exported to CSV.','info');
+  }
+  document.getElementById('exportBtn').addEventListener('click',function(){exportRows(view)});
+
+  /* ── sorting (reorder the data, re-page) ─────────────────────────────────── */
+  document.querySelectorAll('#ctable th[data-col]').forEach(function(th){
+    th.addEventListener('click',function(){
+      var col=+th.dataset.col;
+      sortDir=(sortCol===col)?-sortDir:1; sortCol=col;
+      document.querySelectorAll('#ctable th').forEach(function(x){x.classList.remove('sorted')});
+      th.classList.add('sorted');
+      applySort(); page=0; renderPage();
+    });
+  });
+
+  /* ── seed from URL params (shareable filters / KPI deep-links), then render ── */
+  if(F.q)fName.value=F.q;
+  if(F.status)fStatus.value=F.status;
+  if(F.level)fLevel.value=F.level;
+  if(F.officer)fOff.value=F.officer;
+  if(F.comp)fComp.value=F.comp;
+  if(F.gps)fGps.value=F.gps;
+  reflow();
+});
+</script>
+{{template "c_bot" .}}

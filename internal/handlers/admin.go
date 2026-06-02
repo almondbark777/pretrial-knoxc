@@ -233,9 +233,19 @@ func (s *Server) ClearOverride(w http.ResponseWriter, r *http.Request) {
 // ── Per-defendant CRUD (any allowed officer) ─────────────────────────────────
 
 // profileBack returns the profile redirect target for the posted idn.
+// safeNext returns the request's `next` form value if it's a same-origin path
+// (starts with "/" but not "//"), else def. Guards against open redirects so the
+// new console can post to shared /admin/* endpoints and come back to /console/*.
+func safeNext(r *http.Request, def string) string {
+	if n := strings.TrimSpace(r.FormValue("next")); strings.HasPrefix(n, "/") && !strings.HasPrefix(n, "//") {
+		return n
+	}
+	return def
+}
+
 func profileBack(r *http.Request) (idn, to string) {
 	idn = strings.TrimSpace(r.FormValue("idn"))
-	return idn, "/client_profile.html?idn=" + url.QueryEscape(idn)
+	return idn, safeNext(r, "/client_profile.html?idn="+url.QueryEscape(idn))
 }
 
 func (s *Server) AddNote(w http.ResponseWriter, r *http.Request) {
@@ -275,6 +285,15 @@ func (s *Server) DeleteCourtDate(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	_, back := profileBack(r)
 	s.afterWrite(w, r, back, db.DeleteCourtDate(s.DB, formID(r), auth.User(r)), "Court date deleted.")
+}
+
+// SetCourtOutcome logs a hearing's result (+ optional next date) on a court_dates
+// row — the after-the-hearing FTA step (§5.6). POST /admin/courtdate/outcome.
+func (s *Server) SetCourtOutcome(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	_, back := profileBack(r)
+	err := db.SetCourtOutcome(s.DB, formID(r), r.FormValue("outcome"), r.FormValue("next_date"), auth.User(r))
+	s.afterWrite(w, r, back, err, "Court outcome logged.")
 }
 
 func (s *Server) AddReminder(w http.ResponseWriter, r *http.Request) {

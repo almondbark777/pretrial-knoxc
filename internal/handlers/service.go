@@ -96,9 +96,14 @@ func behindRoster(clients map[string][]*compute.Client, track time.Time) []model
 		if g.SurplusDays != nil {
 			detail += " / " + itoa(-*g.SurplusDays) + " days"
 		}
+		owed := 0.0
+		if g.TotalOwedDollars != nil {
+			owed = *g.TotalOwedDollars
+		}
 		rows = append(rows, models.RosterRow{
 			IDN: c.IDN, Name: c.Name, Officer: c.Officer, Level: lvl,
 			Detail: detail, Amount: *g.SurplusDollars,
+			Owed: owed, Paid: g.TotalGpsPaid, Waived: compute.IsFeesWaived(c.GpNotes),
 		})
 	}
 	sortByName(rows)
@@ -126,15 +131,20 @@ func missedCheckInsRoster(clients map[string][]*compute.Client, track time.Time)
 		if !c.RefOK {
 			continue
 		}
-		// checked in any time during this calendar month?
-		checked := false
+		// Both an in-person AND a phone check-in are required this calendar month
+		// (office policy: clients must do both at their level's cadence). A phone
+		// call alone no longer counts as "checked in".
+		hasIP, hasPh := false, false
 		for _, ci := range c.CheckIns {
 			if ci.DOK && !ci.D.Before(monthStart) && !ci.D.After(monthEnd) {
-				checked = true
-				break
+				if ip, ph := compute.CheckInKind(ci.Type); ip {
+					hasIP = true
+				} else if ph {
+					hasPh = true
+				}
 			}
 		}
-		if checked {
+		if hasIP && hasPh {
 			continue
 		}
 		// 3-day grace: if still inside grace and grace ends at/after month start, skip.
@@ -142,16 +152,45 @@ func missedCheckInsRoster(clients map[string][]*compute.Client, track time.Time)
 		if !graceEnd.Before(track) && !graceEnd.Before(monthStart) {
 			continue
 		}
+		mo := track.Format("January 2006")
+		detail := "no in-person or phone check-in in " + mo
+		switch {
+		case hasIP && !hasPh:
+			detail = "no phone check-in in " + mo
+		case !hasIP && hasPh:
+			detail = "no in-person check-in in " + mo
+		}
 		rows = append(rows, models.RosterRow{
 			IDN: c.IDN, Name: c.Name, Officer: c.Officer, Level: lvl,
-			Detail: "no check-in in " + track.Format("January 2006"),
+			Detail: detail,
 		})
 	}
 	sortByName(rows)
 	return rows
 }
 
-func computeStats(clients map[string][]*compute.Client, track time.Time) models.Stats {
+// violationsSinceEpoch keeps only violations dated on/after the stats go-live
+// epoch (compute.StatsEpoch). The console's aggregate violation count + alert feed
+// reflect the production era, not migrated/pre-go-live history. Undated rows are
+// excluded (can't be confirmed in-period). Per-client records use the unfiltered
+// list, so an individual's full history is unaffected.
+func violationsSinceEpoch(vs []models.Violation) []models.Violation {
+	epoch := compute.StatsEpoch()
+	out := make([]models.Violation, 0, len(vs))
+	for _, v := range vs {
+		if d, ok := compute.ParseDay(v.ViolationDate); ok && !d.Before(epoch) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// rosterStateCounts tallies the cheap, current-state roster sizes with NO
+// per-client compute: distinct IDNs, open/closed by status, and GPS-active (any
+// case). BehindGPS/MissedMonth are left zero — those require full roster passes,
+// so callers that already hold the behind/missed rosters set the lengths
+// themselves instead of recomputing (see consoleDashboard).
+func rosterStateCounts(clients map[string][]*compute.Client) models.Stats {
 	s := models.Stats{Total: len(clients)} // distinct IDNs
 	for _, cases := range clients {
 		c := openRep(cases)
@@ -170,6 +209,11 @@ func computeStats(clients map[string][]*compute.Client, track time.Time) models.
 			}
 		}
 	}
+	return s
+}
+
+func computeStats(clients map[string][]*compute.Client, track time.Time) models.Stats {
+	s := rosterStateCounts(clients)
 	s.BehindGPS = len(behindRoster(clients, track))
 	s.MissedMonth = len(missedCheckInsRoster(clients, track))
 	return s

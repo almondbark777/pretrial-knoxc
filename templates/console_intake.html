@@ -1,0 +1,255 @@
+{{template "c_top" .}}
+<a class="backlink" href="/console/clients">← Clients</a>
+<div class="phead">
+  <div>
+    <h1>New Client Intake</h1>
+    <div class="sub">Create a record the standard way — identity → charges → level → conditions → agreement → assign. Mirrors the commercial intake flow.</div>
+  </div>
+</div>
+
+<ol class="wsteps" id="wsteps">
+  <li class="wchip active" data-go="0"><span class="i">1</span><span class="t">Identity</span></li>
+  <li class="wchip" data-go="1"><span class="i">2</span><span class="t">Case &amp; Charges</span></li>
+  <li class="wchip" data-go="2"><span class="i">3</span><span class="t">Level</span></li>
+  <li class="wchip" data-go="3"><span class="i">4</span><span class="t">Conditions</span></li>
+  <li class="wchip" data-go="4"><span class="i">5</span><span class="t">Release Agreement</span></li>
+  <li class="wchip" data-go="5"><span class="i">6</span><span class="t">Assign &amp; Schedule</span></li>
+</ol>
+
+<div class="panel wcard">
+  <div class="note-hint" style="margin:16px 16px 0">Demo build — this wizard validates each step and saves a draft locally, then confirms with a toast. Native record creation (this app as system of record) lands in a later milestone.</div>
+  <form id="intakeForm" autocomplete="off" method="post" action="/admin/add_defendant">
+    {{/* hidden fields mapped to what /admin/add_defendant expects; populated on submit */}}
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="next" id="h_next" value="/console/clients">
+    <input type="hidden" name="warrant_case_num" id="h_case">
+    <input type="hidden" name="pretrial_level" id="h_level">
+    <input type="hidden" name="supervising_officer" id="h_officer">
+    <input type="hidden" name="referral_date" id="h_referral">
+    <input type="hidden" name="charge_type" id="h_charge">
+    <input type="hidden" name="bond_amount" id="h_bond">
+    <input type="hidden" name="birthdate" id="h_dob">
+    <input type="hidden" name="gps" id="h_gps">
+    <input type="hidden" name="gps_type" id="h_gpstype">
+
+    <section class="wpane active" data-step="0">
+      <h3 class="wh">Identity</h3>
+      <div class="wgrid">
+        <label>Full name <span class="req">*</span><input type="text" name="defendant" data-req placeholder="LAST, FIRST"></label>
+        <label>Date of birth<input type="date" name="dob"></label>
+        <label>IDN <span class="req">*</span><input type="text" name="idn" data-req inputmode="numeric" placeholder="e.g. 1648023"></label>
+        <label>Booking #<input type="text" name="booking"></label>
+        <label>Phone<input type="tel" name="phone" placeholder="(865) 555-0100"></label>
+        <label>Address<input type="text" name="address"></label>
+      </div>
+    </section>
+
+    <section class="wpane" data-step="1">
+      <h3 class="wh">Case &amp; Charges</h3>
+      <div class="wgrid">
+        <label>Case number(s) <span class="req">*</span><input type="text" name="case" data-req placeholder="@1648023, @1648024"></label>
+        <label>Lead charge<input type="text" name="charge" placeholder="Aggravated Assault"></label>
+        <label>Statute<input type="text" name="statute" placeholder="TCA 39-13-102"></label>
+        <label>Severity<select name="severity"><option>Misdemeanor</option><option>Felony</option><option>Violation</option></select></label>
+        <label>Arrest date<input type="date" name="arrest"></label>
+        <label>Arresting agency<input type="text" name="agency" placeholder="KCSO"></label>
+        <label>Bond amount<input type="text" name="bond" placeholder="$25,000"></label>
+        <label>Bond type<select name="bondtype"><option>Surety</option><option>Cash</option><option>Recognizance (OR)</option><option>None set</option></select></label>
+      </div>
+    </section>
+
+    <section class="wpane" data-step="2">
+      <h3 class="wh">Pretrial Level</h3>
+      <p class="muted" style="padding:0;margin:0 0 14px;font-size:13px">The scoring instrument is captured as a result (the instrument itself is out of scope). GPS is a <b>separate condition</b>, not a level outcome.</p>
+      <div class="wgrid">
+        <label>Assessment score<input type="number" name="score" placeholder="e.g. 14"></label>
+        <label>Assigned level <span class="req">*</span><select name="level" id="lvlSel" data-req>
+          <option value="">— choose —</option><option value="1">Level 1 (lightest)</option><option value="2">Level 2</option><option value="3">Level 3 (heaviest)</option></select></label>
+      </div>
+      <label class="wfull">Override / notes (if assigned level differs from score)<textarea name="lvlnote" rows="2" placeholder="Reason for any override…"></textarea></label>
+      <div class="wcadence" id="cadenceHint">Select a level to see the implied check-in cadence.</div>
+    </section>
+
+    <section class="wpane" data-step="3">
+      <h3 class="wh">Conditions</h3>
+      <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Select supervision conditions. Check-in cadence is implied by the level; GPS is toggled separately with a vendor.</p>
+      <div class="wconds">
+        <label class="wcheck" id="condCheckin"><input type="checkbox" name="c_checkin" checked disabled> <span><b>Check-in</b><small id="condCadence">cadence by level</small></span></label>
+        <label class="wcheck"><input type="checkbox" name="c_drug"> <span><b>Random drug testing</b><small>twice monthly</small></span></label>
+        <label class="wcheck"><input type="checkbox" name="c_nocontact"> <span><b>No-contact order</b><small>per release order</small></span></label>
+        <label class="wcheck"><input type="checkbox" name="c_curfew"> <span><b>Curfew</b><small>e.g. 9 PM – 6 AM</small></span></label>
+        <label class="wcheck"><input type="checkbox" name="c_gps" id="gpsToggle"> <span><b>GPS electronic monitoring</b><small>vendor billed daily</small></span></label>
+      </div>
+      <label class="wfull" id="vendorWrap" style="display:none">GPS vendor<select name="vendor"><option value="SCRAM">SCRAM — $15/day</option><option value="ALLIED">ALLIED — $8/day</option><option value="IC">IC — $0/day (indigent)</option></select></label>
+    </section>
+
+    <section class="wpane" data-step="4">
+      <h3 class="wh">Release Agreement</h3>
+      <div class="wagreement">
+        <div class="wdoc">
+          <div class="wdoc-h">PRETRIAL RELEASE AGREEMENT</div>
+          <p>The defendant agrees to comply with all conditions of pretrial release as set by the court, including the supervision level and conditions selected, and to appear at all scheduled court dates. Failure to comply may result in revocation of release and issuance of a warrant.</p>
+          <p class="muted" id="agreementSummary">Conditions summary will appear here.</p>
+        </div>
+        <label class="wcheck"><input type="checkbox" name="signed" id="signedChk"> <span><b>Defendant has reviewed and signed</b><small>the signed PDF would be stored on the record</small></span></label>
+        <label class="wfull">Signature date<input type="date" name="signdate"></label>
+      </div>
+    </section>
+
+    <section class="wpane" data-step="5">
+      <h3 class="wh">Assign &amp; Schedule</h3>
+      <div class="wgrid">
+        <label>Supervising officer <span class="req">*</span><select name="officer" data-req>
+          <option value="">— choose —</option>
+          {{if .UserName}}<option value="{{.UserName}}">{{.UserName}} (me)</option>{{end}}
+          {{range .Officers}}<option>{{.}}</option>{{end}}
+        </select></label>
+        <label>Referral date<input type="date" name="referral"></label>
+        <label>First check-in<input type="date" name="firstcheckin"></label>
+        <label>First court date<input type="date" name="firstcourt"></label>
+      </div>
+      <div class="wreview" id="reviewBox"></div>
+    </section>
+
+  </form>
+
+  <div class="wfoot">
+    <button type="button" class="btn ghost" id="wback" disabled>← Back</button>
+    <span class="grow"></span>
+    <button type="button" class="btn ghost" id="wdraft">Save draft</button>
+    <button type="button" class="btn" id="wnext">Next →</button>
+  </div>
+</div>
+
+<style>
+.wsteps{display:flex;gap:6px;list-style:none;padding:0;margin:0 0 18px;flex-wrap:wrap}
+.wchip{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--line-2);border-radius:var(--r-pill);background:var(--panel);font-size:12.5px;font-weight:600;color:var(--muted);cursor:default}
+.wchip .i{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--panel-3);color:var(--muted);font-size:11px;font-weight:700}
+.wchip.active{border-color:var(--brand);color:var(--brand)}
+html[data-theme="dark"] .wchip.active{border-color:var(--accent);color:var(--accent-ink)}
+.wchip.active .i{background:var(--brand);color:#fff}
+.wchip.done{cursor:pointer;color:var(--ok-ink);border-color:var(--ok-line)}
+.wchip.done .i{background:var(--ok);color:#fff}
+.wcard{max-width:820px}
+.wpane{display:none;padding:18px}
+.wpane.active{display:block;animation:fade .2s ease both}
+.wh{font-size:15px;font-weight:700;margin:0 0 16px}
+.wgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.wgrid{grid-template-columns:1fr}}
+.wpane label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600}
+.wpane label.wfull{grid-column:1/-1;margin-top:14px}
+.wpane input,.wpane select,.wpane textarea{padding:9px 11px;border:1px solid var(--line-2);border-radius:var(--r-sm);font:inherit;font-size:13.5px;background:var(--panel-2);color:var(--ink)}
+.wpane input:focus,.wpane select:focus,.wpane textarea:focus{border-color:var(--accent);box-shadow:var(--ring);outline:none;background:var(--panel)}
+.wpane input.invalid,.wpane select.invalid{border-color:var(--risk);box-shadow:0 0 0 3px var(--risk-bg)}
+.req{color:var(--risk)}
+.wcadence{margin-top:16px;padding:11px 14px;background:var(--info-bg);border:1px solid var(--info-line);border-radius:var(--r-sm);font-size:13px;color:var(--info-ink)}
+.wconds{display:flex;flex-direction:column;gap:10px}
+.wcheck{display:flex!important;flex-direction:row!important;align-items:center;gap:11px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);cursor:pointer}
+.wcheck input{width:auto;flex:0 0 auto}
+.wcheck span{display:flex;flex-direction:column}
+.wcheck b{color:var(--ink);font-size:13.5px}
+.wcheck small{color:var(--muted);font-size:11.5px;font-weight:500}
+.wdoc{border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;background:var(--panel-2);margin-bottom:14px}
+.wdoc-h{font-weight:700;letter-spacing:.04em;font-size:12px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px}
+.wdoc p{padding:0;font-size:13px;margin:0 0 8px}
+.wfoot{display:flex;align-items:center;gap:10px;padding:14px 18px;border-top:1px solid var(--line)}
+.wfoot .btn[disabled]{opacity:.4;cursor:not-allowed}
+.wreview{margin-top:8px}
+.wreview .rrow{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.wreview .rrow b{color:var(--ink)}
+.wsuccess{text-align:center;padding:50px 20px}
+.wsuccess .big{font-size:46px;color:var(--ok-ink);margin-bottom:10px}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var panes=[].slice.call(document.querySelectorAll('.wpane'));
+  var chips=[].slice.call(document.querySelectorAll('.wchip'));
+  var back=document.getElementById('wback'),next=document.getElementById('wnext'),draft=document.getElementById('wdraft');
+  var form=document.getElementById('intakeForm');
+  var cur=0, last=panes.length-1, done=false;
+
+  function show(i){
+    cur=i;
+    panes.forEach(function(p,idx){p.classList.toggle('active',idx===i)});
+    chips.forEach(function(c,idx){c.classList.toggle('active',idx===i);c.classList.toggle('done',idx<i)});
+    back.disabled=(i===0);
+    next.textContent=(i===last)?'Create client':'Next →';
+    if(i===last)buildReview();
+    if(i===2)updateCadence();
+    if(i===4)buildSummary();
+    window.scrollTo(0,0);
+  }
+  function validate(i){
+    var ok=true;
+    panes[i].querySelectorAll('[data-req]').forEach(function(el){
+      if(!el.value.trim()){el.classList.add('invalid');ok=false;}else{el.classList.remove('invalid');}
+    });
+    if(!ok)ptToast('Missing required field','Fill the highlighted field(s) to continue.','warn');
+    return ok;
+  }
+  function cadenceText(){
+    var l=(form.level.value);
+    return l==='1'?'Initial check-in within 3 days of referral (Level 1).':
+           l==='2'?'One in-person check-in per calendar month (Level 2).':
+           l==='3'?'Weekly in-person check-in (Level 3).':'Set the level on the previous step.';
+  }
+  function updateCadence(){document.getElementById('cadenceHint').textContent=cadenceText();}
+  function buildSummary(){
+    var c=[];
+    if(form.c_checkin.checked)c.push('Check-in ('+(form.level.value?('L'+form.level.value):'level TBD')+')');
+    if(form.c_drug.checked)c.push('Drug testing');
+    if(form.c_nocontact.checked)c.push('No-contact order');
+    if(form.c_curfew.checked)c.push('Curfew');
+    if(form.c_gps.checked)c.push('GPS ('+form.vendor.value+')');
+    document.getElementById('agreementSummary').textContent='Conditions: '+(c.join(' · ')||'none selected');
+  }
+  function buildReview(){
+    var rows=[['Name',form.defendant.value],['IDN',form.idn.value],['Case #',form.case.value],
+      ['Level',form.level.value?('Level '+form.level.value):'—'],
+      ['GPS',form.c_gps.checked?form.vendor.value:'No'],
+      ['Officer',form.officer.value||'—'],['Signed',form.signed.checked?'Yes':'No']];
+    document.getElementById('reviewBox').innerHTML='<h3 class="wh" style="margin-top:18px">Review</h3>'+
+      rows.map(function(r){return '<div class="rrow"><span class="muted">'+r[0]+'</span><b>'+(r[1]?String(r[1]).replace(/[<>&]/g,''):'—')+'</b></div>'}).join('');
+  }
+  next.addEventListener('click',function(){
+    if(done)return;
+    if(!validate(cur))return;
+    if(cur<last){show(cur+1);return;}
+    // final step → create a real native record via /admin/add_defendant
+    done=true;
+    var idn=form.idn.value.trim();
+    document.getElementById('h_case').value=form.case.value;
+    document.getElementById('h_level').value=form.level.value;
+    document.getElementById('h_officer').value=form.officer.value;
+    document.getElementById('h_referral').value=form.referral.value;
+    document.getElementById('h_charge').value=form.charge.value;
+    document.getElementById('h_bond').value=form.bond.value;
+    document.getElementById('h_dob').value=form.dob.value;
+    document.getElementById('h_gps').value=form.c_gps.checked ? 'true' : 'false';
+    document.getElementById('h_gpstype').value=form.c_gps.checked ? form.vendor.value : '';
+    document.getElementById('h_next').value='/console/clients/'+encodeURIComponent(idn);
+    try{localStorage.removeItem('ptc-intake-draft')}catch(e){}
+    form.submit(); // server creates the client, then lands on the new record with a flash toast
+  });
+  back.addEventListener('click',function(){if(cur>0)show(cur-1)});
+  chips.forEach(function(c,idx){c.addEventListener('click',function(){if(c.classList.contains('done'))show(idx)})});
+
+  document.getElementById('lvlSel').addEventListener('change',function(){updateCadence();document.getElementById('condCadence').textContent=cadenceText();});
+  document.getElementById('gpsToggle').addEventListener('change',function(){document.getElementById('vendorWrap').style.display=this.checked?'flex':'none';});
+
+  draft.addEventListener('click',function(){
+    try{
+      var d={};new FormData(form).forEach(function(v,k){d[k]=v});
+      localStorage.setItem('ptc-intake-draft',JSON.stringify(d));
+      ptToast('Draft saved','Your progress is saved in this browser.','info');
+    }catch(e){ptToast('Draft saved','(local only)','info');}
+  });
+  // restore draft if present
+  try{
+    var raw=localStorage.getItem('ptc-intake-draft');
+    if(raw){var d=JSON.parse(raw);Object.keys(d).forEach(function(k){if(form[k]!=null&&form[k].type!=='checkbox')try{form[k].value=d[k]}catch(e){}});}
+  }catch(e){}
+  show(0);
+});
+</script>
+{{template "c_bot" .}}

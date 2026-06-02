@@ -1,0 +1,62 @@
+{{template "c_top" .}}
+{{if .Client}}<a class="backlink" href="/console/clients/{{.Client.IDN}}">← {{.Client.Name}}'s record</a>{{end}}
+<div class="phead">
+  <div>
+    <h1>Calendar</h1>
+    <div class="sub">{{if .Roster}}Division-wide activity per day — team standup view{{else}}{{with .Client}}{{.Name}} · IDN {{.IDN}}{{end}}{{end}}</div>
+  </div>
+  <div class="right">
+    <a class="btn ghost sm" href="/console/calendar?month={{.PrevMonth}}{{if .Client}}&idn={{.Client.IDN}}{{end}}">‹ Prev</a>
+    <span class="asof" style="font-weight:600">{{.Title}}</span>
+    <a class="btn ghost sm" href="/console/calendar?month={{.NextMonth}}{{if .Client}}&idn={{.Client.IDN}}{{end}}">Next ›</a>
+    <button class="btn ghost sm" onclick="window.print()">Print</button>
+  </div>
+</div>
+
+{{if .Roster}}
+<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+  <div class="kpi ok"><div class="n">{{.RC.TotCheckIns}}</div><div class="l">Check-ins this month</div></div>
+  <div class="kpi"><div class="n">{{.RC.TotPayments}}</div><div class="l">Payments this month</div></div>
+  <div class="kpi warn"><div class="n">{{.RC.TotDue}}</div><div class="l">Check-ins due</div></div>
+  <div class="kpi risk"><div class="n">{{.RC.TotMissed}}</div><div class="l">Missed windows</div></div>
+</div>
+<div class="callegend">
+  <span><i style="background:var(--ok)"></i>Check-in</span>
+  <span><i style="background:var(--ok-ink)"></i>Payment</span>
+  <span><i style="background:var(--warn-ink)"></i>Due</span>
+  <span><i style="background:var(--risk)"></i>Missed</span>
+</div>
+<div class="cal">
+  <div class="cal-hd">Sun</div><div class="cal-hd">Mon</div><div class="cal-hd">Tue</div><div class="cal-hd">Wed</div><div class="cal-hd">Thu</div><div class="cal-hd">Fri</div><div class="cal-hd">Sat</div>
+  {{range .RC.Days}}
+    {{if eq .Day 0}}<div class="cal-d pad"></div>
+    {{else}}<div class="cal-d"><div class="cal-n">{{.Day}}</div>
+      {{if .CheckIns}}<span class="ev checkin">{{.CheckIns}} check-in{{if gt .CheckIns 1}}s{{end}}</span>{{end}}
+      {{if .Payments}}<span class="ev payment">{{.Payments}} payment{{if gt .Payments 1}}s{{end}}</span>{{end}}
+      {{if .Due}}<span class="ev due">{{.Due}} due</span>{{end}}
+      {{if .Missed}}<span class="ev missed">{{.Missed}} missed</span>{{end}}
+    </div>{{end}}
+  {{end}}
+</div>
+<p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">Open any client record and the calendar can be focused to that person's events. Click an event in the per-client view to jump to the record.</p>
+
+{{else}}
+<div class="callegend">
+  <span><i style="background:var(--info)"></i>Referral</span>
+  <span><i style="background:var(--ok)"></i>Check-in</span>
+  <span><i style="background:var(--ok-ink)"></i>Payment</span>
+  <span><i style="background:var(--warn)"></i>GPS</span>
+  <span><i style="background:var(--warn-ink)"></i>Due</span>
+  <span><i style="background:var(--risk)"></i>Missed</span>
+</div>
+<div class="cal">
+  <div class="cal-hd">Sun</div><div class="cal-hd">Mon</div><div class="cal-hd">Tue</div><div class="cal-hd">Wed</div><div class="cal-hd">Thu</div><div class="cal-hd">Fri</div><div class="cal-hd">Sat</div>
+  {{range .Days}}
+    {{if eq .Day 0}}<div class="cal-d pad"></div>
+    {{else}}<div class="cal-d"><div class="cal-n">{{.Day}}</div>
+      {{range .Events}}<span class="ev {{evclass .Kind}}" title="{{.Label}}">{{.Label}}</span>{{end}}
+    </div>{{end}}
+  {{end}}
+</div>
+{{end}}
+{{template "c_bot" .}}

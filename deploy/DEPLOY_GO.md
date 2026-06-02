@@ -18,8 +18,13 @@ or pip on the server. Cloudflare Tunnel, the Access policy, and the import timer
 
 ## 1. Build (Linux amd64, single binary)
 ```bash
-GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o server ./cmd/server
+# Prefer deploy/build-bundle.sh (stamps the version + tars everything). Manual:
+VERSION="$(git rev-parse --short HEAD)-$(date +%Y%m%d)"
+GOOS=linux GOARCH=amd64 go build -trimpath \
+  -ldflags="-s -w -X pretrial-knoxc/internal/build.Version=$VERSION" -o server ./cmd/server
 ```
+The version stamp is reported by `/health` (`"version"`) and the `ptr_build_info`
+metric, so you can confirm the right binary is live after a deploy.
 
 ## 2. Ship binary + templates/ + static/  (static/lookup/ carries the tracker bundle)
 ```bash

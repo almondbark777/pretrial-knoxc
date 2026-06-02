@@ -19,7 +19,13 @@ OUT="deploy/dist/ptr1-deploy.tar.gz"
 echo "== 1. cross-compile server (linux/amd64, CGO off) =="
 rm -rf "$STAGE" "$OUT"
 mkdir -p "$STAGE"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$STAGE/server" ./cmd/server
+# Stamp the build so /health and /metrics report exactly which binary is live.
+VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo nogit)-$(date +%Y%m%d)"
+[ -n "$(git status --porcelain 2>/dev/null)" ] && VERSION="${VERSION}-dirty"
+echo "  version: $VERSION"
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+  -ldflags="-s -w -X pretrial-knoxc/internal/build.Version=$VERSION" \
+  -o "$STAGE/server" ./cmd/server
 ls -la "$STAGE/server" | sed 's/^/  /'
 
 echo "== 2. stage templates/ + static/ =="

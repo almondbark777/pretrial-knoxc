@@ -11,7 +11,8 @@
   <span class="muted shell-sub">Client Tracker</span>
   <span class="grow"></span>
   <span class="muted">{{.User}}</span>
-  <a class="btn" href="/dashboard" title="Open the new admin &amp; data-entry app">Admin &amp; Data-Entry &rarr;</a>
+  <a class="btn" href="/console" title="Open the case management console">Open Console &rarr;</a>
+  <a class="pilllink" href="/dashboard" title="Classic admin &amp; data-entry view (legacy)">Classic view</a>
   <a href="#" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login');return false">Sign out</a>
 </header>
 <iframe class="shell-frame" src="/static/lookup/PTR_Client_Lookup.html" title="PTR Client Lookup"></iframe>

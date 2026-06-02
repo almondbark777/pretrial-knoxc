@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"pretrial-knoxc/internal/auth"
+	"pretrial-knoxc/internal/build"
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/models"
@@ -72,10 +73,10 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func (s *Server) Health(w http.ResponseWriter, r *http.Request) {
 	if err := s.DB.Ping(); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": err.Error()})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": err.Error(), "version": build.Version})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "db": "up"})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "db": "up", "version": build.Version})
 }
 
 // ── Auth pages ────────────────────────────────────────────────────────────────

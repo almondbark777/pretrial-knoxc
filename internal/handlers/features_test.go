@@ -140,6 +140,41 @@ func TestExportCSV(t *testing.T) {
 	}
 }
 
+// TestExportHonorsAsOf pins that the roster CSV exports compute against the
+// console's as-of date (ptc_asof cookie), not today — so a file downloaded from a
+// "historical view" matches the on-screen roster and is stamped with that date.
+func TestExportHonorsAsOf(t *testing.T) {
+	d := testDB(t)
+	srv := newServer(d)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	const asofStr = "2026-01-15"
+	asof, ok := compute.ParseDay(asofStr)
+	if !ok {
+		t.Fatalf("ParseDay(%q) failed", asofStr)
+	}
+	want := len(behindRoster(clients, asof))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/export/behind.csv", nil)
+	req.AddCookie(&http.Cookie{Name: "ptc_asof", Value: asofStr})
+	srv.ExportBehind(rec, req)
+
+	// Filename carries the as-of date — only possible if the handler used the cookie.
+	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, asofStr) {
+		t.Errorf("filename should carry as-of date %s, got %q", asofStr, cd)
+	}
+	recs, err := csv.NewReader(rec.Body).ReadAll()
+	if err != nil {
+		t.Fatalf("CSV parse: %v", err)
+	}
+	if got := len(recs) - 1; got != want {
+		t.Errorf("rows = %d, want %d (behind roster as of %s)", got, want, asofStr)
+	}
+}
+
 func headerWidth(recs [][]string) int {
 	if len(recs) == 0 {
 		return 0

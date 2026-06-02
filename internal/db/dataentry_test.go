@@ -66,8 +66,16 @@ func TestAddPaymentAndCheckInFlowIn(t *testing.T) {
 	if err := AddPayment(d, idn, "@1", "5/1/2026", "120", "SCRAM", "Officer X", "by"); err != nil {
 		t.Fatalf("AddPayment: %v", err)
 	}
-	if err := AddCheckIn(d, idn, "5/2/2026", "In Person", "by"); err != nil {
+	if err := AddCheckIn(d, idn, "5/2/2026", "In Person", "GPS fitment: strap sized, base unit issued", "by"); err != nil {
 		t.Fatalf("AddCheckIn: %v", err)
+	}
+	// The per-check-in note round-trips via ListAddedCheckIns.
+	added, err := ListAddedCheckIns(d, idn)
+	if err != nil || len(added) == 0 {
+		t.Fatalf("ListAddedCheckIns: %v (n=%d)", err, len(added))
+	}
+	if added[0].Note != "GPS fitment: strap sized, base unit issued" {
+		t.Errorf("check-in note not persisted, got %q", added[0].Note)
 	}
 
 	clients, err := BuildClients(d, time.Now())
@@ -129,7 +137,7 @@ func TestDataEntryWritesAudit(t *testing.T) {
 	idn := "999000444"
 	_ = AddDefendant(d, NewDefendant{IDN: idn, Name: "ZZAUD, ANN", Status: "Open"}, "auditor@knoxsheriff.org")
 	_ = AddPayment(d, idn, "", "5/1/2026", "50", "GPS", "", "auditor@knoxsheriff.org")
-	_ = AddCheckIn(d, idn, "5/2/2026", "Phone", "auditor@knoxsheriff.org")
+	_ = AddCheckIn(d, idn, "5/2/2026", "Phone", "", "auditor@knoxsheriff.org")
 	rows, err := ListAudit(d, idn, 50)
 	if err != nil {
 		t.Fatalf("ListAudit: %v", err)

@@ -92,16 +92,32 @@ func TestCheckIns_L2_Reasonover(t *testing.T) {
 	if len(r.Windows) != 5 {
 		t.Fatalf("L2 windows=%d want 5", len(r.Windows))
 	}
-	if len(r.Missed) != 3 {
-		t.Fatalf("L2 missed=%d want 3 (initial,Feb,Mar)", len(r.Missed))
+	// Both in-person AND phone are required. April has only an in-person visit, so
+	// it is NOT satisfied (the in-person half is met, the phone half is not).
+	if r.Windows[3].Satisfied || !r.Windows[3].SatisfiedInPerson || r.Windows[3].SatisfiedPhone {
+		t.Fatalf("Apr in-person-only: satisfied=%v ip=%v ph=%v want false/true/false",
+			r.Windows[3].Satisfied, r.Windows[3].SatisfiedInPerson, r.Windows[3].SatisfiedPhone)
 	}
-	if r.LastCheckIn == nil || !r.LastCheckIn.Equal(Noon(2026, 4, 7)) {
-		t.Fatalf("L2 lastCheckIn=%v want 2026-04-07", r.LastCheckIn)
+	// initial, Feb, Mar, Apr missed (Apr now missed for lack of a phone); May current.
+	if len(r.Missed) != 4 {
+		t.Fatalf("L2 missed=%d want 4 (initial,Feb,Mar,Apr)", len(r.Missed))
 	}
-	// April satisfied, May not missed (current month).
+	if r.LastInPerson == nil || !r.LastInPerson.Equal(Noon(2026, 4, 7)) || r.LastPhone != nil {
+		t.Fatalf("L2 lastInPerson=%v lastPhone=%v want 4/7 / nil", r.LastInPerson, r.LastPhone)
+	}
+
+	// Add a phone in April → both halves met → April satisfied, missed drops to 3.
+	c.addCI("4/8/2026", "Phone")
+	r = ComputeCheckIns(c, track)
 	if !r.Windows[3].Satisfied || r.Windows[4].Missed {
 		t.Fatalf("L2 Apr.satisfied=%v May.missed=%v want true/false",
 			r.Windows[3].Satisfied, r.Windows[4].Missed)
+	}
+	if len(r.Missed) != 3 {
+		t.Fatalf("L2 missed=%d want 3 (initial,Feb,Mar)", len(r.Missed))
+	}
+	if r.LastPhone == nil || !r.LastPhone.Equal(Noon(2026, 4, 8)) {
+		t.Fatalf("L2 lastPhone=%v want 4/8", r.LastPhone)
 	}
 }
 

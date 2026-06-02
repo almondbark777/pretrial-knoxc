@@ -1,0 +1,70 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Admin</h1>
+    <div class="sub">Roles, conditions library, reminder templates, and the corrections audit trail</div>
+  </div>
+  {{if not .IsSupervisor}}<div class="right"><span class="asof">read-only · supervisor sign-in required to change</span></div>{{end}}
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <div class="h"><h2>Users &amp; Roles</h2><span class="grow"></span><button class="btn ghost sm" onclick="openAction('soon','user management')">+ Add user</button></div>
+    <div class="pad">
+      <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Three roles gate capability (not pages), built as a config map so re-tuning who-can-do-what is a config change, not a refactor:</p>
+      <div class="condrow" style="border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;padding:11px 14px"><div class="grow"><div class="t">Officer</div><div class="m">Read everything; create notes, check-ins, court dates, violations, reminders.</div></div><span class="chip info">officer</span></div>
+      <div class="condrow" style="border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;padding:11px 14px"><div class="grow"><div class="t">Supervisor</div><div class="m">+ apply overrides/corrections, waive fees/conditions, reassign clients.</div></div><span class="chip warn">supervisor</span></div>
+      <div class="condrow" style="border:1px solid var(--line);border-radius:var(--r);padding:11px 14px"><div class="grow"><div class="t">Admin</div><div class="m">+ manage users, conditions library, reminder templates.</div></div><span class="chip risk">admin</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="h"><h2>Overridable Fields</h2></div>
+    <div class="pad">
+      <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Roster facts are corrected as <b>overrides</b> applied on read (never edits to <code>raw_*</code>), so a fix shows in both apps. Supervisor-only.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">{{range .Fields}}<span class="chip neutral">{{.Label}}</span>{{end}}</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:18px">
+  <div class="panel">
+    <div class="h"><h2>Conditions Library</h2><span class="grow"></span><button class="btn ghost sm" onclick="openAction('soon','the conditions library')">+ Condition</button></div>
+    <div class="pad">
+      <div class="condrow" style="padding:10px 0"><div class="grow"><div class="t">Initial check-in (3-day)</div><div class="m">L1 · within 3 days of referral</div></div><span class="chip ok">default</span></div>
+      <div class="condrow" style="padding:10px 0"><div class="grow"><div class="t">Monthly in-person check-in</div><div class="m">L2 · one per calendar month</div></div><span class="chip ok">default</span></div>
+      <div class="condrow" style="padding:10px 0"><div class="grow"><div class="t">Weekly in-person check-in</div><div class="m">L3 / GPS · one per week</div></div><span class="chip ok">default</span></div>
+      <div class="condrow" style="padding:10px 0;border-bottom:0"><div class="grow"><div class="t">GPS electronic monitoring</div><div class="m">Vendors: SCRAM $15/day · ALLIED $8/day · IC $0/day</div></div><span class="chip info">vendors</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="h"><h2>Reminder Templates</h2><span class="grow"></span><button class="btn ghost sm" onclick="openAction('soon','reminder templates')">+ Template</button></div>
+    <div class="pad">
+      <div class="note-hint" style="margin-bottom:12px">Reminders are <b>log-only in v1</b> — recorded and marked “logged (not sent).” A <code>channel</code> field is kept so SMS/email can be wired later with no UI change.</div>
+      <div class="condrow" style="padding:10px 0"><div class="grow"><div class="t">Court date reminder</div><div class="m">Channel SMS · 24h &amp; 48h before</div></div><span class="chip warn">log-only</span></div>
+      <div class="condrow" style="padding:10px 0;border-bottom:0"><div class="grow"><div class="t">Check-in reminder</div><div class="m">Channel SMS · morning of</div></div><span class="chip warn">log-only</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Recent Audit Trail</h2><span class="grow"></span><span class="count">{{len .Audit}}</span></div>
+  <div class="tscroll">
+    {{if .Audit}}<table class="data">
+      <thead><tr><th>When</th><th>User</th><th>Action</th><th>Table</th><th>Record</th><th>Change</th></tr></thead>
+      <tbody>{{range .Audit}}<tr style="cursor:default"><td>{{.Ts}}</td><td>{{.User}}</td><td><span class="chip neutral">{{.Action}}</span></td><td>{{.Table}}</td><td>{{.RowID}}</td><td class="muted">{{if .OldValue}}{{.OldValue}} → {{end}}{{.NewValue}}</td></tr>{{end}}</tbody>
+    </table>{{else}}<div class="emptybox"><div class="big">◯</div>No audit entries yet — every create / update / delete / override will appear here.</div>{{end}}
+  </div>
+</div>
+
+{{if .Tombstones}}
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Deleted (tombstoned) records</h2><span class="grow"></span><span class="count">{{len .Tombstones}}</span></div>
+  <div class="tscroll"><table class="data">
+    <thead><tr><th>IDN</th><th>Name</th><th>Case</th><th>Deleted by</th><th>When</th><th>Reason</th></tr></thead>
+    <tbody>{{range .Tombstones}}<tr style="cursor:default"><td>{{.IDN}}</td><td>{{.Name}}</td><td>{{if .CaseNumber}}{{.CaseNumber}}{{else}}(whole person){{end}}</td><td>{{.DeletedBy}}</td><td>{{.DeletedAt}}</td><td class="muted">{{.Reason}}</td></tr>{{end}}</tbody>
+  </table></div>
+</div>
+{{end}}
+{{template "c_bot" .}}

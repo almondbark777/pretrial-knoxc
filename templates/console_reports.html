@@ -1,0 +1,64 @@
+{{template "c_top" .}}
+{{$a := .A}}
+<div class="phead">
+  <div>
+    <h1>Reports</h1>
+    <div class="sub">Population, compliance, and fee summaries across the active caseload · as of {{.Today}} · go-live {{.Epoch}}</div>
+  </div>
+  <div class="right">
+    <button class="btn ghost sm" onclick="window.print()">Print / PDF</button>
+    <a class="btn ghost sm" href="/export/cases.csv">Export cases CSV ⤓</a>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="n">{{$a.Stats.Total}}</div><div class="l">Total clients</div></div>
+  <div class="kpi ok"><div class="n">{{$a.Stats.Open}}</div><div class="l">Open</div></div>
+  <div class="kpi"><div class="n">{{$a.Stats.GPSActive}}</div><div class="l">GPS active</div></div>
+  <div class="kpi risk"><div class="n">{{$a.Stats.BehindGPS}}</div><div class="l">Behind on GPS</div></div>
+  <div class="kpi warn"><div class="n">{{$a.Stats.MissedMonth}}</div><div class="l">Missed this month</div></div>
+</div>
+
+<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+  <div class="kpi ok"><div class="n">{{.CheckinComplianceRate}}</div><div class="l">Check-in compliance</div></div>
+  <div class="kpi ok"><div class="n">{{.GpsComplianceRate}}</div><div class="l">GPS coverage compliance</div></div>
+  <div class="kpi"><div class="n">{{.GpsCollectRate}}</div><div class="l">GPS fee collection</div></div>
+  <div class="kpi"><div class="n">{{.PtrCollectRate}}</div><div class="l">PTR fee collection</div></div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <div class="h"><h2>Population by Pretrial Level</h2></div>
+    <div class="pad">
+      {{range $a.ByLevel}}<div class="bar"><span class="lab">{{.Label}}</span><span class="track"><span class="fill" style="width:{{.Pct}}%"></span></span><span class="v">{{.Count}}</span></div>{{else}}<p class="muted" style="padding:0">No data.</p>{{end}}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="h"><h2>GPS Vendor Mix</h2></div>
+    <div class="pad">
+      {{range $a.ByVendor}}<div class="bar"><span class="lab">{{.Label}}</span><span class="track"><span class="fill" style="width:{{.Pct}}%"></span></span><span class="v">{{.Count}}</span></div>{{else}}<p class="muted" style="padding:0">No GPS clients.</p>{{end}}
+    </div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:18px">
+  <div class="panel">
+    <div class="h"><h2>Caseload by Officer</h2></div>
+    <div class="pad">
+      {{range $a.TopOfficers}}<div class="bar"><span class="lab wide">{{.Label}}</span><span class="track"><span class="fill" style="width:{{.Pct}}%"></span></span><span class="v">{{.Count}}</span></div>{{else}}<p class="muted" style="padding:0">No officers assigned.</p>{{end}}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="h"><h2>Fees Outstanding</h2></div>
+    <div class="pad">
+      <table class="kv">
+        <tr><td>PTR fees owed</td><td>{{moneyi $a.TotalPtrOwed}}</td></tr>
+        <tr><td>PTR fees paid</td><td>{{money $a.TotalPtrPaid}}</td></tr>
+        <tr><td>GPS fees owed</td><td>{{money $a.TotalGpsOwed}}</td></tr>
+        <tr><td>GPS fees paid</td><td>{{money $a.TotalGpsPaid}}</td></tr>
+      </table>
+      <p class="muted" style="padding:0;margin-top:12px;font-size:12px">Current balances over the active (open) roster — owed/paid are lifetime per client, not period-scoped (real outstanding money doesn't reset at go-live · {{.Epoch}}). The show-cause / past-due EM-fee letters live in the existing app's <a href="/reports/em-fees">EM Fees report</a>.</p>
+    </div>
+  </div>
+</div>
+{{template "c_bot" .}}

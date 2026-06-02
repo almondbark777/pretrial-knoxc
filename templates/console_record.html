@@ -1,0 +1,288 @@
+{{template "c_top" .}}
+{{if .NotFound}}
+  <a class="backlink" href="/console/clients">← Clients</a>
+  <div class="panel"><div class="emptybox"><div class="big">◯</div>No client found for IDN <b>{{.NotFound}}</b>.<div style="margin-top:10px"><a class="btn ghost" href="/console/clients">Back to client list</a></div></div></div>
+{{else}}
+{{$r := .R}}
+<a class="backlink" href="/console/clients">← Clients</a>
+
+<div class="rechead">
+  <span class="av">{{$r.Initials}}</span>
+  <div>
+    <h1>{{$r.Name}}</h1>
+    <div class="meta">Case {{$r.CaseNo}}{{if $r.DOB}} · DOB {{$r.DOB}}{{end}} · IDN {{$r.IDN}} · Officer: {{$r.Officer}}</div>
+    <div class="badges">
+      {{template "chip" $r.LevelChip}}
+      {{template "chip" $r.StatusChip}}
+      {{range $r.Badges}}{{template "chip" .}}{{end}}
+      {{if $r.Closed}}<span class="chip neutral">Closed {{$r.ClosedDate}}</span>{{end}}
+    </div>
+  </div>
+  <div class="acts">
+    <button class="btn ghost" onclick="cmOpen('noteModal')">+ Note</button>
+    <button class="btn ghost" onclick="cmOpen('checkinModal')">Log Check-in</button>
+    <button class="btn" onclick="cmOpen('reminderModal')">Send Reminder</button>
+    <div class="recmenu">
+      <button class="btn ghost" id="ovbtn" aria-label="More actions">⋯</button>
+      <div class="pop" id="ovpop">
+        <a href="/console/calendar?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">View calendar</a>
+        <button type="button" onclick="cmOpen('courtModal')">Add court date</button>
+        <button type="button" onclick="cmOpen('violationModal')">Record violation</button>
+        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Add tag</button>
+        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Pin client</button>
+        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Correct field (override)</button>
+        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Waive fee</button>
+        <button type="button" onclick="window.print()">Print case file</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="active" data-tab="t-summary">Case Summary</button>
+  <button data-tab="t-conditions">Conditions</button>
+  <button data-tab="t-checkins">Check-ins</button>
+  <button data-tab="t-court">Court</button>
+  <button data-tab="t-fees">Payments / Fees</button>
+  <button data-tab="t-docs">Documents</button>
+  <button data-tab="t-activity">Activity</button>
+</div>
+
+{{/* ── Case Summary ── */}}
+<div class="tabpane active" id="t-summary">
+  {{if $r.Missing}}<div class="banner"><span>⚠</span><div><b>Missing critical information.</b> The following field{{if gt (len $r.Missing) 1}}s are{{else}} is{{end}} blank and should be completed: {{range $i,$m := $r.Missing}}{{if $i}}, {{end}}{{$m}}{{end}}.</div></div>{{end}}
+  <div class="sgrid">
+    {{range $r.Summary}}
+    <div class="field"><div class="k">{{.K}}</div><div class="v{{if .Tone}} {{.Tone}}{{end}}">{{.V}}{{if .Missing}}<span class="missing">⚠ MISSING</span>{{end}}</div></div>
+    {{end}}
+  </div>
+  <div class="panel" style="margin-top:18px">
+    <div class="h"><h2>Notes</h2><span class="grow"></span>{{if $r.Notes}}<span class="count">{{len $r.Notes}}</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('noteModal')">+ Note</button></div>
+    <div class="body">
+      {{range $r.Notes}}<div class="frow"><span class="rail info">·</span><div class="grow"><div class="t" style="font-weight:500;white-space:normal">{{.Body}}</div><div class="m">{{officer .Author}} · {{shortdate .CreatedAt}}</div></div></div>{{else}}<div class="emptybox" style="padding:22px"><div class="big">·</div>No notes yet. Use <b>+ Note</b> to add the first one.</div>{{end}}
+    </div>
+  </div>
+</div>
+
+{{/* ── Conditions ── */}}
+<div class="tabpane" id="t-conditions">
+  <div class="tablewrap">
+    {{range $r.Conditions}}
+    <div class="condrow"><div class="grow"><div class="t">{{.Name}}</div><div class="m">{{.Detail}}</div></div>{{template "chip" .Chip}}</div>
+    {{else}}
+    <div class="emptybox"><div class="big">◯</div>No supervision conditions on record.</div>
+    {{end}}
+  </div>
+</div>
+
+{{/* ── Check-ins ── */}}
+<div class="tabpane" id="t-checkins">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
+  {{if $r.LoggedCheckIns}}
+  <div class="panel" style="margin-bottom:14px">
+    <div class="h"><h2>Logged check-ins</h2><span class="grow"></span><span class="count">{{len $r.LoggedCheckIns}}</span></div>
+    <div class="body">
+      {{range $r.LoggedCheckIns}}
+      <div class="frow"><span class="rail ok">✓</span><div class="grow">
+        <div class="t" style="font-weight:600">{{.Type}} · {{.Date}}</div>
+        {{if .Note}}<div class="x" style="white-space:normal">{{.Note}}</div>{{end}}
+        <div class="m">{{.Author}}</div>
+      </div></div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+  {{if $r.CheckIns}}
+  <div class="timeline">
+    {{range $r.CheckIns}}
+    <div class="tl"><div class="rail"><div class="dot {{.Tone}}">{{.Icon}}</div><div class="line"></div></div>
+      <div class="card"><div class="top"><span class="t">{{.Title}}</span><span class="d">{{.Date}}</span></div>{{if .Detail}}<div class="x">{{.Detail}}</div>{{end}}</div></div>
+    {{end}}
+  </div>
+  {{else}}<div class="panel"><div class="emptybox"><div class="big">◯</div>No check-ins recorded yet.{{if $r.CI.Error}}<div class="m" style="margin-top:6px">{{$r.CI.Error}} — windows can't be computed.</div>{{end}}</div></div>{{end}}
+</div>
+
+{{/* ── Court ── */}}
+<div class="tabpane" id="t-court">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="cmOpen('courtModal')">+ Add Court Date</button></div>
+  {{if $r.Court}}
+  <div class="tablewrap"><div class="tscroll"><table class="data">
+    <thead><tr><th>Event</th><th>Date</th><th>Outcome</th><th>Next date</th><th>Reminder</th><th></th></tr></thead>
+    <tbody>{{range $r.Court}}<tr style="cursor:default"><td>{{.Event}}</td><td>{{.Date}}</td><td>{{template "chip" .Outcome}}</td><td>{{if .NextDate}}{{.NextDate}}{{else}}—{{end}}</td><td>{{template "chip" .Reminder}}</td><td class="qc">{{if not .HasOutcome}}<button type="button" class="btn ghost sm" onclick="cmOutcome({{.ID}})">Log outcome</button>{{end}}</td></tr>{{end}}</tbody>
+  </table></div></div>
+  {{else}}<div class="panel"><div class="emptybox"><div class="big">▦</div>No court dates on record. Use <b>+ Add Court Date</b> to schedule one.</div></div>{{end}}
+</div>
+
+{{/* ── Payments / Fees ── */}}
+<div class="tabpane" id="t-fees">
+  <div class="feegrid">
+    <div class="panel">
+      <div class="h"><h2>PTR Supervision Fee</h2></div>
+      <div class="pad">
+        {{if $r.PTR.Applies}}
+        <table class="kv">
+          <tr><td>Months owed</td><td>{{len $r.PTR.MonthsOwed}}</td></tr>
+          <tr><td>Total owed</td><td>{{moneyi $r.PTR.TotalOwed}}</td></tr>
+          <tr><td>Total paid</td><td>{{money $r.PTR.TotalPaid}}</td></tr>
+          <tr><td>Balance</td><td class="{{if lt $r.PTR.Balance 0.0}}warn-t{{else}}ok-t{{end}}">{{money $r.PTR.Balance}}{{if lt $r.PTR.Balance 0.0}} (owes){{end}}</td></tr>
+        </table>
+        {{if $r.PTRMonths}}<details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Show {{len $r.PTRMonths}} month breakdown</summary>
+        <table class="kv" style="margin-top:8px">{{range $r.PTRMonths}}<tr><td>{{.Label}}</td><td>{{moneyi .Amount}}</td></tr>{{end}}</table></details>{{end}}
+        {{else}}<p class="muted" style="padding:0">PTR supervision fee does not apply to this client.</p>{{end}}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="h"><h2>GPS Electronic Monitoring</h2>{{if $r.GpsWaived}}<span class="grow"></span><span class="chip neutral">Fees waived</span>{{end}}</div>
+      <div class="pad">
+        {{if $r.GPS.Vendor}}
+        <table class="kv">
+          <tr><td>Vendor</td><td>{{$r.GPS.Vendor}}{{if $r.GPS.HasSwitch}} → {{$r.GPS.Vendor2}}{{end}}</td></tr>
+          <tr><td>Daily rate</td><td>{{if $r.GPS.DailyRate}}{{moneyi (derefi $r.GPS.DailyRate)}}/day{{else}}—{{end}}</td></tr>
+          <tr><td>Days active</td><td>{{intP $r.GPS.DaysActive}}</td></tr>
+          <tr><td>Total owed</td><td>{{moneyP $r.GPS.TotalOwedDollars}}</td></tr>
+          <tr><td>Total paid</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr>
+          {{if $r.GPS.Adj}}<tr><td>Day adjustment</td><td>{{$r.GPS.Adj}} days ({{money $r.GPS.AdjDollars}})</td></tr>{{end}}
+          <tr><td>{{if boolP $r.GPS.Covered}}Surplus{{else}}Behind{{end}}</td><td class="{{if boolP $r.GPS.Covered}}ok-t{{else}}risk-t{{end}}">{{moneyP $r.GPS.SurplusDollars}}{{if $r.GPS.SurplusDays}} · {{intP $r.GPS.SurplusDays}} days{{end}}</td></tr>
+        </table>
+        {{else if $r.GPS.TotalGpsPaid}}
+        <table class="kv"><tr><td>GPS payments on file</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr><tr><td>Vendor / rate</td><td class="warn-t">MISSING</td></tr></table>
+        {{else}}<p class="muted" style="padding:0">No GPS monitoring on this client.</p>{{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{/* ── Documents ── */}}
+<div class="tabpane" id="t-docs">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="openAction('soon','{{$r.Name}}')">+ Upload Document</button></div>
+  <div class="panel"><div class="emptybox"><div class="big">▤</div>No documents on file yet.<div class="m" style="margin-top:6px">Release agreements, orders, and assessments will appear here once uploaded.</div></div></div>
+</div>
+
+{{/* ── Activity ── */}}
+<div class="tabpane" id="t-activity">
+  {{if $r.Activity}}
+  <div class="timeline">
+    {{range $r.Activity}}
+    <div class="tl"><div class="rail"><div class="dot {{.Tone}}">{{.Icon}}</div><div class="line"></div></div>
+      <div class="card"><div class="top"><span class="t">{{.Title}}</span><span class="d">{{.Date}}</span></div>{{if .Detail}}<div class="x">{{.Detail}}</div>{{end}}</div></div>
+    {{end}}
+  </div>
+  {{else}}<div class="panel"><div class="emptybox"><div class="big">◯</div>No recorded activity yet.</div></div>{{end}}
+</div>
+
+{{/* ── REAL write modals (persist to extension tables via the CSRF-guarded
+      /admin/* endpoints, then redirect back here with a flash toast) ── */}}
+<div class="backdrop" id="noteModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/note/add">
+    <div class="mh"><h3>Add Note</h3><button type="button" class="x" onclick="cmClose('noteModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Note</label><textarea name="body" required placeholder="Type a note about {{$r.Name}}…"></textarea></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('noteModal')">Cancel</button><button type="submit" class="btn">Save note</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="checkinModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/checkin/add">
+    <div class="mh"><h3>Log Check-in</h3><button type="button" class="x" onclick="cmClose('checkinModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Type</label><select name="type_of_check_in"><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>
+      <div class="fld"><label>Date</label><input type="date" name="date" value="{{.AsOfInput}}" required></div>
+      <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, observations, etc.)</span></label><textarea name="note" placeholder="e.g. GPS fitment — strap sized, base unit #1234 issued"></textarea></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('checkinModal')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="reminderModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/reminder/add" onsubmit="this.body.value='['+this.channel.value+', logged not sent] '+this.body.value">
+    <div class="mh"><h3>Send Court Reminder</h3><button type="button" class="x" onclick="cmClose('reminderModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="note-hint">v1 is <b>log-only</b> — the reminder is recorded and marked “logged (not sent).” A provider (SMS/email) can be wired later with no UI change.</div>
+      <div class="fld"><label>Channel</label><select name="channel"><option>SMS</option><option>Email</option><option>Phone call</option></select></div>
+      <div class="fld"><label>Due date</label><input type="date" name="due_date" value="{{.AsOfInput}}"></div>
+      <div class="fld"><label>Message</label><textarea name="body" required>Reminder: you have a court date scheduled. Please contact your officer with any questions.</textarea></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('reminderModal')">Cancel</button><button type="submit" class="btn">Log reminder</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="courtModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/courtdate/add">
+    <div class="mh"><h3>Add Court Date</h3><button type="button" class="x" onclick="cmClose('courtModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Date</label><input type="date" name="court_date" value="{{.AsOfInput}}" required></div>
+      <div class="fld"><label>Court / location</label><input type="text" name="court" placeholder="Courtroom 3B"></div>
+      <div class="fld"><label>Notes</label><textarea name="notes" placeholder="Event type, etc."></textarea></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('courtModal')">Cancel</button><button type="submit" class="btn">Save court date</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="violationModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/violation/add">
+    <div class="mh"><h3>Record Violation</h3><button type="button" class="x" onclick="cmClose('violationModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Date</label><input type="date" name="violation_date" value="{{.AsOfInput}}" required></div>
+      <div class="fld"><label>Category</label><select name="category"><option>Missed check-in</option><option>Failed drug screen</option><option>Curfew violation</option><option>New arrest</option><option>Other</option></select></div>
+      <div class="fld"><label>Severity</label><select name="severity"><option>Low</option><option>Medium</option><option>High</option></select></div>
+      <div class="fld"><label>Description</label><textarea name="description"></textarea></div>
+      <div class="fld"><label>Action taken</label><input type="text" name="action_taken" placeholder="Voicemail left, warrant requested, …"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('violationModal')">Cancel</button><button type="submit" class="btn">Record violation</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="outcomeModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/courtdate/outcome">
+    <div class="mh"><h3>Log Court Outcome</h3><button type="button" class="x" onclick="cmClose('outcomeModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}"><input type="hidden" name="id" id="oc_id">
+      <div class="fld"><label>Outcome</label><select name="outcome"><option>Appeared — continued</option><option>Appeared — plea entered</option><option>Appeared — disposed</option><option>Failed to appear (FTA)</option><option>Reset / rescheduled</option></select></div>
+      <div class="fld"><label>Next date (if any)</label><input type="date" name="next_date"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('outcomeModal')">Cancel</button><button type="submit" class="btn">Log outcome</button></div>
+  </form>
+</div></div>
+
+<script>
+function cmOpen(id){var m=document.getElementById(id);m.classList.add('show');var f=m.querySelector('textarea,input:not([type=hidden]),select');if(f)setTimeout(function(){f.focus()},30);}
+function cmOutcome(id){document.getElementById('oc_id').value=id;cmOpen('outcomeModal');}
+function cmClose(id){document.getElementById(id).classList.remove('show');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('.backdrop[data-cm].show').forEach(function(m){m.classList.remove('show')});});
+document.querySelectorAll('.backdrop[data-cm]').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('show');});});
+</script>
+
+<style>
+.recmenu{position:relative}
+.recmenu .pop{position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);box-shadow:var(--shadow);min-width:190px;padding:6px;display:none;z-index:25}
+.recmenu .pop.show{display:block}
+.recmenu .pop button{display:block;width:100%;text-align:left;padding:9px 11px;border:0;background:none;color:var(--ink);font:inherit;font-size:13px;border-radius:var(--r-sm);cursor:pointer}
+.recmenu .pop button:hover{background:var(--panel-3)}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  // tabs
+  document.querySelectorAll('.tabs button').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('active')});
+      document.querySelectorAll('.tabpane').forEach(function(x){x.classList.remove('active')});
+      b.classList.add('active');
+      var p=document.getElementById(b.dataset.tab); if(p)p.classList.add('active');
+    });
+  });
+  // overflow menu
+  var ob=document.getElementById('ovbtn'),op=document.getElementById('ovpop');
+  if(ob){ob.addEventListener('click',function(e){e.stopPropagation();op.classList.toggle('show')});
+    document.addEventListener('click',function(){op.classList.remove('show')});
+    op.addEventListener('click',function(e){e.stopPropagation();op.classList.remove('show')});}
+});
+</script>
+{{end}}
+{{template "c_bot" .}}

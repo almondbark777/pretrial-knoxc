@@ -1,0 +1,90 @@
+{{template "c_top" .}}
+{{$d := .D}}
+<div class="phead">
+  <div>
+    <h1 id="ch1">Division Caseload</h1>
+    <div class="sub">{{$d.AsOf}} · {{$d.KPIs.ActiveClients}} active clients</div>
+  </div>
+  <div class="right">
+    <div class="seg" role="tablist" aria-label="Caseload scope">
+      <button class="segbtn active" data-scope="all">All</button>
+      <button class="segbtn" data-scope="mine">My caseload</button>
+    </div>
+    <span class="asof">{{if .IsToday}}as of today · EST{{else}}as of {{.Today}} · historical{{end}}</span>
+  </div>
+</div>
+
+<div class="kpis">
+  <a class="kpi" href="/console/clients?status=active"><div class="n">{{$d.KPIs.ActiveClients}}</div><div class="l">Active Clients</div></a>
+  <a class="kpi" href="/console/clients"><div class="n">{{$d.KPIs.DueToday}}</div><div class="l">Check-ins Due Today</div></a>
+  <a class="kpi" href="/console/calendar"><div class="n">{{$d.KPIs.CourtThisWeek}}</div><div class="l">Court Dates This Week</div></a>
+  <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OpenViolations}}</div><div class="l">Open Violations <span class="kpi-since">since {{.Epoch}}</span></div></a>
+  <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OverdueCheckIns}}</div><div class="l">Overdue Check-ins (mo.)</div></a>
+</div>
+<div class="epoch-note">Roster counts are current as of the selected date. Activity tallies (violations) count from go-live · <b>{{.Epoch}}</b>.</div>
+
+<div class="grid2">
+  <div class="panel">
+    <div class="h"><h2>Alerts Needing Attention</h2><span class="grow"></span><span class="count">{{len $d.Alerts}}</span></div>
+    <div class="body" id="alertfeed">
+      {{range $d.Alerts}}
+      <div class="frow" data-mine="{{.Mine}}">
+        <span class="rail {{.Chip.Tone}}">{{.Icon}}</span>
+        <div class="grow"><div class="t"><a href="/console/clients/{{.IDN}}">{{.Name}}</a></div><div class="m">{{.Context}}</div></div>
+        {{template "chip" .Chip}}
+      </div>
+      {{else}}
+      <div class="emptybox"><div class="big">✓</div>Nothing needs attention right now.</div>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="h"><h2>Today's Schedule</h2><span class="grow"></span><span class="count">{{len $d.Schedule}}</span></div>
+    <div class="body" id="schedfeed">
+      {{range $d.Schedule}}
+      <div class="frow" data-mine="{{.Mine}}">
+        <div class="grow"><div class="t">{{if .IDN}}<a href="/console/clients/{{.IDN}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}</div><div class="m">{{.Sub}}</div></div>
+        {{template "chip" .Chip}}
+      </div>
+      {{else}}
+      <div class="emptybox"><div class="big">◯</div>Nothing scheduled for today.</div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<style>
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:var(--r-sm);overflow:hidden;background:var(--panel)}
+.segbtn{background:none;border:0;padding:7px 13px;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.segbtn.active{background:var(--brand);color:#fff}
+body.scope-mine .frow[data-mine="false"]{display:none}
+.kpi-since{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-top:3px;letter-spacing:.02em;text-transform:none}
+.epoch-note{margin:10px 2px 0;font-size:12px;color:var(--muted)}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var name={{.UserName}};
+  function emptyNote(feedId, msg){
+    var feed=document.getElementById(feedId); if(!feed)return;
+    var note=feed.querySelector('.scope-empty');
+    var anyMine=feed.querySelector('.frow[data-mine="true"]');
+    if(!anyMine){
+      if(!note){note=document.createElement('div');note.className='emptybox scope-empty';note.innerHTML='<div class="big">◯</div>Nothing on your caseload here.';feed.appendChild(note);}
+      note.style.display='';
+    } else if(note){note.style.display='none';}
+  }
+  document.querySelectorAll('.segbtn').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.segbtn').forEach(function(x){x.classList.remove('active')});
+      b.classList.add('active');
+      var mine=b.dataset.scope==='mine';
+      document.body.classList.toggle('scope-mine',mine);
+      document.getElementById('ch1').textContent=mine?('My Caseload — '+(name||'me')):'Division Caseload';
+      if(mine){emptyNote('alertfeed');emptyNote('schedfeed');}
+      else{document.querySelectorAll('.scope-empty').forEach(function(n){n.style.display='none'});}
+    });
+  });
+});
+</script>
+{{template "c_bot" .}}
