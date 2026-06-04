@@ -86,7 +86,7 @@
 
     <h2>GPS{{if index .C.Overrides "gps_type"}} <span class="badge-risk">type override</span>{{end}}</h2>
     {{if .GPS.DailyRate}}
-      <p>{{.GPS.Vendor}} @ ${{derefi .GPS.DailyRate}}/day · {{derefi .GPS.DaysActive}} days ·
+      <p>{{.GPS.Vendor}} @ ${{derefi .GPS.DailyRate}}/day · {{derefi .GPS.DaysActive}} days active · {{days1 .GPS.DaysCovered}} days covered ·
          owed <strong>${{deref .GPS.TotalOwedDollars}}</strong> · paid ${{printf "%.2f" .GPS.TotalGpsPaid}}</p>
       <p>Surplus <strong class="{{if .GPS.Covered}}ok{{else}}risk{{end}}">${{deref .GPS.SurplusDollars}}</strong>
          ({{derefi .GPS.SurplusDays}} days){{if .GPS.HasSwitch}} · switched to {{.GPS.Vendor2}}{{end}}{{if .GPS.ReliefSwitch}} · GPS relieved{{end}}</p>

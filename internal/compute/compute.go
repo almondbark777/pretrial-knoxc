@@ -261,9 +261,11 @@ type GPSResult struct {
 	TotalOwedDollars *float64 `json:"totalOwedDollars"`
 	TotalGpsPaid     float64  `json:"totalGpsPaid"`
 	DaysActive       *int     `json:"daysActive"`
+	DaysCovered      *float64 `json:"daysCovered"`
 	Adj              float64  `json:"adj"`
 	AdjDollars       float64  `json:"adjDollars"`
 	SurplusDollars   *float64 `json:"surplusDollars"`
+	Surplus          *float64 `json:"surplus"`
 	SurplusDays      *int     `json:"surplusDays"`
 	Covered          *bool    `json:"covered"`
 }
@@ -690,10 +692,32 @@ func ComputeGPS(c Client, track time.Time, sessionAdj *float64, caseFilter strin
 		adjDollars = adj * float64(*adjRate)
 	}
 
+	// daysCovered: dollars-paid divided by the current rate, plus the day
+	// adjustment. Mirrors computeGPS' daysCovered (the "Days Covered" stat the
+	// offline client tracker shows). nil when there's no rate to divide by.
+	var daysCovered *float64
+	if adjRate != nil && *adjRate > 0 {
+		raw := totalGpsPaid / float64(*adjRate)
+		if raw < 0 {
+			raw = 0
+		}
+		v := raw + adj
+		daysCovered = &v
+	}
+
 	var surplusDollars *float64
 	if totalOwed != nil {
 		v := (totalGpsPaid + adjDollars) - *totalOwed
 		surplusDollars = &v
+	}
+
+	// surplus: the real-number day surplus/shortfall (surplusDollars converted to
+	// days at the current rate). The offline tracker shows ceil(surplus) with a
+	// one-decimal detail; surplusDays below is the rounded integer form.
+	var surplus *float64
+	if surplusDollars != nil && adjRate != nil && *adjRate > 0 {
+		v := *surplusDollars / float64(*adjRate)
+		surplus = &v
 	}
 
 	var surplusDays *int
@@ -717,8 +741,9 @@ func ComputeGPS(c Client, track time.Time, sessionAdj *float64, caseFilter strin
 		Vendor: vendor, DailyRate: dailyRate, Vendor2: vendor2, DailyRate2: dailyRate2,
 		HasSwitch: hasSwitch, ReliefSwitch: isReliefSwitch(c.GpSwitchedTo),
 		TotalOwedDollars: totalOwed, TotalGpsPaid: totalGpsPaid, DaysActive: daysActive,
-		Adj: adj, AdjDollars: adjDollars, SurplusDollars: surplusDollars,
-		SurplusDays: surplusDays, Covered: covered,
+		DaysCovered: daysCovered,
+		Adj:         adj, AdjDollars: adjDollars, SurplusDollars: surplusDollars,
+		Surplus: surplus, SurplusDays: surplusDays, Covered: covered,
 	}
 }
 

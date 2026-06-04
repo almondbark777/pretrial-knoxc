@@ -142,6 +142,7 @@
           <tr><td>Vendor</td><td>{{$r.GPS.Vendor}}{{if $r.GPS.HasSwitch}} → {{$r.GPS.Vendor2}}{{end}}</td></tr>
           <tr><td>Daily rate</td><td>{{if $r.GPS.DailyRate}}{{moneyi (derefi $r.GPS.DailyRate)}}/day{{else}}—{{end}}</td></tr>
           <tr><td>Days active</td><td>{{intP $r.GPS.DaysActive}}</td></tr>
+          <tr><td>Days covered</td><td>{{days1 $r.GPS.DaysCovered}}</td></tr>
           <tr><td>Total owed</td><td>{{moneyP $r.GPS.TotalOwedDollars}}</td></tr>
           <tr><td>Total paid</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr>
           {{if $r.GPS.Adj}}<tr><td>Day adjustment</td><td>{{$r.GPS.Adj}} days ({{money $r.GPS.AdjDollars}})</td></tr>{{end}}

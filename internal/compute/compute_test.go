@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -296,6 +297,64 @@ func TestGPS_SurplusPaidAhead(t *testing.T) {
 	// owed 31*15=465; paid 500 + adj 2*15=30 => surplus 65 => ceil(65/15)=5
 	if *g.SurplusDollars != 65 || *g.SurplusDays != 5 {
 		t.Fatalf("surplus$=%v days=%v want 65/5", g.SurplusDollars, g.SurplusDays)
+	}
+}
+
+// daysCovered = paid/rate + adj; surplus (real days) = surplusDollars/rate.
+// Mirrors the offline tracker's "Days Covered" stat and the ceil(surplus) hero.
+func TestGPS_DaysCoveredAndSurplus(t *testing.T) {
+	c := gpsClient("SCRAM", "1/1/2026")
+	c.DayAdj = 2
+	c.addPay("1/5/2026", 500, "GPS")
+	g := ComputeGPS(c, Noon(2026, 1, 31), nil, "")
+	// rate 15; daysCovered = 500/15 + 2 = 35.3333…
+	if g.DaysCovered == nil || math.Abs(*g.DaysCovered-(500.0/15.0+2)) > 1e-9 {
+		t.Fatalf("daysCovered=%v want %v", g.DaysCovered, 500.0/15.0+2)
+	}
+	// surplusDollars 65; surplus = 65/15 = 4.3333…; surplusDays = ceil = 5
+	if g.Surplus == nil || math.Abs(*g.Surplus-(65.0/15.0)) > 1e-9 {
+		t.Fatalf("surplus=%v want %v", g.Surplus, 65.0/15.0)
+	}
+	if g.SurplusDays == nil || *g.SurplusDays != 5 {
+		t.Fatalf("surplusDays=%v want 5", g.SurplusDays)
+	}
+}
+
+// daysCovered clamps the paid-side to >= 0 before adding the adjustment (the JS
+// Math.max(0, paid/rate)); with zero payments it's just the adjustment.
+func TestGPS_DaysCoveredFloorsPaidSide(t *testing.T) {
+	c := gpsClient("ALLIED", "1/1/2026") // rate 8, no payments
+	g := ComputeGPS(c, Noon(2026, 1, 31), nil, "")
+	if g.DaysCovered == nil || *g.DaysCovered != 0 {
+		t.Fatalf("daysCovered=%v want 0 (no payments, no adj)", g.DaysCovered)
+	}
+}
+
+// JSToFixed must match JavaScript Number.toFixed digit-for-digit (the offline
+// tracker renders Days Covered with .toFixed(1)). Expected values were read off
+// the actual JS engine. Note the half-away-from-zero rounding (381.25 -> 381.3,
+// not the 381.2 that Go's FormatFloat round-to-even would give) and the "-0.0".
+func TestJSToFixed(t *testing.T) {
+	cases := []struct {
+		x    float64
+		prec int
+		want string
+	}{
+		{3050.0 / 8.0, 1, "381.3"},
+		{381.25, 1, "381.3"},
+		{0.05, 1, "0.1"},
+		{2.5, 0, "3"},
+		{1.15, 1, "1.1"},
+		{0, 1, "0.0"},
+		{-1.25, 1, "-1.3"},
+		{381.2, 1, "381.2"},
+		{7140.0 / 15.0, 1, "476.0"},
+		{-0.04, 1, "-0.0"},
+	}
+	for _, c := range cases {
+		if got := JSToFixed(c.x, c.prec); got != c.want {
+			t.Errorf("JSToFixed(%v,%d)=%q want %q", c.x, c.prec, got, c.want)
+		}
 	}
 }
 

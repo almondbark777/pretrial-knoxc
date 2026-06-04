@@ -349,6 +349,15 @@ func tmplFuncs() template.FuncMap {
 			}
 			return strconv.Itoa(*p)
 		},
+		// days1 renders a *float64 day count to one decimal (e.g. GPS Days
+		// Covered), matching the offline tracker's daysCovered.toFixed(1)
+		// (JS rounds halves away from zero — see compute.JSToFixed).
+		"days1": func(p *float64) string {
+			if p == nil {
+				return "—"
+			}
+			return compute.JSToFixed(*p, 1)
+		},
 		"boolP": func(p *bool) bool { return p != nil && *p },
 		// evclass maps a calendar event Kind to its console .ev color class.
 		// officer renders an email as a display name; shortdate normalizes a

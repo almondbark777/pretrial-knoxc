@@ -1,10 +1,49 @@
 package compute
 
 import (
+	"math"
+	"math/big"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
 )
+
+// JSToFixed formats x with exactly prec decimal places, matching JavaScript's
+// Number.prototype.toFixed. The offline client tracker renders GPS "Days
+// Covered" with daysCovered.toFixed(1); Go's strconv.FormatFloat rounds halves
+// to even, while toFixed rounds halves away from zero (e.g. 3050/8 = 381.25
+// renders "381.3" in JS but "381.2" via FormatFloat). We round the float's
+// EXACT value (via big.Rat, the same value toFixed sees) half-away-from-zero so
+// the dashboard's day counts match the tracker to the digit.
+func JSToFixed(x float64, prec int) string {
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return strconv.FormatFloat(x, 'f', prec, 64)
+	}
+	neg := math.Signbit(x) && x != 0
+	r := new(big.Rat).SetFloat64(math.Abs(x)) // exact value of the double
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(prec)), nil)
+	r.Mul(r, new(big.Rat).SetInt(scale))
+	// Round half away from zero: floor(r + 1/2) (r is non-negative here).
+	r.Add(r, big.NewRat(1, 2))
+	n := new(big.Int).Quo(r.Num(), r.Denom()) // truncate toward zero == floor for r>=0
+	digits := n.String()
+	var out string
+	if prec == 0 {
+		out = digits
+	} else {
+		for len(digits) <= prec {
+			digits = "0" + digits
+		}
+		out = digits[:len(digits)-prec] + "." + digits[len(digits)-prec:]
+	}
+	if neg {
+		// Match toFixed's sign handling, including its "-0.0" for small
+		// negatives that round to zero.
+		out = "-" + out
+	}
+	return out
+}
 
 // FmtOfficer turns an officer email into a display name:
 // "Nicholas.Loveless@knoxsheriff.org" -> "Nicholas Loveless".
