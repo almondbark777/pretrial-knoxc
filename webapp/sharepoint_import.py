@@ -40,7 +40,7 @@ DATASETS = {
         "sp_item_id": ["ID"],
         "idn": ["field_1", "IDN"],
         "defendant": ["field_2", "Defendant"],
-        "warrant_case_num": ["CASE_x0023__x0023__x0023__x0023_", "Warrant/Case #", "warrant_case_num"],
+        "warrant_case_num": ["CASE_x0023__x0023__x0023__x0023_", "Warrant/Case #", "Case Number", "warrant_case_num"],
         "pretrial_level": ["field_3", "Pretrial Level"],
         "referral_date": ["field_4", "Referral Date"],
         "supervision_type": ["SupervisionType", "Supervision Type"],
