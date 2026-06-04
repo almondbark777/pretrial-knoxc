@@ -408,6 +408,17 @@ type ConsoleLoggedCI struct {
 	Author string
 }
 
+// ConsoleLoggedPayment is one app-entered payment shown on the record so an
+// officer can confirm (and remove) what they just recorded.
+type ConsoleLoggedPayment struct {
+	ID     int64
+	Date   string
+	Type   string
+	Amount string
+	Case   string
+	Author string
+}
+
 // ConsoleRecord is the full client-record view-model.
 type ConsoleRecord struct {
 	IDN        string
@@ -430,6 +441,7 @@ type ConsoleRecord struct {
 	CheckIns       []ConsoleTLItem
 	Court          []ConsoleCourtRow
 	LoggedCheckIns []ConsoleLoggedCI
+	LoggedPayments []ConsoleLoggedPayment
 	PTRMonths      []ConsolePTRMonth
 	PTR            compute.PTRResult
 	GPS            compute.GPSResult
@@ -584,6 +596,16 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 			ID: cd.ID, Event: orDash(cd.Court != "", cd.Court), Date: dateStr, Location: dash(cd.Court),
 			Notes: dash(cd.Notes), Outcome: outcome, HasOutcome: cd.Outcome != "", NextDate: nextDate,
 			Reminder: Chip{Tone: "warn", Icon: "◯", Label: "Logged (not sent)"},
+		})
+	}
+
+	// App-entered payments (newest first; ListAddedPayments is add_id DESC) so an
+	// officer can confirm/remove what they recorded. Imported payments stay in the
+	// fee totals above, not here.
+	for _, p := range extras.AddedPayments {
+		rec.LoggedPayments = append(rec.LoggedPayments, ConsoleLoggedPayment{
+			ID: p.ID, Date: shortStamp(p.PaymentDate), Type: dash(p.PaymentType),
+			Amount: p.PaymentAmount, Case: p.CaseNumber, Author: compute.FmtOfficer(p.Author),
 		})
 	}
 

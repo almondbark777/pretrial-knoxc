@@ -26,6 +26,7 @@
       <button class="btn ghost" id="ovbtn" aria-label="More actions">⋯</button>
       <div class="pop" id="ovpop">
         <a href="/console/calendar?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">View calendar</a>
+        <button type="button" onclick="cmOpen('paymentModal')">Record payment</button>
         <button type="button" onclick="cmOpen('courtModal')">Add court date</button>
         <button type="button" onclick="cmOpen('violationModal')">Record violation</button>
         <button type="button" onclick="openAction('soon','{{$r.Name}}')">Add tag</button>
@@ -115,6 +116,7 @@
 
 {{/* ── Payments / Fees ── */}}
 <div class="tabpane" id="t-fees">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="cmOpen('paymentModal')">+ Record Payment</button></div>
   <div class="feegrid">
     <div class="panel">
       <div class="h"><h2>PTR Supervision Fee</h2></div>
@@ -149,6 +151,24 @@
         <table class="kv"><tr><td>GPS payments on file</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr><tr><td>Vendor / rate</td><td class="warn-t">MISSING</td></tr></table>
         {{else}}<p class="muted" style="padding:0">No GPS monitoring on this client.</p>{{end}}
       </div>
+    </div>
+  </div>
+
+  {{/* App-entered payments (reflected in the fee totals above). */}}
+  <div class="panel" style="margin-top:16px">
+    <div class="h"><h2>Recorded payments</h2><span class="grow"></span>{{if $r.LoggedPayments}}<span class="count">{{len $r.LoggedPayments}}</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('paymentModal')">+ Record Payment</button></div>
+    <div class="pad">
+      {{if $r.LoggedPayments}}
+      <table class="kv"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Case</th><th>By</th><th></th></tr></thead><tbody>
+        {{range $r.LoggedPayments}}
+        <tr><td>{{.Date}}</td><td>{{.Type}}</td><td>{{.Amount}}</td><td>{{if .Case}}{{.Case}}{{else}}—{{end}}</td><td class="muted">{{.Author}}</td>
+          <td style="text-align:right"><form method="post" action="/admin/payment/delete" style="margin:0" onsubmit="return confirm('Remove this payment entry?');">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+            <button type="submit" class="btn ghost sm" aria-label="Remove payment">×</button></form></td></tr>
+        {{end}}
+      </tbody></table>
+      <p class="muted" style="margin:8px 0 0;font-size:12px">App-entered payments only — these feed the fee totals above. Imported payments are not listed here.</p>
+      {{else}}<p class="muted" style="padding:0">No app-entered payments yet. Imported payments are reflected in the fee totals above.</p>{{end}}
     </div>
   </div>
 </div>
@@ -194,6 +214,23 @@
       <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, observations, etc.)</span></label><textarea name="note" placeholder="e.g. GPS fitment — strap sized, base unit #1234 issued"></textarea></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('checkinModal')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="paymentModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/payment/add">
+    <div class="mh"><h3>Record Payment</h3><button type="button" class="x" onclick="cmClose('paymentModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Date</label><input type="date" name="payment_date" value="{{.AsOfInput}}" required></div>
+      <div class="fld"><label>Amount</label><input type="text" name="payment_amount" inputmode="decimal" placeholder="$ amount" required></div>
+      <div class="fld"><label>Type</label><select name="payment_type">
+        <option>GPS</option><option>Allied</option><option>SCRAM</option><option>SCRAM GPS</option><option>PTR Fee</option><option>Drug Screen</option><option>Other</option>
+      </select></div>
+      <div class="fld"><label>Case # <span class="muted" style="font-weight:400">(optional)</span></label><input type="text" name="case_number" placeholder="e.g. {{$r.CaseNo}}"></div>
+      <div class="note-hint">GPS / Allied / SCRAM credit GPS coverage; “PTR Fee” credits the PTR supervision balance. App-entered payments feed the fee totals — they never touch imported data.</div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('paymentModal')">Cancel</button><button type="submit" class="btn">Record payment</button></div>
   </form>
 </div></div>
 
