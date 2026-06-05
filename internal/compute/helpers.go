@@ -103,3 +103,18 @@ func StatsEpoch() time.Time { return Noon(2026, 6, 1) }
 // StatsEpochLabel is the human-readable go-live date shown next to epoch-scoped
 // stats so the reporting period is unambiguous.
 const StatsEpochLabel = "Jun 1, 2026"
+
+// CheckInDataFloor is the date the office began capturing check-ins digitally.
+// Defendants supervised since before this had no digital check-in trail (the
+// data starts ~early 2026), so judging them against the full referral-to-today
+// window would flood the missed-check-in reports with gaps that reflect ABSENT
+// DATA, not non-compliance. Two reporting-layer rules use this floor (the core
+// compute math is unchanged, so per-client profile detail still shows every
+// window): (1) aggregate "missed" counts/rosters ignore windows whose deadline
+// is before the floor; (2) a client with NO check-in records at all is not
+// flagged as missing. Mirrors the StatsEpoch pattern. Surfaced as the label.
+func CheckInDataFloor() time.Time { return Noon(2026, 3, 1) }
+
+// CheckInDataFloorLabel is the human-readable floor date for the UI, so officers
+// know missed-check-in tracking begins when digital records do.
+const CheckInDataFloorLabel = "Mar 1, 2026"

@@ -66,6 +66,37 @@ func caseOptions(cases []*compute.Client) []string {
 	return out
 }
 
+// hasCheckInRecord reports whether a client has at least one parseable check-in
+// on file. Clients with none have no digital history to judge, so the missed
+// reports skip them (see CheckInDataFloor) rather than flag absent data.
+func hasCheckInRecord(c *compute.Client) bool {
+	for _, ci := range c.CheckIns {
+		if ci.DOK {
+			return true
+		}
+	}
+	return false
+}
+
+// reportedMissed filters ComputeCheckIns' raw missed windows down to the ones the
+// office should act on: only windows whose deadline is on/after CheckInDataFloor,
+// and only for clients who actually have check-in records. This is a
+// reporting-layer filter — the underlying compute (and the per-client profile
+// view) still expose every window; only aggregate counts/rosters use this.
+func reportedMissed(c *compute.Client, ci compute.CheckInResult) []compute.Window {
+	if !hasCheckInRecord(c) {
+		return nil
+	}
+	floor := compute.CheckInDataFloor()
+	out := make([]compute.Window, 0, len(ci.Missed))
+	for _, w := range ci.Missed {
+		if !w.Deadline.Before(floor) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
 // behindRoster mirrors the HTML BehindRoster default view: one rep per IDN
 // (open-preferred among the IDN's GPS-active cases), GPS surplusDollars < 0, and
 // the rep is open (the component defaults to its 'open' filter). Sorted by name.
@@ -119,10 +150,21 @@ func missedCheckInsRoster(clients map[string][]*compute.Client, track time.Time)
 	monthStart := compute.Noon(track.Year(), track.Month(), 1)
 	monthEnd := monthStart.AddDate(0, 1, -1) // last day of the month, noon UTC
 	var rows []models.RosterRow
+	// The evaluated month predates digital check-in capture: nothing to report
+	// (won't happen at today's date, but keeps the data-floor rule explicit).
+	if monthEnd.Before(compute.CheckInDataFloor()) {
+		return rows
+	}
 	for _, cases := range clients {
 		c := openRep(cases)
 		if c == nil || !reOpen.MatchString(c.Status) {
 			continue // open cases only
+		}
+		// No digital check-in history at all -> we can't judge compliance, so don't
+		// flood the roster with defendants whose absence reflects missing data
+		// rather than a missed visit (see compute.CheckInDataFloor).
+		if !hasCheckInRecord(c) {
+			continue
 		}
 		lvl, _ := compute.ParseLevel(c.Level)
 		if lvl == 1 {
@@ -245,7 +287,7 @@ func defendantRows(clients map[string][]*compute.Client, track time.Time) []mode
 			IDN: idn, Name: c.Name, Level: lvl, Status: c.Status, Officer: c.Officer,
 			CaseNo: c.CaseNo, GpsActive: c.GpsActive, GpsVendor: gps.Vendor,
 			GpsSurplus: gps.SurplusDollars, BehindGPS: behind[idn],
-			PTRBalance: ptr.Balance, MissedCount: len(ci.Missed), MissedMonth: missed[idn],
+			PTRBalance: ptr.Balance, MissedCount: len(reportedMissed(c, ci)), MissedMonth: missed[idn],
 		})
 	}
 	sort.Slice(rows, func(i, j int) bool {
@@ -434,11 +476,13 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 	byDay := map[int]*models.RosterDay{}
 	rc := models.RosterCalendar{Title: first.Format("January 2006")}
 
+	floor := compute.CheckInDataFloor()
 	for _, cases := range clients {
 		c := openRep(cases)
 		if c == nil {
 			continue
 		}
+		hasRec := hasCheckInRecord(c) // gate "missed" marks the same way the rosters do
 		for _, ev := range compute.GetEventsForClient(*c, track) {
 			if ev.Date.Year() != year || ev.Date.Month() != month {
 				continue
@@ -457,6 +501,11 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 				rd.Payments++
 				rc.TotPayments++
 			case ev.Kind == "missed":
+				// Don't mark missed for clients with no digital check-in history,
+				// or for windows predating digital capture (CheckInDataFloor).
+				if !hasRec || ev.Date.Before(floor) {
+					continue
+				}
 				rd.Missed++
 				rc.TotMissed++
 			case ev.Kind == "due":

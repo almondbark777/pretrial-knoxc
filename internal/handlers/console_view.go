@@ -299,7 +299,7 @@ func consoleClientRows(clients map[string][]*compute.Client, track time.Time, co
 			Officer: dash(c.Officer), NextCourt: nextCourt, NextCourtSort: nextCourtSort,
 			NextCheckIn: nextCI, NextCheckInSort: nextCISort,
 			CheckInOverdue: overdue,
-			Compliance:     complianceChip(behind[idn], missed[idn], len(ci.Missed), true),
+			Compliance:     complianceChip(behind[idn], missed[idn], len(reportedMissed(c, ci)), true),
 			GpsActive:      c.GpsActive,
 		}
 		row.Search = strings.ToLower(c.Name + " " + idn + " " + c.CaseNo + " " + c.Officer)
