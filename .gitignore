@@ -70,3 +70,6 @@ deploy/dist/
 
 # PTR tracker bundle edit scratch (unpack/repack workspace)
 _tracker_work/
+
+# scratch commit-message file used by the local workflow
+COMMIT_MSG.txt
