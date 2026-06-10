@@ -5,9 +5,11 @@
 // colFind() expects, every value coerced to a string (mirrors PapaParse).
 //
 // It honors the SAME suppression + corrections as BuildClients: tombstoned idns
-// (and cases) are filtered, and supervisor overrides are spliced in — so a
-// deleted person disappears from the tracker too, and a corrected field shows
-// the corrected value there. (Phase 7 guarantee: gone/changed in EVERY view.)
+// (and cases) are filtered, supervisor overrides are spliced in, and app fee
+// waivers are appended to the GPS notes — so a deleted person disappears from
+// the tracker too, a corrected field shows the corrected value there, and the
+// tracker's own isFeesWaived lights up for an app-waived client. (Phase 7
+// guarantee: gone/changed in EVERY view.)
 package db
 
 import "database/sql"
@@ -56,6 +58,10 @@ func LookupDatasets(d *sql.DB) (map[string]any, error) {
 		return nil, err
 	}
 	overrides, err := loadOverrides(d)
+	if err != nil {
+		return nil, err
+	}
+	waivers, err := loadFeeWaivers(d)
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +118,25 @@ func LookupDatasets(d *sql.DB) (map[string]any, error) {
 		bb = append(bb, remap(r, bbHeaderMap))
 	}
 
+	// GPS: per-row suppression + app fee waivers appended to the notes (the
+	// bundled tracker derives waived status from this column), then remap.
+	gp := make([]map[string]string, 0, len(gpRaw))
+	for _, r := range gpRaw {
+		idn := norm(r["idn"])
+		if tomb.whole[idn] {
+			continue
+		}
+		if m := waivers[idn]; m != "" {
+			r["notes"] = appendGpNote(r["notes"], m)
+		}
+		gp = append(gp, remap(r, gpHeaderMap))
+	}
+
 	return map[string]any{
 		"bb": bb,
 		"ci": remapAll(ciRaw, ciHeaderMap, tomb),
 		"pm": remapAll(pmRaw, pmHeaderMap, tomb),
-		"gp": remapAll(gpRaw, gpHeaderMap, tomb),
+		"gp": gp,
 	}, nil
 }
 

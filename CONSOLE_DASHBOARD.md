@@ -66,7 +66,9 @@ tolerant `addColumnIfMissing` migration in `EnsureSchema`), shown as a ✓ chip.
 real native record** via `/admin/add_defendant` (Phase-10 path, writes `added_defendants`,
 merged into every view by IDN) and lands on the new record — verified live. The shared
 `safeNext` helper lets these endpoints redirect back to `/console/*` (open-redirect-guarded).
-Tag / Pin / Override / Waive remain demo-safe "coming soon" stubs this pass; the clients
+Tag / Pin / Override / Waive remain demo-safe "coming soon" stubs this pass
+*(all four have since shipped — Tag and Override were already real by 2026-06-09,
+Pin 2026-06-09, Waive 2026-06-10; only Upload Document is still a stub)*; the clients
 table also has a hover **"✓ Check-in"** quick-action that persists. The roster's
 **bulk-select** bar (appears on selection) offers **Export selected** (real — client-side
 CSV of the chosen rows) and **Check-in selected** (real — POSTs to `/admin/checkin/bulk`,
@@ -405,3 +407,49 @@ Continuing "keep improving":
 All live-verified in the preview (save → chip → re-apply 140/2158 filtered →
 delete; compliance + record render clean, no JS errors). Full `go test ./...`
 green, vet/gofmt clean.
+
+## Entry — 2026-06-10 — "Waive fee" is real (GPS fee waivers)
+
+Continuing the improvement rounds (Alex: pick something and improve it, again
+every 3 hours): the record's last actionable "coming soon" stub — **Waive
+fee** — is now a real, supervisor-gated action. (Upload Document is the only
+stub left; it needs file-storage decisions.)
+
+**Design: no second flag.** The vendor's GPS notes already carry historical
+waivers as free text, and every consumer derives waived status from
+`compute.IsFeesWaived(gp_notes)` (the v0.73 regex port). So an app waiver
+lives in a new `fee_waivers` extension table (migration 006 + ensureSchemaSQL;
+`UNIQUE(idn)`, reason / waived_by / created_at in ET) and is **spliced into
+gp_notes at the two read points** — `BuildClients` and the tracker feed
+`LookupDatasets` — as a marker the regex already matches:
+`GPS fees waived (app — Officer Name 2026-06-10): reason`. The record's
+Fees-waived chip, the payment-status "Waived" chip, the compliance roster's
+Waived flag, AND the bundled tracker's own isFeesWaived all light up through
+the existing single source of truth; zero compute changes. EM-fees untouched
+(record-for-record parity with the canonical skill is preserved).
+
+Surface: record ⋯ menu → "Waive GPS fees…" (modal, optional reason) when not
+waived, "Remove fee waiver" (named confirm) when app-waived — supervisor-only
+in the template AND server-enforced via `requireSupervisor` (a waiver is a
+money decision, same tier as field overrides). A waiver that exists only in
+the vendor's notes shows the chip but no Remove action (raw text the app
+can't clear — `HasFeeWaiver` distinguishes the two). `POST /admin/waiver` +
+`/admin/waiver/clear` (CSRF-guarded), audited `waiver_add`/`waiver_remove`,
+cache cleared on both. `fee_waivers` purged on whole-person delete
+(extensionTablesByIDN); re-granting upserts by idn; clearing a non-waiver is
+a quiet no-op (no audit litter on a double-submit).
+
+Files: `internal/db/waivers.go`, `internal/handlers/waivers.go`,
+`db/migrations/006_feewaivers_sqlite.sql`, splices in `internal/db/db.go` +
+`internal/db/lookup_data.go`, routes in `cmd/server/main.go`, menu + modal in
+`templates/console_record.html`, `AppWaiver` flag in ConsoleRecordPage.
+
+Tests: `TestFeeWaiverLifecycle` (grant → IsFeesWaived via the BuildClients
+splice → upsert keeps one row → clear → audit 2 adds / 1 remove),
+`TestFeeWaiverInLookupFeed` (gp feed Notes carries the marker),
+`TestFeeWaiversPurgedOnPersonDelete`, `TestFeeWaiverHandlers` (non-supervisor
+403 on both endpoints through the real middleware). Live-verified in the
+preview: waive → flash + chip + menu flips to Remove → `/api/lookup_data` gp
+Notes shows the marker → remove → chip/marker gone, menu back to Waive; audit
+shows exactly the test's 2 adds / 2 removes; no JS errors. `go build` /
+`go vet` / `gofmt` clean, full `go test ./...` green.

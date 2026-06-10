@@ -186,6 +186,7 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 	data["CSRF"] = s.Auth.CSRF(w, r)
 	data["OverridableFields"] = db.OverridableFields() // for the supervisor "Correct field" modal
 	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)
+	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn) // Waive-fees vs Remove-waiver on the ⋯ menu
 	s.renderConsole(w, "console_record.html", data)
 }
 

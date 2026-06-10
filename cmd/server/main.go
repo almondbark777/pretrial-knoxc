@@ -196,6 +196,8 @@ func main() {
 		ar.Get("/audit", srv.Audit)                      // audit-log viewer (supervisor)
 		ar.Post("/override", srv.SetOverride)            // set field override (supervisor)
 		ar.Post("/override/clear", srv.ClearOverride)    // clear override (supervisor)
+		ar.Post("/waiver", srv.SetFeeWaiver)             // grant GPS fee waiver (supervisor)
+		ar.Post("/waiver/clear", srv.ClearFeeWaiver)     // remove app fee waiver (supervisor)
 
 		// Data entry (any allowed officer): add a client, payments, check-ins.
 		// The classic add-client form is gone — the console intake wizard is the

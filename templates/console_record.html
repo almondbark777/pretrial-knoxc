@@ -38,9 +38,12 @@
           <button type="submit">{{if .Pinned}}Unpin client{{else}}Pin client{{end}}</button>
         </form>
         {{if .IsSupervisor}}<button type="button" onclick="cmOpen('overrideModal')">Correct field (override)</button>
+        {{if .AppWaiver}}<form method="post" action="/admin/waiver/clear" style="margin:0" onsubmit="return confirm('Remove the GPS fee waiver for {{$r.Name}}?')">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+          <button type="submit">Remove fee waiver</button>
+        </form>{{else}}<button type="button" onclick="cmOpen('waiverModal')">Waive GPS fees…</button>{{end}}
         <a href="/admin/audit?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">Audit history</a>
         <a href="/admin/delete?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--risk-ink);font-size:13px">Delete client…</a>{{end}}
-        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Waive fee</button>
         <button type="button" onclick="window.print()">Print case file</button>
       </div>
     </div>
@@ -353,6 +356,19 @@
       <div class="fld"><label>Corrected value <span class="muted" style="font-weight:400">(blank to clear)</span></label><input type="text" name="value" placeholder="New value"></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('overrideModal')">Cancel</button><button type="submit" class="btn">Apply override</button></div>
+  </form>
+</div></div>
+
+{{/* ── Waive GPS fees (supervisor only — server also enforces) ── */}}
+<div class="backdrop" id="waiverModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/waiver">
+    <div class="mh"><h3>Waive GPS Fees</h3><button type="button" class="x" onclick="cmClose('waiverModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">Marks {{$r.Name}}'s GPS fees waived. The waived flag shows on this record, the compliance rosters, and the client tracker; it survives the daily import and is audited &amp; reversible (⋯ → Remove fee waiver).</p>
+      <div class="fld"><label>Reason <span class="muted" style="font-weight:400">(optional, shows in the GPS notes)</span></label><input type="text" name="reason" placeholder="e.g. indigency — approved by Judge …"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('waiverModal')">Cancel</button><button type="submit" class="btn">Waive fees</button></div>
   </form>
 </div></div>
 {{end}}

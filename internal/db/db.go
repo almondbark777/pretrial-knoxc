@@ -168,6 +168,10 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 	if err != nil {
 		return nil, err
 	}
+	waivers, err := loadFeeWaivers(d)
+	if err != nil {
+		return nil, err
+	}
 
 	// GPS map: install-nonempty row wins per idn.
 	gpMap := map[string]map[string]string{}
@@ -265,6 +269,12 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 			c.GpSwitchedTo = norm(gpRec["switched_to"]) // "" if column absent
 			c.GpSwitchedDate = norm(gpRec["switched_gps_date"])
 			c.GpNotes = norm(gpRec["notes"])
+		}
+		// An app fee waiver lands in the GPS notes so the one true waiver check
+		// (compute.IsFeesWaived) sees it everywhere — record chip, roster Waived
+		// flag — with no second flag to keep in sync.
+		if m := waivers[idn]; m != "" {
+			c.GpNotes = appendGpNote(c.GpNotes, m)
 		}
 		if dt, ok := compute.ParseDay(norm(r["referral_date"])); ok {
 			c.RefD, c.RefOK = dt, true

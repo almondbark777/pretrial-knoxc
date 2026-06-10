@@ -209,6 +209,15 @@ CREATE TABLE IF NOT EXISTS saved_searches (
     created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_search_user ON saved_searches(user_id);
+
+CREATE TABLE IF NOT EXISTS fee_waivers (
+    waiver_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn         TEXT NOT NULL,
+    reason      TEXT NULL,
+    waived_by   TEXT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_waiver_idn UNIQUE(idn)
+);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to
@@ -451,7 +460,7 @@ func nz(s string) any {
 var extensionTablesByIDN = []string{
 	"defendant_notes", "defendant_tags", "court_dates", "violations",
 	"reminders", "overrides", "pinned_defendants", "defendant_documents",
-	"scheduled_check_ins", "drug_screens",
+	"scheduled_check_ins", "drug_screens", "fee_waivers",
 }
 
 // raw tables physically purged only on the IMPORTER_RETIRED path.

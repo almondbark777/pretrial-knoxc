@@ -158,6 +158,17 @@ console dashboard's "My caseload" scope toggle)*
       (`saved_searches` from migration 001, finally in use). "★ Save view" on
       `/console/clients`, one-click chips, owner-scoped delete, sanitized
       query params, audited. Tests: `TestSavedViews`, `TestSanitizeViewQuery`.
+- [x] "Waive GPS fees" on the record — **done 2026-06-10** (was the record's
+      last actionable "coming soon" stub): supervisor-granted fee waivers
+      (`fee_waivers` table, migration 006 + EnsureSchema self-provision),
+      spliced into `gp_notes` at both read points (BuildClients + the tracker
+      feed) so `compute.IsFeesWaived` stays the single source of truth — the
+      record chip, roster Waived flag, and the bundled tracker all light up
+      with zero compute changes. ⋯ menu Waive/Remove toggle (modal with
+      optional reason), audited `waiver_add`/`waiver_remove`, reversible,
+      purged on whole-person delete. Tests: `TestFeeWaiverLifecycle`,
+      `TestFeeWaiverInLookupFeed`, `TestFeeWaiversPurgedOnPersonDelete`,
+      `TestFeeWaiverHandlers`.
 - DB-backed allow-list (currently env/`ALLOWED_EMAILS` with a built-in fallback).
 
 ---
