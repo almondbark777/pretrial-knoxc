@@ -96,6 +96,10 @@ func TestConsoleRecordRowIDs(t *testing.T) {
 		AddedCheckIns: []models.AddedCheckIn{{ID: 41, Date: "2026-06-01", Type: "Phone"}},
 		CourtDates:    []models.CourtDate{{ID: 42, IDN: "1", CourtDate: "2026-06-20", Court: "Division I"}},
 		Notes:         []models.Note{{ID: 43, IDN: "1", Body: "note"}},
+		Violations: []models.Violation{{ID: 44, IDN: "1", ViolationDate: "2026-06-05",
+			Category: "Curfew violation", Severity: "High", Description: "home late"}},
+		Reminders: []models.Reminder{{ID: 45, IDN: "1", Body: "court reminder",
+			DueDate: "2026-06-19", CreatedAt: "2026-06-09"}},
 	}
 	rec := consoleRecord(c, []*compute.Client{c}, track,
 		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras)
@@ -108,5 +112,15 @@ func TestConsoleRecordRowIDs(t *testing.T) {
 	}
 	if len(rec.Notes) != 1 || rec.Notes[0].ID != 43 {
 		t.Errorf("Notes ID = %+v, want 43", rec.Notes)
+	}
+	if len(rec.Violations) != 1 || rec.Violations[0].ID != 44 {
+		t.Errorf("Violations ID = %+v, want 44", rec.Violations)
+	} else if rec.Violations[0].Severity.Tone != "risk" {
+		t.Errorf("High severity tone = %q, want risk", rec.Violations[0].Severity.Tone)
+	}
+	if len(rec.Reminders) != 1 || rec.Reminders[0].ID != 45 {
+		t.Errorf("Reminders ID = %+v, want 45", rec.Reminders)
+	} else if rec.Reminders[0].Due != "Jun 19, 2026" {
+		t.Errorf("Reminder Due = %q, want Jun 19, 2026", rec.Reminders[0].Due)
 	}
 }

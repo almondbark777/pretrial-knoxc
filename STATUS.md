@@ -1,6 +1,6 @@
 # Project status — Knox County Pre-Trial (Go app)
 
-> Last updated 2026-05-31. Single-glance "what's done, what's left."
+> Last updated 2026-06-10. Single-glance "what's done, what's left."
 > Deeper detail lives in `PTR_MASTER_OVERHAUL_BRIEF.md` (spec, parent folder), the
 > append-only `PHASE_*.md` paper trail, `README.md`, and `deploy/DEPLOY_GO.md`.
 
@@ -188,6 +188,25 @@ console dashboard's "My caseload" scope toggle)*
       purged on whole-person delete. Tests: `TestFeeWaiverLifecycle`,
       `TestFeeWaiverInLookupFeed`, `TestFeeWaiversPurgedOnPersonDelete`,
       `TestFeeWaiverHandlers`.
+- [x] Violations + reminders row UI on the record — **done 2026-06-10**: the
+      last two app-entered row types that rendered only in the Activity
+      timeline now have list panels with per-row × remove — Recorded
+      violations on the Conditions tab (severity-toned chips, description,
+      action taken) and Logged reminders on the Court tab. With this, every
+      app-entered row type (notes, check-ins, payments, court dates, drug
+      screens, tags, scheduled check-ins, violations, reminders) has a list +
+      remove control on the console record. `TestConsoleRecordRowIDs` extended
+      to pin both new row types' DB ids.
+- [x] "Check-in due" roster filter — **done 2026-06-10**: the dashboard's
+      Due-Today KPI used to land on the unfiltered roster; it now deep-links
+      to `/console/clients?status=active&due=today`. New "Check-in due"
+      filter (today / overdue) in the roster's client-side pipeline, URL-
+      seeded, saveable as a view (`sanitizeViewQuery` keeps `due`). Verified
+      live: KPI count == filtered row count under as-of time travel.
+- [x] README modernized — **done 2026-06-10**: the stale Azure-era sections
+      (Python run instructions, App Service deploy plan, pymssql quirks,
+      Azure security TODOs) replaced with the current Go repo layout, the
+      ptr1 deploy procedure, and the real security posture.
 - DB-backed allow-list (currently env/`ALLOWED_EMAILS` with a built-in fallback).
 
 ---

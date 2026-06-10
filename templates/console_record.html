@@ -91,6 +91,24 @@
     <div class="emptybox"><div class="big">◯</div>No supervision conditions on record.</div>
     {{end}}
   </div>
+  {{if $r.Violations}}
+  <div class="panel" style="margin-top:14px">
+    <div class="h"><h2>Recorded violations</h2><span class="grow"></span><span class="count">{{len $r.Violations}}</span><button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('violationModal')">+ Record violation</button></div>
+    <div class="body">
+      {{range $r.Violations}}
+      <div class="frow"><span class="rail {{.Severity.Tone}}">⚠</span><div class="grow">
+        <div class="t" style="font-weight:600">{{.Category}} · {{.Date}} {{template "chip" .Severity}}</div>
+        {{if .Description}}<div class="x" style="white-space:normal">{{.Description}}</div>{{end}}
+        <div class="m">{{if .ActionTaken}}Action: {{.ActionTaken}} · {{end}}{{.Author}}</div>
+      </div>
+      <form method="post" action="/admin/violation/delete" style="margin:0;align-self:center" onsubmit="return confirm('Delete this violation entry?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Delete violation entry">×</button>
+      </form></div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
 </div>
 
 {{/* ── Check-ins ── */}}
@@ -169,6 +187,23 @@
       </form></td></tr>{{end}}</tbody>
   </table></div></div>
   {{else}}<div class="panel"><div class="emptybox"><div class="big">▦</div>No court dates on record. Use <b>+ Add Court Date</b> to schedule one.</div></div>{{end}}
+  {{if $r.Reminders}}
+  <div class="panel" style="margin-top:14px">
+    <div class="h"><h2>Logged reminders</h2><span class="grow"></span><span class="count">{{len $r.Reminders}}</span><button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('reminderModal')">+ Log reminder</button></div>
+    <div class="body">
+      {{range $r.Reminders}}
+      <div class="frow"><span class="rail warn">◯</span><div class="grow">
+        <div class="t" style="font-weight:500;white-space:normal">{{.Body}}</div>
+        <div class="m">Logged {{.Logged}}{{if .Due}} · due {{.Due}}{{end}} · {{.Author}}</div>
+      </div>
+      <form method="post" action="/admin/reminder/delete" style="margin:0;align-self:center" onsubmit="return confirm('Delete this logged reminder?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Delete logged reminder">×</button>
+      </form></div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
 </div>
 
 {{/* ── Payments / Fees ── */}}

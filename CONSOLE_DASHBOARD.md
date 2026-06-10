@@ -249,6 +249,9 @@ Three asks from an officer using the system:
   which only shows the Behind/Missed rosters — there is no violations roster, so the target is
   misleading. Either build a small violations roster (filter the alert feed / a dedicated page)
   or repoint the card. Parked 2026-06-02 at Alex's request ("note it and we'll come back").
+  **RESOLVED 2026-06-09** — the compliance page gained a Violations roster (epoch-scoped,
+  CSV export, rows resolve to the client record) in the console-only commit; the KPI lands
+  on real rows now.
 
 ## Performance — server-side compute + compression (2026-06-02)
 
@@ -532,3 +535,44 @@ Still open from the round-2 notes: violations and reminders have delete
 endpoints but render only in the Activity timeline (no row UI) — exposing
 them would need a new list section, a different-sized change. README
 "Security TODOs" remains stale Azure-era text (doc-fix candidate).
+
+## Violations & reminders row UI + "Check-in due" filter + docs refresh (2026-06-10)
+
+"Get the website fully functional and easy to use" pass. Three changes, all
+live-verified in the preview, full `go test ./...` green.
+
+**1. The last two timeline-only row types got list panels with per-row remove.**
+Violations and reminders had audited delete endpoints (`/admin/violation/delete`,
+`/admin/reminder/delete`) but rendered only in the Activity timeline — the
+round-5 leftover. The record's Conditions tab now lists **Recorded violations**
+(severity chip via new `severityChip()` — High=risk / Medium=warn / Low=info,
+description, action taken, author, × confirm form) and the Court tab lists
+**Logged reminders** (body, logged/due dates, author, ×) right under the court
+dates they remind about. `ConsoleRecord` gained `Violations []ConsoleViolationRow`
+and `Reminders []ConsoleReminderRow`; `TestConsoleRecordRowIDs` extended to pin
+both new row types' DB ids (and the severity tone + due-date formatting).
+With this, EVERY app-entered row type on the record has list + remove UI.
+E2E: reminder add → panel renders → delete through the new × → panel and
+Activity entry both gone.
+
+**2. The Due-Today KPI now lands on the rows it counts.** It linked to the bare
+roster — useless at ~3,300 rows. New "Check-in due" filter (today / overdue) in
+the roster's client-side pipeline: `due=today` matches rows whose `cis`
+(next-check-in ISO sort key, same `NextDue.Deadline` source the KPI counts)
+equals the page's as-of date; `due=overdue` matches the existing `ov` flag.
+URL-seeded like every other filter, included in saved views (`sanitizeViewQuery`
+keeps `due` — test extended), KPI href → `/console/clients?status=active&due=today`.
+Parity proven live under as-of time travel (2026-03-15): KPI 7 == filtered
+roster "7 of 2158 shown", all rows "Mar 15 · Active"; overdue option matches
+the data's ov count; honest 0-row empty state at today on the stale fixture.
+
+**3. Docs.** README's dead Azure-era bottom half (Python venv instructions,
+App Service deploy plan, pymssql quirks, Azure security TODO checklist) replaced
+with the current repo layout, the ptr1 deploy procedure, and the real security
+posture; the routes paragraph now describes the console-only surface. STATUS.md
+header + nice-to-have list brought current (2026-06-10).
+
+The "Parked (revisit)" item above — the Open-Violations KPI pointing at a page
+with no violations roster — was already resolved when the compliance page
+gained its Violations panel (the console-only commit, 2026-06-09); noted here
+so nobody re-fixes it.

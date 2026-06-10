@@ -16,7 +16,7 @@
 
 <div class="kpis">
   <a class="kpi" href="/console/clients?status=active"><div class="n">{{$d.KPIs.ActiveClients}}</div><div class="l">Active Clients</div></a>
-  <a class="kpi" href="/console/clients"><div class="n">{{$d.KPIs.DueToday}}</div><div class="l">Check-ins Due Today</div></a>
+  <a class="kpi" href="/console/clients?status=active&due=today"><div class="n">{{$d.KPIs.DueToday}}</div><div class="l">Check-ins Due Today</div></a>
   <a class="kpi" href="/console/calendar"><div class="n">{{$d.KPIs.CourtThisWeek}}</div><div class="l">Court Dates This Week</div></a>
   <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OpenViolations}}</div><div class="l">Open Violations <span class="kpi-since">since {{.Epoch}}</span></div></a>
   <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OverdueCheckIns}}</div><div class="l">Overdue Check-ins (mo.)</div></a>

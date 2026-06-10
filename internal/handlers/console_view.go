@@ -443,6 +443,30 @@ type ConsoleDrugScreen struct {
 	Author     string
 }
 
+// ConsoleViolationRow is one recorded violation listed on the record's
+// Conditions tab. ID drives the per-row remove form (violations are app-entered
+// extension rows, so every one is removable by the officer who can record one).
+type ConsoleViolationRow struct {
+	ID          int64
+	Date        string
+	Category    string
+	Severity    Chip
+	Description string
+	ActionTaken string
+	Author      string
+}
+
+// ConsoleReminderRow is one logged court reminder on the record's Court tab
+// (v1 reminders are log-only — recorded, marked "not sent"). ID drives the
+// per-row remove form.
+type ConsoleReminderRow struct {
+	ID     int64
+	Logged string
+	Due    string // "" when no due date was set
+	Body   string
+	Author string
+}
+
 // ConsoleRecord is the full client-record view-model.
 type ConsoleRecord struct {
 	IDN        string
@@ -468,6 +492,8 @@ type ConsoleRecord struct {
 	Scheduled      []ConsoleSchedCI
 	LoggedPayments []ConsoleLoggedPayment
 	DrugScreens    []ConsoleDrugScreen
+	Violations     []ConsoleViolationRow
+	Reminders      []ConsoleReminderRow
 	PTRMonths      []ConsolePTRMonth
 	PTR            compute.PTRResult
 	GPS            compute.GPSResult
@@ -666,6 +692,31 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		})
 	}
 
+	// Recorded violations (newest first from ListViolations) — listed with a
+	// per-row remove on the Conditions tab; the Activity merge below shows the
+	// same rows in timeline form.
+	for _, v := range extras.Violations {
+		rec.Violations = append(rec.Violations, ConsoleViolationRow{
+			ID: v.ID, Date: shortStamp(v.ViolationDate), Category: dash(v.Category),
+			Severity: severityChip(v.Severity), Description: v.Description,
+			ActionTaken: v.ActionTaken, Author: compute.FmtOfficer(v.Officer),
+		})
+	}
+
+	// Logged reminders (ListReminders: incomplete first, then by due date) —
+	// listed with a per-row remove on the Court tab next to the court dates
+	// they're reminders for.
+	for _, rm := range extras.Reminders {
+		due := ""
+		if strings.TrimSpace(rm.DueDate) != "" {
+			due = shortStamp(rm.DueDate)
+		}
+		rec.Reminders = append(rec.Reminders, ConsoleReminderRow{
+			ID: rm.ID, Logged: shortStamp(rm.CreatedAt), Due: due,
+			Body: rm.Body, Author: compute.FmtOfficer(rm.CreatedBy),
+		})
+	}
+
 	// App-entered payments (newest first; ListAddedPayments is add_id DESC) so an
 	// officer can confirm/remove what they recorded. Imported payments stay in the
 	// fee totals above, not here.
@@ -823,6 +874,23 @@ func drugScreenChip(result string) Chip {
 		return Chip{Tone: "neutral", Label: "—"}
 	default:
 		return Chip{Tone: "neutral", Label: titleCase(result)}
+	}
+}
+
+// severityChip maps a violation severity onto the shared chip tones: High reads
+// as risk, Medium as warn, Low as info, anything else neutral.
+func severityChip(sev string) Chip {
+	switch strings.ToLower(strings.TrimSpace(sev)) {
+	case "high":
+		return Chip{Tone: "risk", Icon: "⚠", Label: "High"}
+	case "medium":
+		return Chip{Tone: "warn", Icon: "⚠", Label: "Medium"}
+	case "low":
+		return Chip{Tone: "info", Label: "Low"}
+	case "":
+		return Chip{Tone: "neutral", Label: "—"}
+	default:
+		return Chip{Tone: "neutral", Label: titleCase(sev)}
 	}
 }
 

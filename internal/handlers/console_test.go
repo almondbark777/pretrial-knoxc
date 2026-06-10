@@ -400,6 +400,9 @@ func TestSanitizeViewQuery(t *testing.T) {
 	if got := sanitizeViewQuery(""); got != "" {
 		t.Errorf("empty query = %q, want empty", got)
 	}
+	if got := sanitizeViewQuery("due=today&status=active"); got != "due=today&status=active" {
+		t.Errorf("due param dropped: %q (the Due-Today KPI deep-link must be saveable)", got)
+	}
 	if got := sanitizeViewQuery("q=O%27Brien"); got != "q=O%27Brien" {
 		t.Errorf("escaped value mangled: %q", got)
 	}

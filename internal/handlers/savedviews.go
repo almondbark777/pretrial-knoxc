@@ -15,7 +15,7 @@ import (
 
 // viewParams are the roster filter keys a saved view may carry — anything else
 // posted is dropped, so stored specs stay clean and safe to link.
-var viewParams = []string{"q", "status", "level", "officer", "comp", "gps"}
+var viewParams = []string{"q", "status", "level", "officer", "comp", "gps", "due"}
 
 // sanitizeViewQuery keeps only known filter params and re-encodes them
 // deterministically (url.Values.Encode sorts keys).

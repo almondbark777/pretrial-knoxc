@@ -111,6 +111,7 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	data["Fofficer"] = q.Get("officer")
 	data["Fcomp"] = q.Get("comp")
 	data["Fgps"] = q.Get("gps")
+	data["Fdue"] = q.Get("due")      // "today" / "overdue" — the Due-Today KPI deep-links with this set
 	data["CSRF"] = s.Auth.CSRF(w, r) // for the row quick-action (log check-in)
 	if views, _ := db.ListSavedViews(s.DB, auth.User(r), "/console/clients"); len(views) > 0 {
 		data["Views"] = viewChips(views)

@@ -9,8 +9,9 @@ delete bad data. Replaces a SharePoint + Excel workflow.
 > the office. This replaced the earlier Python/FastAPI + Azure SQL prototype (kept
 > below as history); the business math now runs **server-side** as the single
 > source of truth. The existing **client tracker stays the landing page** (`/`)
-> during the transition — the new admin/data-entry app is one button away at
-> `/dashboard`.
+> during the transition — the **Case Console** app is one button away at
+> `/console` (the classic `/dashboard` interface was removed 2026-06-09; its
+> old URLs redirect to console equivalents).
 
 ## The Go app
 
@@ -33,12 +34,16 @@ APP_BASE_DIR=. SQLITE_DB_PATH=db/kh222.db APP_PASSWORD=dev go run ./cmd/server
 - `models/` — plain data shapes. `templates/` + `static/` — server-rendered UI
   (no SPA, framework, or CDN).
 
-**Routes** — `/` (client-tracker shell), `/dashboard`, `/my_day.html`,
-`/pretrial_app.html` (cases), `/analytics.html`, `/calendar.html` (per-client +
-roster mode), `/client_profile.html`, `/export/{behind,missed,cases}.csv`,
-`/api/{lookup,clients,stats,defendants,lookup_data,refresh}`, the CSRF-guarded
-audited write side `/admin/{delete,restore,deleted,override,audit,…CRUD}`,
-`/login`, and `/health` (always auth-free).
+**Routes** — `/` (client-tracker shell) and the **Case Console**:
+`/console` (dashboard), `/console/clients` (+ `/new` intake wizard, `/{idn}`
+record), `/console/{calendar,compliance,reports,admin}`. Printable reports at
+`/reports` (Behind-on-GPS, Missed, EM-fees show-cause letters); CSV exports at
+`/export/{behind,missed,cases,violations}.csv`; JSON at
+`/api/{lookup,clients,stats,defendants,lookup_data,refresh}`; the CSRF-guarded
+audited write side `/admin/{delete,restore,deleted,override,audit,…CRUD}`;
+`/login`, `/metrics` (localhost-only), and `/health` (always auth-free).
+Classic URLs (`/dashboard`, `/client_profile.html`, `/calendar.html`,
+`/my_day.html`, …) 302 to their console equivalents.
 
 **Config** (env, or `webapp/.env`) — `APP_PASSWORD`, `APP_SESSION_SECRET`,
 `SQLITE_DB_PATH`, `ALLOWED_EMAILS`, `SUPERVISOR_EMAILS`, `IMPORTER_RETIRED`,
@@ -52,8 +57,56 @@ are supervisor-gated; every write is audited (viewable at `/admin/audit`).
 
 **Docs** — the spec is `PTR_MASTER_OVERHAUL_BRIEF.md` (parent folder); the
 `PHASE_*.md` files are the append-only paper trail (`PHASE_7` admin/data-entry,
-`PHASE_8` two-server HA plan); `deploy/DEPLOY_GO.md` + `deploy/smoke.sh` cover the
-cutover and post-deploy verification.
+`PHASE_8` two-server HA plan); `STATUS.md` is the single-glance state of the
+project; `CONSOLE_DASHBOARD.md` documents the console; `deploy/DEPLOY_GO.md` +
+`deploy/smoke.sh` cover the cutover and post-deploy verification.
+
+**Repo layout (current)**
+
+```
+pretrial-knoxc/
+├── cmd/server/            main: routes, middleware, graceful shutdown
+├── internal/              compute / db / handlers / auth / models / emfees / metrics / build
+├── templates/             server-rendered pages (console_*.html, reports, admin)
+├── static/                console.css + the bundled client tracker (lookup/)
+├── db/migrations/         001–006 extension-table migrations (also self-provisioned at startup)
+├── deploy/                build-bundle.sh, install-on-ptr1.sh, monitoring + backup units, docs
+├── tools/parity_ref.py    golden-value generator (Python port of the canonical JS)
+└── webapp/                legacy Python app — reference only, superseded
+```
+
+**Deploying to ptr1**
+
+```bash
+bash deploy/build-bundle.sh          # dev box: cross-compile + stage → deploy/dist/ptr1-deploy.tar.gz
+scp deploy/dist/ptr1-deploy.tar.gz alex@ptr1:~
+ssh alex@ptr1 'tar xzf ptr1-deploy.tar.gz && cd ptr1-deploy && ./install-on-ptr1.sh'
+curl -s https://ptr.<domain>/health  # check the stamped version took
+```
+
+The installer backs up the binary, unit, and DB before swapping, restarts
+`ptr-webapp`, and health-checks. Rollback = restore the saved unit + restart.
+Daily DB backups (`ptr-backup.timer` → `/mnt/backup/ptr`, 30-day retention,
+integrity-checked) and Netdata monitoring with ntfy phone alerts are already
+installed on the box — see `deploy/MONITORING.md` and `PHASE_5_BACKUP.md`.
+
+**Security posture (current)**
+
+- Two gates: Cloudflare Access (email allow-list + one-time code) in front of
+  an app login (allow-listed email + shared `APP_PASSWORD`, 12 h session).
+- Supervisor tier (`SUPERVISOR_EMAILS`) gates deletes, restores, overrides,
+  and fee waivers; every write is audited in ET (`/admin/audit`).
+- CSRF tokens on all `/admin/*` POSTs; security headers (nosniff,
+  `X-Frame-Options: SAMEORIGIN`, Referrer-Policy); `COOKIE_SECURE` in prod.
+- `/metrics` is localhost-only (Netdata scrapes it on-box); `/health` is the
+  only auth-free public route. No PII leaves the server.
+- Remaining hardening (tracked in `STATUS.md`): DB-backed allow-list instead
+  of env, real SSO if funding allows, two-server HA at production scale-up.
+
+**Data quirks to remember** (full list in `CLAUDE.md`) — mixed date formats in
+TEXT columns (one flexible parser); officer names are emails (one display
+helper); multi-case defendants comma-joined in the raw data; `order` is a
+reserved-word column in `raw_gps_48_hours`.
 
 ---
 
@@ -65,90 +118,17 @@ cutover and post-deploy verification.
 A FastAPI site backed by an Azure SQL database, gated behind a shared-password
 login for 22 allow-listed users.
 
-- ✅ **Database loaded** — 32K historical defendants + 3.3K active-roster with
-  full case/check-in/payment/GPS history on Azure SQL Database.
-- ✅ **App built** — 10 pages wired to live data (dashboard, case management,
-  client profile lookup, analytics, violations, 5 mockup tools).
-- ✅ **Auth** — HTTP Basic Auth middleware, 22-user allow-list, shared password.
-- ⏳ **Hosting** — ran locally only.
-- ⏳ **Real SSO** — Microsoft Entra; superseded by the Cloudflare Access gate.
+- **Database** — 32K historical defendants + 3.3K active-roster loaded to
+  Azure SQL; later mirrored to the SQLite file the Go app uses today.
+- **App** — FastAPI + Jinja2, 10 pages, HTTP Basic Auth, 22-user allow-list.
+- **Hosting** — ran locally only; the planned Azure App Service deployment was
+  dropped in favor of self-hosting on `ptr1` (no cloud services except the
+  Cloudflare tunnel). All Azure-era credentials and firewall rules were retired
+  with the prototype.
 
-## Repo layout
-
-```
-pretrial-knoxc/
-├── CLAUDE.md                        project memory for Claude Code
-├── README.md                        (you are here)
-├── .gitignore
-├── db/                              SQL schema + ETL scripts + built SQLite copy
-│   ├── schema_azure_sql.sql
-│   ├── load_azure.sql
-│   ├── build_db.py, export_azure.py
-│   ├── csv_clean/                   10 UTF-8 CSVs ready for BULK INSERT
-│   ├── kh222.db                     SQLite mirror for offline reference
-│   └── README.md                    schema + row counts + quirks
-└── webapp/
-    ├── app.py                       FastAPI routes + Basic Auth middleware
-    ├── queries.py                   all SQL queries + pymssql pool + TTL cache
-    ├── users.py                     22-user allow-list
-    ├── requirements.txt
-    ├── .env.example                 copy to .env, fill in secrets
-    ├── templates/                   10 HTML pages (5 Jinja-patched)
-    └── README.md                    app internals + API reference
-```
-
-## Running locally
-
-Requires Python 3.10+ and git on your PATH.
-
-```bash
-cd webapp
-python -m venv .venv
-# Windows:      .venv\Scripts\Activate.ps1
-# macOS/Linux:  source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env        # Windows: copy .env.example .env
-# edit .env, paste your DB_PASSWORD, optionally change APP_PASSWORD
-uvicorn app:app --reload --port 8000
-```
-
-Open http://localhost:8000 — browser prompts for:
-
-- **Username:** any email in `webapp/users.py` (case-insensitive)
-- **Password:** whatever `APP_PASSWORD` is set to (default `pretrialtestsite`)
-
-First request after idle will take ~15 s — the serverless DB cold-starts.
-
-## Making it live (without needing your laptop on)
-
-Push to GitHub, deploy to **Azure App Service Free F1** ($0/mo), wire up
-**GitHub Actions** for push-to-deploy. End state:
-
-- Public URL: `<app-name>.azurewebsites.net`
-- Users log in with their email + shared password from anywhere
-- `git push` to main → ~2 min later the site is updated
-- Works when your laptop is off, or you're on vacation
-
-Open Claude Code in this folder and it will walk you through it — see
-`CLAUDE.md` for the full project memory + deployment plan.
-
-## Known quirks
-
-- **pymssql.bulk_copy is broken on NVARCHAR** — stage into VARCHAR first,
-  then server-side `INSERT SELECT`. See `CLAUDE.md` → "Quirks."
-- **Azure SQL cold-start** — 15–30 s on first hit after auto-pause.
-- **Mixed date formats** — source data has ISO, US, and Excel dates jumbled
-  together. All date columns are `NVARCHAR(50)`. Use `TRY_CONVERT`.
-- **`order` is a reserved word** — bracketed `[order]` in the schema.
-
-## Security TODOs (before going wider)
-
-- [ ] Rotate the Azure SQL admin password.
-- [ ] Delete the wide-open `claude-sandbox` firewall rule in SQL Server → Networking.
-- [ ] Create an `app_reader` DB user with only `db_datareader` role; switch the app to use it.
-- [ ] Turn on Azure SQL auditing.
-- [ ] HTTPS-only (App Service → TLS settings → HTTPS only → on).
-- [ ] Swap shared-password auth for Microsoft Entra SSO when funding allows.
+The legacy code is still under `webapp/` for reference. It is not deployed,
+not maintained, and its Azure-specific quirks (pymssql NVARCHAR bulk-copy,
+serverless cold-starts, T-SQL `TRY_CONVERT`) no longer apply to the live system.
 
 ## License
 

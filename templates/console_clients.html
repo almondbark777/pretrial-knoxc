@@ -14,6 +14,7 @@
   <select id="f-officer"><option value="">All officers</option><option value="mine">My caseload</option></select>
   <select id="f-comp"><option value="">Compliance: any</option><option value="behind">Behind on GPS</option><option value="missed">Missed check-in</option><option value="ok">Compliant</option></select>
   <select id="f-gps"><option value="">GPS: any</option><option value="1">GPS active</option><option value="0">No GPS</option></select>
+  <select id="f-due"><option value="">Check-in due: any</option><option value="today">Due today</option><option value="overdue">Overdue</option></select>
   <span class="count" id="f-count"></span>
   <span style="flex:1"></span>
   <button type="button" class="btn ghost" id="saveViewBtn" title="Save the current filter combination as a named one-click view">★ Save view</button>
@@ -135,8 +136,9 @@ html[data-theme="dark"] .viewchip a{color:var(--accent-ink)}
    keeps the node count flat (~50 rows) regardless of caseload size, so the page
    stays responsive on low-end office hardware. */
 const ROWS = {{.RowsJSON}};
-const F = {q:{{.Fq}},status:{{.Fstatus}},level:{{.Flevel}},officer:{{.Fofficer}},comp:{{.Fcomp}},gps:{{.Fgps}}};
+const F = {q:{{.Fq}},status:{{.Fstatus}},level:{{.Flevel}},officer:{{.Fofficer}},comp:{{.Fcomp}},gps:{{.Fgps}},due:{{.Fdue}}};
 const USERNAME = ({{.UserName}}||'').toLowerCase();
+const ASOF = {{.AsOfInput}}; // ISO as-of date — "Due today" compares the cis sort key to this
 
 function qcheck(idn,name){
   document.getElementById('qcIdn').value=idn;
@@ -155,7 +157,7 @@ document.addEventListener('DOMContentLoaded',function(){
   var fName=document.getElementById('f-name'),fStatus=document.getElementById('f-status'),
       fLevel=document.getElementById('f-level'),fOff=document.getElementById('f-officer'),
       fComp=document.getElementById('f-comp'),fGps=document.getElementById('f-gps'),
-      count=document.getElementById('f-count');
+      fDue=document.getElementById('f-due'),count=document.getElementById('f-count');
   var pgPrev=document.getElementById('pgPrev'),pgNext=document.getElementById('pgNext'),
       pgInfo=document.getElementById('pgInfo'),pager=document.getElementById('pager');
   var cbAll=document.getElementById('cb-all'),bulkbar=document.getElementById('bulkbar'),
@@ -198,7 +200,7 @@ document.addEventListener('DOMContentLoaded',function(){
   /* ── filter + sort (operate on the data, not the DOM) ────────────────────── */
   function reflow(){
     var q=fName.value.trim().toLowerCase(), st=fStatus.value, lv=fLevel.value,
-        cmp=fComp.value, gps=fGps.value, mine=fOff.value==='mine';
+        cmp=fComp.value, gps=fGps.value, mine=fOff.value==='mine', due=fDue.value;
     view=ROWS.filter(function(r){
       if(q && r.s.indexOf(q)<0)return false;
       if(st && statusKey(r.st)!==st)return false;
@@ -206,6 +208,8 @@ document.addEventListener('DOMContentLoaded',function(){
       if(cmp && compKey(r.cm)!==cmp)return false;
       if(gps!=='' && (r.g?'1':'0')!==gps)return false;
       if(mine && (r.o||'').toLowerCase()!==USERNAME)return false;
+      if(due==='today' && r.cis!==ASOF)return false; // next check-in deadline is the as-of day
+      if(due==='overdue' && !r.ov)return false;
       return true;
     });
     applySort(); page=0; renderPage();
@@ -290,8 +294,8 @@ document.addEventListener('DOMContentLoaded',function(){
 
   /* ── filters ─────────────────────────────────────────────────────────────── */
   function filterReflow(){sel.clear();reflow();} // changing a filter clears selection
-  [fName,fStatus,fLevel,fOff,fComp,fGps].forEach(function(el){el.addEventListener('input',filterReflow)});
-  function clearAll(){fName.value='';fStatus.value='';fLevel.value='';fOff.value='';fComp.value='';fGps.value='';filterReflow();}
+  [fName,fStatus,fLevel,fOff,fComp,fGps,fDue].forEach(function(el){el.addEventListener('input',filterReflow)});
+  function clearAll(){fName.value='';fStatus.value='';fLevel.value='';fOff.value='';fComp.value='';fGps.value='';fDue.value='';filterReflow();}
 
   /* ── header select-all + bulk actions ────────────────────────────────────── */
   cbAll.addEventListener('change',function(){
@@ -381,6 +385,7 @@ document.addEventListener('DOMContentLoaded',function(){
       }
       add('q',fName,'Search'); add('status',fStatus,'Status'); add('level',fLevel,'Level');
       add('officer',fOff,'Officer'); add('comp',fComp,'Compliance'); add('gps',fGps,'GPS');
+      add('due',fDue,'Due');
       document.getElementById('svQuery').value=parts.join('&');
       document.getElementById('svSummary').textContent=labels.length?('Saves: '+labels.join(' · ')):'No filters set — this saves an “all clients” view.';
       svModal.classList.add('show');
@@ -396,6 +401,7 @@ document.addEventListener('DOMContentLoaded',function(){
   if(F.officer)fOff.value=F.officer;
   if(F.comp)fComp.value=F.comp;
   if(F.gps)fGps.value=F.gps;
+  if(F.due)fDue.value=F.due;
   reflow();
 });
 </script>
