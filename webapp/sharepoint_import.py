@@ -306,6 +306,15 @@ def main():
             conn.execute("BEGIN")
             for ds in ("bluebook", "checkins", "payments", "gps"):
                 log(import_dataset(conn, ds, csvs[ds], args.dry_run, mode))
+            # Freshness stamp, committed atomically with the data: the webapp's
+            # console footer shows "Data refreshed <time>" from this row and
+            # warns when it goes stale (i.e. this import silently stopped).
+            conn.execute("CREATE TABLE IF NOT EXISTS import_meta (key TEXT PRIMARY KEY, value TEXT)")
+            now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            for k, v in (("last_import", now_utc), ("last_import_mode", mode)):
+                conn.execute(
+                    "INSERT INTO import_meta(key, value) VALUES(?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (k, v))
             if args.dry_run:
                 conn.execute("ROLLBACK"); log("dry-run: rolled back, no changes written")
             else:

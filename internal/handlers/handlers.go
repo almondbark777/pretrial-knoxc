@@ -157,12 +157,23 @@ func (s *Server) APILookup(w http.ResponseWriter, r *http.Request) {
 	hits := []models.SearchHit{}
 	if len(q) >= 2 {
 		ql := strings.ToLower(q)
+		// Case-number match scans every case the person has, not just the
+		// representative one — officers often start from court paperwork that
+		// names one specific case ("@1606962" or just "1606962").
+		caseHit := func(cases []*compute.Client) bool {
+			for _, cc := range cases {
+				if cc.CaseNo != "" && strings.Contains(strings.ToLower(cc.CaseNo), ql) {
+					return true
+				}
+			}
+			return false
+		}
 		for _, cases := range clients { // one hit per IDN (rep = open-preferred)
 			c := openRep(cases)
 			if c == nil {
 				continue
 			}
-			if strings.Contains(strings.ToLower(c.Name), ql) || strings.HasPrefix(c.IDN, q) {
+			if strings.Contains(strings.ToLower(c.Name), ql) || strings.HasPrefix(c.IDN, q) || caseHit(cases) {
 				lvl, _ := compute.ParseLevel(c.Level)
 				hits = append(hits, models.SearchHit{
 					IDN: c.IDN, Name: c.Name, Status: c.Status, Level: lvl,

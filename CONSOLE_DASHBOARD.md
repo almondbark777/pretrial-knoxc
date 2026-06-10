@@ -616,3 +616,37 @@ Preview-cookie gotcha recorded: `ptc_asof` set during as-of testing persists
 per-host in the preview browser (localhost vs 127.0.0.1 are different cookie
 jars) — clear it (or check `document.cookie`) before trusting dashboard
 numbers in a later session.
+
+## Additions round: case-number search, Help page, data-freshness (2026-06-10)
+
+Alex: "anything else you can think of adding." Three additions, each closing a
+verified gap; all live-tested, full suite green.
+
+1. **Case-number search.** `/api/lookup` matched name + IDN-prefix only —
+   officers start from court paperwork that names a case. The handler now also
+   scans EVERY case the person has (`caseHit` over the IDN's case list, plain
+   Contains so "@1624082" and "1624082" both work). Search placeholder →
+   "Search by name, IDN, or case #…"; result rows now show the case number so
+   a case search visibly confirms its match. Test `TestAPILookupByCaseNumber`
+   (both @-prefixed and bare queries against a fixture case).
+2. **`/console/help` quick-reference.** The office is migrating off
+   SharePoint+Excel and nothing in-app explained the system. Static template
+   (`console_help.html`, handler `ConsoleHelp`, sidebar "?" nav entry, link
+   from the `?` shortcut overlay): the daily routine (KPI cards), finding a
+   client, **check-in rules incl. the both-types rule** (L1 initial-3-day /
+   L2 monthly / L3+GPS weekly; in-person AND phone each cadence), chip legend
+   (Behind/Missed/Past-missed/Compliant/No-referral/waived), fees table (PTR
+   $20/mo; SCRAM $15/ALLIED $8/IC $0 per day), officer-vs-supervisor
+   capabilities, where the numbers come from (import + app-entered merge,
+   as-of control), keyboard shortcuts. Print-friendly.
+3. **Data-freshness indicator.** The daily import had no in-app heartbeat — if
+   it silently broke, officers worked stale numbers unknowingly.
+   `sharepoint_import.py` now stamps an `import_meta` table (last_import UTC +
+   mode) **inside the same transaction** as the data (dry-run rollback covers
+   it). New `db.LastImport` reads it tolerantly (absent table/row/junk = no
+   display — the offline fixture and pre-rollout ptr1 DB just don't show it);
+   `consoleBase` formats it via new `compute.InET` into the sidebar foot:
+   "Data refreshed Jun 10, 9:28 AM ET", with an amber ⚠ when >26h old.
+   Tests `TestLastImport` (tolerance ladder) + live-verified fresh and stale
+   stamps. NOTE: the indicator appears on ptr1 only after BOTH the next deploy
+   AND the next import run; absence is normal until then.

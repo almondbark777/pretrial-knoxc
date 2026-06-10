@@ -1,0 +1,110 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Help &amp; Quick Reference</h1>
+    <div class="sub">How the console fits the day-to-day job — finding people, logging contacts, and reading the chips</div>
+  </div>
+  <div class="right"><button class="btn ghost sm" onclick="window.print()">Print</button></div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <div class="h"><h2>The daily routine</h2></div>
+    <div class="pad">
+      <p class="muted" style="padding:0;margin:0 0 10px;font-size:13px">Start on the <a href="/console">Dashboard</a>. The five cards answer the morning questions — click any card to land on exactly those clients:</p>
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Check-ins Due Today</div><div class="m">Whose required check-in window closes today. Work this list first.</div></div></div>
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Court Dates This Week</div><div class="m">Appearances in the next 7 days (from court dates logged in the app).</div></div></div>
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Open Violations / Missed Check-ins</div><div class="m">The standing problem lists — both live in <a href="/console/compliance">Compliance</a>.</div></div></div>
+      <div class="condrow" style="padding:9px 0;border-bottom:0"><div class="grow"><div class="t">My caseload toggle</div><div class="m">Flips the dashboard between the whole division and just the clients you supervise. Pin frequent clients (⋯ menu on their record) to keep them one click away.</div></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="h"><h2>Finding a client</h2></div>
+    <div class="pad">
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Search box (press <kbd>/</kbd>)</div><div class="m">Matches name, IDN, or case number — paste a case # straight off court paperwork.</div></div></div>
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t"><a href="/console/clients">Clients</a> filters</div><div class="m">Narrow by status, level, officer, compliance, GPS, or check-in due. Filters live in the page address — bookmark or share any combination.</div></div></div>
+      <div class="condrow" style="padding:9px 0;border-bottom:0"><div class="grow"><div class="t">★ Save view</div><div class="m">Saves your current filter combo as a one-click chip (yours only) — e.g. "My L3 · behind on GPS".</div></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Check-in rules — what counts</h2></div>
+  <div class="pad">
+    <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px"><b>Both kinds of contact are required.</b> A client must make an <b>in-person</b> visit <i>and</i> a <b>phone/virtual</b> contact at their level's cadence — a string of phone calls does not cover a missing office visit. The record's Conditions tab tracks each kind separately.</p>
+    <div class="tablewrap"><table class="data">
+      <thead><tr><th>Level</th><th>Cadence</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr style="cursor:default"><td>{{template "lvlchip" 1}}</td><td>Initial check-in within 3 days of referral</td><td class="muted">L1 is excluded from the monthly missed roster</td></tr>
+        <tr style="cursor:default"><td>{{template "lvlchip" 2}}</td><td>Monthly — one of each kind per calendar month</td><td class="muted">3-day grace after referral honored</td></tr>
+        <tr style="cursor:default"><td>{{template "lvlchip" 3}}</td><td>Weekly — one of each kind per week</td><td class="muted">Also applies to GPS-monitored clients</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted" style="padding:0;margin:12px 0 0;font-size:13px"><b>Logging vs scheduling:</b> <i>Log Check-in</i> records a contact that happened (it feeds the compliance math). <i>Schedule Check-in</i> books a future appointment — it shows on the dashboard the day it falls due and turns ✓ once a real check-in is logged that day, but a booking by itself satisfies nothing.</p>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:18px">
+  <div class="panel">
+    <div class="h"><h2>What the chips mean</h2></div>
+    <div class="pad">
+      <div class="condrow" style="padding:8px 0"><div class="grow"><div class="m">GPS fee balance is short — the client owes coverage money. Detail on the record's Payments / Fees tab.</div></div><span class="chip risk"><span class="g">⚠</span>Behind on GPS</span></div>
+      <div class="condrow" style="padding:8px 0"><div class="grow"><div class="m">A required check-in (either kind) was missed this month.</div></div><span class="chip risk"><span class="g">⚠</span>Missed check-in</span></div>
+      <div class="condrow" style="padding:8px 0"><div class="grow"><div class="m">Missed in a previous month, but current this month.</div></div><span class="chip warn"><span class="g">⚠</span>Past missed</span></div>
+      <div class="condrow" style="padding:8px 0"><div class="grow"><div class="m">All requirements satisfied as of the selected date.</div></div><span class="chip ok"><span class="g">✓</span>Compliant</span></div>
+      <div class="condrow" style="padding:8px 0"><div class="grow"><div class="m">No referral date on file — windows can't be computed. Fix the record.</div></div><span class="chip neutral"><span class="g">◯</span>No referral</span></div>
+      <div class="condrow" style="padding:8px 0;border-bottom:0"><div class="grow"><div class="m">GPS fees waived by a supervisor — excluded from the behind roster.</div></div><span class="chip neutral">waived</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="h"><h2>Fees &amp; money</h2></div>
+    <div class="pad">
+      <div class="tablewrap"><table class="data">
+        <thead><tr><th>Fee</th><th>Rate</th><th>Credited by payment type</th></tr></thead>
+        <tbody>
+          <tr style="cursor:default"><td>PTR supervision</td><td>$20 / month</td><td class="muted">"PTR Fee"</td></tr>
+          <tr style="cursor:default"><td>GPS — SCRAM</td><td>$15 / day</td><td class="muted" rowspan="3">"GPS", "Allied", "SCRAM" — all credit GPS coverage</td></tr>
+          <tr style="cursor:default"><td>GPS — ALLIED</td><td>$8 / day</td></tr>
+          <tr style="cursor:default"><td>GPS — IC</td><td>$0 / day</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="padding:0;margin:12px 0 0;font-size:13px">Record payments from the client record (Payments / Fees tab). App-entered payments feed the balances immediately and never touch the imported data. Waiving GPS fees is a supervisor action (⋯ menu) — audited and reversible.</p>
+    </div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:18px">
+  <div class="panel">
+    <div class="h"><h2>Who can do what</h2></div>
+    <div class="pad">
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Every officer</div><div class="m">Read everything; log check-ins, payments, notes, court dates + outcomes, violations, drug screens, reminders, tags; schedule check-ins; add new clients; remove their own app-entered rows.</div></div><span class="chip info">officer</span></div>
+      <div class="condrow" style="padding:9px 0;border-bottom:0"><div class="grow"><div class="t">Supervisors</div><div class="m">Everything above, plus: correct imported fields (overrides), waive GPS fees, delete / restore clients, and the full audit log. Deletes are reversible — nothing is ever lost silently.</div></div><span class="chip warn">supervisor</span></div>
+      <p class="muted" style="padding:0;margin:10px 0 0;font-size:13px">Every write is recorded in the audit trail with who and when.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="h"><h2>Where the numbers come from</h2></div>
+    <div class="pad">
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Daily import + your entries, merged</div><div class="m">SharePoint data lands once a day (see "Data refreshed" at the bottom of the sidebar). Anything you enter in the app shows everywhere immediately and survives the import.</div></div></div>
+      <div class="condrow" style="padding:9px 0"><div class="grow"><div class="t">Same math as the tracker</div><div class="m">The console and the classic client tracker compute from one shared engine — the numbers always agree.</div></div></div>
+      <div class="condrow" style="padding:9px 0;border-bottom:0"><div class="grow"><div class="t">"As of" time travel</div><div class="m">The date control in the top bar re-runs every page as of any date — for "what did this look like last Monday". CSV exports honor it. Reset with ×.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Keyboard shortcuts</h2></div>
+  <div class="pad">
+    <table class="kbd-list">
+      <tr><td><kbd>/</kbd></td><td>Focus the search box</td></tr>
+      <tr><td><kbd>g</kbd> <span class="kbd-then">then</span> <kbd>d</kbd> <kbd>c</kbd> <kbd>k</kbd> <kbd>m</kbd> <kbd>r</kbd> <kbd>a</kbd></td><td>Go to Dashboard · Clients · Calendar · Compliance · Reports · Admin</td></tr>
+      <tr><td><kbd>n</kbd></td><td>New note (on a client record)</td></tr>
+      <tr><td><kbd>?</kbd></td><td>Shortcut overlay anywhere</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close any dialog</td></tr>
+    </table>
+  </div>
+</div>
+{{template "c_bot" .}}

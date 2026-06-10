@@ -33,17 +33,18 @@
       <a href="/console/compliance"{{if eq .ActiveNav "compliance"}} class="active"{{end}} title="Compliance"><span class="ico">⚑</span><span class="label">Compliance</span></a>
       <a href="/console/reports"{{if eq .ActiveNav "reports"}} class="active"{{end}} title="Reports"><span class="ico">▥</span><span class="label">Reports</span></a>
       <a href="/console/admin"{{if eq .ActiveNav "admin"}} class="active"{{end}} title="Admin"><span class="ico">⚙</span><span class="label">Admin</span></a>
+      <a href="/console/help"{{if eq .ActiveNav "help"}} class="active"{{end}} title="Help & quick reference"><span class="ico">?</span><span class="label">Help</span></a>
       <span class="spacer"></span>
       <a href="/" class="back" title="Back to the Client Tracker"><span class="ico">←</span><span class="label">Client Tracker</span></a>
     </nav>
-    <div class="foot">Knox County Pre-Trial<br>Case Management Console</div>
+    <div class="foot">Knox County Pre-Trial<br>Case Management Console{{if .DataRefreshed}}<br><span{{if .DataStale}} style="color:var(--warn-ink);font-weight:600"{{end}} title="When the daily SharePoint import last wrote this database">{{if .DataStale}}⚠ {{end}}Data refreshed {{.DataRefreshed}}</span>{{end}}</div>
   </aside>
 
   <div class="cmain">
     <header class="ctopbar">
       <div class="csearch">
         <span class="mag">⌕</span>
-        <input id="csearch-input" type="text" placeholder="Search clients by name or IDN…  ( / )" autocomplete="off" aria-label="Search clients">
+        <input id="csearch-input" type="text" placeholder="Search by name, IDN, or case #…  ( / )" autocomplete="off" aria-label="Search clients">
         <div class="res" id="csearch-res" role="listbox"></div>
       </div>
       <a class="btn newref" href="/console/clients/new" title="Start a new referral">+ New Referral</a>
@@ -95,6 +96,7 @@
         <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Close any dialog</td></tr>
       </table>
+      <p class="muted" style="margin:12px 2px 0;font-size:12.5px">New to the console? The <a href="/console/help">Help page</a> covers the daily workflow, what the chips mean, and the check-in rules.</p>
     </div>
   </div>
 </div>
@@ -229,7 +231,7 @@ function ptToast(title, msg, tone){
   function close(){box.classList.remove('show');box.innerHTML='';items=[];sel=-1}
   function render(hits){
     if(!hits.length){box.innerHTML='<div class="empty">No matches</div>';box.classList.add('show');return}
-    box.innerHTML=hits.map(function(h){return '<a role="option" href="/console/clients/'+h.idn+'"><div class="nm">'+esc(h.name)+'</div><div class="mt">IDN '+esc(h.idn)+' · L'+h.level+' · '+esc(h.officer||'—')+'</div></a>'}).join('');
+    box.innerHTML=hits.map(function(h){return '<a role="option" href="/console/clients/'+h.idn+'"><div class="nm">'+esc(h.name)+'</div><div class="mt">IDN '+esc(h.idn)+(h.caseNum?' · '+esc(h.caseNum):'')+' · L'+h.level+' · '+esc(h.officer||'—')+'</div></a>'}).join('');
     box.classList.add('show');
     items=Array.prototype.slice.call(box.querySelectorAll('a'));sel=-1;
   }

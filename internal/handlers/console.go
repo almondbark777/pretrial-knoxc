@@ -41,7 +41,7 @@ func (s *Server) trackFrom(r *http.Request) time.Time {
 // date control.
 func (s *Server) consoleBase(r *http.Request, active string, track time.Time) map[string]any {
 	user := auth.User(r)
-	return map[string]any{
+	data := map[string]any{
 		"User":         user,
 		"UserName":     compute.FmtOfficer(user),
 		"IsSupervisor": s.Auth.IsSupervisor(user),
@@ -52,6 +52,15 @@ func (s *Server) consoleBase(r *http.Request, active string, track time.Time) ma
 		"Epoch":        compute.StatsEpochLabel,  // go-live date for epoch-scoped stat labels
 		"Msg":          r.URL.Query().Get("msg"), // flash toast after a write redirect
 	}
+	// Data freshness (sidebar foot): when the daily importer last committed.
+	// Absent on pre-rollout DBs — the display simply stays off. Stale (>26h —
+	// the import is daily, with slack) gets a warning so a silently broken
+	// import pipeline is visible to the people relying on the numbers.
+	if t, ok := db.LastImport(s.DB); ok {
+		data["DataRefreshed"] = compute.InET(t).Format("Jan 2, 3:04 PM") + " ET"
+		data["DataStale"] = time.Since(t) > 26*time.Hour
+	}
+	return data
 }
 
 // renderConsole renders a console template, falling back to a graceful in-shell
@@ -118,6 +127,16 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 		data["Views"] = viewChips(views)
 	}
 	s.renderConsole(w, "console_clients.html", data)
+}
+
+// ── /console/help — quick reference ───────────────────────────────────────────
+
+// ConsoleHelp renders the static in-app guide: the daily workflow, what the
+// chips mean, the check-in cadence rules (including the both-types rule),
+// fees/billing basics, roles, and keyboard shortcuts. Content lives entirely
+// in templates/console_help.html.
+func (s *Server) ConsoleHelp(w http.ResponseWriter, r *http.Request) {
+	s.renderConsole(w, "console_help.html", s.consoleBase(r, "help", s.trackFrom(r)))
 }
 
 // ── /console/clients/new — intake wizard (demo-safe) ──────────────────────────

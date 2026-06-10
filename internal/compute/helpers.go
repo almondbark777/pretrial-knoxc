@@ -92,6 +92,11 @@ func TodayET() time.Time {
 // reuses the same resolved location as TodayET.
 func NowET() time.Time { return time.Now().In(nyLoc) }
 
+// InET converts any instant to America/New_York for display — the one ET
+// location source, shared with TodayET/NowET (e.g. the data-freshness stamp
+// the importer writes in UTC).
+func InET(t time.Time) time.Time { return t.In(nyLoc) }
+
 // StatsEpoch is the system go-live date. Aggregate "activity" tallies on the
 // console (e.g. the number of violations logged) count only events on or after
 // this date, so the overall stats reflect the production era rather than migrated
