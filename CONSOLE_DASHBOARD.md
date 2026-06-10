@@ -652,3 +652,22 @@ verified gap; all live-tested, full suite green.
    Tests `TestLastImport` (tolerance ladder) + live-verified fresh and stale
    stamps. NOTE: the indicator appears on ptr1 only after BOTH the next deploy
    AND the next import run; absence is normal until then.
+
+## Deploy-readiness finish-up (2026-06-10)
+
+Two loose ends closed before the ptr1 push:
+
+1. **Generated letters now show on the client record.** `letter_log` rows are
+   loaded with the rest of the extras (`models.LetterLogEntry`,
+   `db.ListLetters`, `LoadExtras`) and merge into the Activity timeline as
+   "Past-due letter generated (EM fees) — behind $X · open · by Officer".
+   Read-only history (letters aren't deletable; the supervisor person-delete
+   purge is the only eraser). Pinned in `TestConsoleRecordRowIDs`;
+   live-verified on a smoke-DB client with logged letters.
+2. **The deploy bundle now ships the importer.** `build-bundle.sh` stages
+   `webapp/sharepoint_import.py`; `install-on-ptr1.sh` backs up the live copy
+   then installs it to `/opt/ptr-knoxc/webapp/` (0755, app owner) — so the
+   `import_meta` freshness stamp deploys in the same run, no separate scp.
+   Guarded `if [ -f ]` so older bundles still install. `bash -n` clean.
+
+Full `go test ./...` green; fresh bundle built ready for the ptr1 push.

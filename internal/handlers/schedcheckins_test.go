@@ -100,6 +100,9 @@ func TestConsoleRecordRowIDs(t *testing.T) {
 			Category: "Curfew violation", Severity: "High", Description: "home late"}},
 		Reminders: []models.Reminder{{ID: 45, IDN: "1", Body: "court reminder",
 			DueDate: "2026-06-19", CreatedAt: "2026-06-09"}},
+		Letters: []models.LetterLogEntry{{ID: 46, IDN: "1", Case: "@9",
+			Detail: "behind $40.00 · open", GeneratedBy: "officer.x@knoxsheriff.org",
+			CreatedAt: "2026-06-08 09:00:00 EDT"}},
 	}
 	rec := consoleRecord(c, []*compute.Client{c}, track,
 		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras)
@@ -122,5 +125,18 @@ func TestConsoleRecordRowIDs(t *testing.T) {
 		t.Errorf("Reminders ID = %+v, want 45", rec.Reminders)
 	} else if rec.Reminders[0].Due != "Jun 19, 2026" {
 		t.Errorf("Reminder Due = %q, want Jun 19, 2026", rec.Reminders[0].Due)
+	}
+	// Generated letters surface on the Activity timeline (read-only history).
+	letterSeen := false
+	for _, a := range rec.Activity {
+		if a.Title == "Past-due letter generated (EM fees)" {
+			letterSeen = true
+			if a.Detail != "behind $40.00 · open · by Officer X" {
+				t.Errorf("letter activity detail = %q", a.Detail)
+			}
+		}
+	}
+	if !letterSeen {
+		t.Error("generated letter missing from the Activity timeline")
 	}
 }

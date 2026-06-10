@@ -58,6 +58,14 @@ sudo mkdir -p "$APP/deploy"
 for script in ptr-backup.sh install-netdata.sh; do
   [ -f "$SRC/$script" ] && sudo install -m0755 "$SRC/$script" "$APP/deploy/$script" && echo "  installed $script"
 done
+# The daily importer (ptr-import.service runs it from $APP/webapp). Backed up
+# like the binary; skipped silently for older bundles that don't carry it.
+if [ -f "$SRC/sharepoint_import.py" ]; then
+  [ -f "$APP/webapp/sharepoint_import.py" ] && sudo cp -a "$APP/webapp/sharepoint_import.py" "$BK/sharepoint_import.py.$STAMP" && echo "  saved sharepoint_import.py.$STAMP"
+  sudo install -m0755 "$SRC/sharepoint_import.py" "$APP/webapp/sharepoint_import.py"
+  sudo chown "$OWN" "$APP/webapp/sharepoint_import.py" 2>/dev/null || true
+  echo "  installed sharepoint_import.py (next import stamps import_meta -> the 'Data refreshed' footer)"
+fi
 echo "  installed (owner $OWN)"
 
 say "5. update .env (idempotent; existing keys left as-is)"

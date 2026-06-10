@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/models"
 )
 
 // LetterRef identifies one generated letter: the client, the case the memo
@@ -60,6 +61,28 @@ func LogLetters(d *sql.DB, by, letterType string, refs []LetterRef) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// ListLetters returns one client's full letter history, newest first, for the
+// record's Activity timeline.
+func ListLetters(d *sql.DB, idn string) ([]models.LetterLogEntry, error) {
+	rows, err := d.Query(
+		`SELECT letter_id, idn, IFNULL(case_number,''), letter_type, IFNULL(detail,''),
+		        IFNULL(generated_by,''), created_at
+		   FROM letter_log WHERE idn = ? ORDER BY created_at DESC, letter_id DESC`, idn)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.LetterLogEntry
+	for rows.Next() {
+		var l models.LetterLogEntry
+		if err := rows.Scan(&l.ID, &l.IDN, &l.Case, &l.Type, &l.Detail, &l.GeneratedBy, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
 }
 
 // LastLetters returns each client's most recent letter generation for the

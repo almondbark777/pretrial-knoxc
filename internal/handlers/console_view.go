@@ -785,6 +785,16 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 			Date: shortStamp(rm.CreatedAt), Title: "Reminder logged (not sent)",
 			Detail: rm.Body, Tone: "warn", Icon: "◯"}})
 	}
+	for _, lt := range extras.Letters {
+		t, _ := compute.ParseDay(lt.CreatedAt)
+		detail := strings.TrimSpace(lt.Detail)
+		if by := compute.FmtOfficer(lt.GeneratedBy); by != "" {
+			detail = strings.TrimSpace(detail + " · by " + by)
+		}
+		acts = append(acts, act{t, ConsoleTLItem{
+			Date: shortStamp(lt.CreatedAt), Title: "Past-due letter generated (EM fees)",
+			Detail: detail, Tone: "warn", Icon: "▤"}})
+	}
 	for _, ds := range extras.DrugScreens {
 		t, _ := compute.ParseDay(ds.ScreenDate)
 		chip := drugScreenChip(ds.Result)

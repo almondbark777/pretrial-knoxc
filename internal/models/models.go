@@ -329,4 +329,18 @@ type DefendantExtras struct {
 	AddedPayments     []AddedPayment
 	AddedCheckIns     []AddedCheckIn
 	ScheduledCheckIns []ScheduledCheckIn
+	Letters           []LetterLogEntry
+}
+
+// LetterLogEntry is one generated letter from letter_log (migration 007) —
+// read-only history surfaced on the record's Activity timeline; generation
+// happens on the EM-fees report.
+type LetterLogEntry struct {
+	ID          int64  `json:"id"`
+	IDN         string `json:"idn"`
+	Case        string `json:"case"`
+	Type        string `json:"type"`
+	Detail      string `json:"detail"`
+	GeneratedBy string `json:"generatedBy"`
+	CreatedAt   string `json:"createdAt"`
 }

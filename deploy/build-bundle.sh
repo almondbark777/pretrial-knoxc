@@ -28,8 +28,12 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
   -o "$STAGE/server" ./cmd/server
 ls -la "$STAGE/server" | sed 's/^/  /'
 
-echo "== 2. stage templates/ + static/ =="
+echo "== 2. stage templates/ + static/ + the importer =="
 cp -r templates static "$STAGE/"
+# The daily importer ships with the app so the import_meta freshness stamp
+# (the console's "Data refreshed" footer) deploys in the same run — no
+# separate scp per deploy/INCREMENTAL.md needed anymore.
+cp webapp/sharepoint_import.py "$STAGE/"
 
 echo "== 3. stage installers + units + docs (flat, beside the binary) =="
 for f in \
