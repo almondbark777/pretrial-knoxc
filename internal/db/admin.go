@@ -218,6 +218,19 @@ CREATE TABLE IF NOT EXISTS fee_waivers (
     created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_waiver_idn UNIQUE(idn)
 );
+
+CREATE TABLE IF NOT EXISTS scheduled_check_ins (
+    sched_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn             INTEGER NOT NULL,
+    scheduled_for   TEXT NOT NULL,
+    check_in_type   TEXT NULL,
+    officer         TEXT NULL,
+    completed_check_in_id INTEGER NULL,
+    created_by      TEXT NULL,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sched_idn  ON scheduled_check_ins(idn);
+CREATE INDEX IF NOT EXISTS idx_sched_when ON scheduled_check_ins(scheduled_for);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to

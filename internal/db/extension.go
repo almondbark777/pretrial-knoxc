@@ -388,6 +388,9 @@ func LoadExtras(d *sql.DB, idn string) (models.DefendantExtras, error) {
 	if e.AddedCheckIns, err = ListAddedCheckIns(d, idn); err != nil {
 		return e, err
 	}
+	if e.ScheduledCheckIns, err = ListScheduledCheckIns(d, idn); err != nil {
+		return e, err
+	}
 	return e, nil
 }
 

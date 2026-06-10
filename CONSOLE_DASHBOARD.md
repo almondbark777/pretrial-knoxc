@@ -453,3 +453,50 @@ preview: waive → flash + chip + menu flips to Remove → `/api/lookup_data` gp
 Notes shows the marker → remove → chip/marker gone, menu back to Waive; audit
 shows exactly the test's 2 adds / 2 removes; no JS errors. `go build` /
 `go vet` / `gofmt` clean, full `go test ./...` green.
+
+## Entry — 2026-06-10 (round 2) — Scheduled check-ins: migration 001 §12 activated
+
+The 3-hourly improvement round. The last dormant migration-001 table,
+`scheduled_check_ins` ("calendar of upcoming check-ins", §12 — the same
+situation `pinned_defendants` and `saved_searches` were in before they were
+activated), is now live end-to-end: officers can **book a future check-in
+appointment** from the record and see it where it matters.
+
+**Design: display-only with respect to the compliance math.** A booking is an
+appointment, not a check-in — logging the real check-in stays a separate act,
+and no compute changes. State is derived at read time instead of written back:
+a booking shows **✓ done** when a real check-in (raw or app-entered — both are
+in `Client.CheckIns`) exists on the booked day, **⚠ missed** when the day
+passed without one, neutral otherwise. The migration's
+`completed_check_in_id` FK column stays unused — no fulfillment bookkeeping to
+drift out of sync.
+
+Surfaces: **record Check-ins tab** — "Schedule Check-in" button + ⋯-menu item
+open a modal (date + type); bookings list in a "Scheduled check-ins" panel
+(soonest first, × cancel with confirm). **Console dashboard Today's
+Schedule** — bookings falling due on the as-of day appear as
+"Scheduled check-in · Type" rows (distinct from the computed
+"Check-in due today" compliance-window rows), attributed to the supervising
+officer via officerForIDN so they survive the "My caseload" filter.
+
+Plumbing mirrors court dates: `internal/db/schedcheckins.go`
+(List/ListAll tolerant/Add/Delete via txAddWithAudit + txDeleteByID, audited
+`sched_add`/`sched_delete`), `models.ScheduledCheckIn` + DefendantExtras +
+LoadExtras, table mirrored into ensureSchemaSQL (already in
+extensionTablesByIDN so whole-person delete purges it), officer-level routes
+`POST /admin/schedule/{add,delete}`, `consoleDashboard` takes a `scheds`
+param, `ConsoleSchedCI` rows on the record VM.
+
+Tests: `TestScheduledCheckInLifecycle` (validation, chronological list,
+LoadExtras carry, cancel, audit 2/1, purge on person delete),
+`TestConsoleDashboardScheduledCheckIn` (today shows / tomorrow hidden / Mine
+attribution), `TestConsoleRecordScheduledStates` (done / missed / future).
+Live-verified in the preview: book 3 (today, past-unfulfilled, past+matching
+check-in) → panel shows ✓/⚠/· states correctly → dashboard shows exactly
+today's booking → cancel all 3 through the real forms → panel gone, dashboard
+clean, no JS errors. go build/vet/gofmt clean, full go test ./... green.
+
+Noted for a future round: the record's Logged check-ins panel exposes no
+per-row delete even though `POST /admin/checkin/delete`
+(DeleteAddedCheckIn) exists — the delete UI was lost with the classic
+profile. Same for app-entered payments (endpoint exists, no console UI).

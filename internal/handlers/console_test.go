@@ -25,7 +25,7 @@ func TestConsoleDashboardParity(t *testing.T) {
 		t.Fatalf("BuildClients: %v", err)
 	}
 	stats := computeStats(clients, adminTrack)
-	dash := consoleDashboard(clients, adminTrack, nil, nil, "")
+	dash := consoleDashboard(clients, adminTrack, nil, nil, nil, "")
 
 	if dash.KPIs.ActiveClients != stats.Open {
 		t.Errorf("ActiveClients = %d, want Open %d", dash.KPIs.ActiveClients, stats.Open)
@@ -74,7 +74,7 @@ func TestConsoleDashboardCourtMine(t *testing.T) {
 	}
 
 	// Signed in as the supervising officer → the court item is "mine".
-	mineCi := courtItem(consoleDashboard(clients, track, courts, nil, "Alice Smith"))
+	mineCi := courtItem(consoleDashboard(clients, track, courts, nil, nil, "Alice Smith"))
 	if mineCi == nil {
 		t.Fatal("expected a court schedule item")
 	}
@@ -82,7 +82,7 @@ func TestConsoleDashboardCourtMine(t *testing.T) {
 		t.Error("court item should be Mine for the supervising officer")
 	}
 	// Signed in as a different officer → not mine.
-	otherCi := courtItem(consoleDashboard(clients, track, courts, nil, "Bob Jones"))
+	otherCi := courtItem(consoleDashboard(clients, track, courts, nil, nil, "Bob Jones"))
 	if otherCi == nil {
 		t.Fatal("expected a court schedule item")
 	}
@@ -108,10 +108,10 @@ func TestConsoleDashboardViolationMine(t *testing.T) {
 		}
 		return nil
 	}
-	if a := violAlert(consoleDashboard(clients, track, nil, viols, "Alice Smith")); a == nil || !a.Mine {
+	if a := violAlert(consoleDashboard(clients, track, nil, viols, nil, "Alice Smith")); a == nil || !a.Mine {
 		t.Errorf("violation alert should be Mine for the supervising officer, got %+v", a)
 	}
-	if a := violAlert(consoleDashboard(clients, track, nil, viols, "Bob Jones")); a == nil || a.Mine {
+	if a := violAlert(consoleDashboard(clients, track, nil, viols, nil, "Bob Jones")); a == nil || a.Mine {
 		t.Errorf("violation alert should not be Mine for a different officer, got %+v", a)
 	}
 }

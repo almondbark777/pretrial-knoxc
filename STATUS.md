@@ -158,6 +158,17 @@ console dashboard's "My caseload" scope toggle)*
       (`saved_searches` from migration 001, finally in use). "★ Save view" on
       `/console/clients`, one-click chips, owner-scoped delete, sanitized
       query params, audited. Tests: `TestSavedViews`, `TestSanitizeViewQuery`.
+- [x] Scheduled check-ins (book appointments) — **done 2026-06-10**: the
+      dormant migration-001 §12 `scheduled_check_ins` table is now live
+      (mirrored into EnsureSchema). "Schedule Check-in" on the record books a
+      date+type; bookings show in a Scheduled panel on the Check-ins tab with
+      derived state (✓ done when a real check-in exists that day, ⚠ missed
+      when the day passed without one) and on the console dashboard's Today's
+      Schedule the day they fall due (Mine-attributed). Officer CRUD
+      `POST /admin/schedule/{add,delete}`, audited `sched_add`/`sched_delete`,
+      purged on whole-person delete. Display-only w.r.t. the compliance math.
+      Tests: `TestScheduledCheckInLifecycle`,
+      `TestConsoleDashboardScheduledCheckIn`, `TestConsoleRecordScheduledStates`.
 - [x] "Waive GPS fees" on the record — **done 2026-06-10** (was the record's
       last actionable "coming soon" stub): supervisor-granted fee waivers
       (`fee_waivers` table, migration 006 + EnsureSchema self-provision),

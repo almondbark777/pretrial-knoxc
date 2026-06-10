@@ -209,6 +209,8 @@ func main() {
 		ar.Post("/checkin/add", srv.AddCheckIn)
 		ar.Post("/checkin/bulk", srv.BulkAddCheckIn)
 		ar.Post("/checkin/delete", srv.DeleteAddedCheckIn)
+		ar.Post("/schedule/add", srv.AddScheduledCheckIn)
+		ar.Post("/schedule/delete", srv.DeleteScheduledCheckIn)
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)

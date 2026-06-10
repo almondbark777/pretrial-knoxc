@@ -184,6 +184,19 @@ type Reminder struct {
 	CreatedAt  string `json:"createdAt"`
 }
 
+// ScheduledCheckIn is one booked future check-in appointment (migration 001
+// §12's "calendar of upcoming check-ins"). Display-only with respect to the
+// compliance math — the real check-in is logged separately.
+type ScheduledCheckIn struct {
+	ID        int64  `json:"id"`
+	IDN       string `json:"idn"`
+	For       string `json:"scheduledFor"`
+	Type      string `json:"type"`
+	Officer   string `json:"officer"`
+	CreatedBy string `json:"createdBy"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // Violation is one recorded violation.
 type Violation struct {
 	ID            int64  `json:"id"`
@@ -306,13 +319,14 @@ type AddedCheckIn struct {
 
 // DefendantExtras bundles a defendant's app-owned data for the profile page.
 type DefendantExtras struct {
-	Notes         []Note
-	Tags          []Tag
-	CourtDates    []CourtDate
-	Reminders     []Reminder
-	Violations    []Violation
-	DrugScreens   []DrugScreen
-	Overrides     []Override
-	AddedPayments []AddedPayment
-	AddedCheckIns []AddedCheckIn
+	Notes             []Note
+	Tags              []Tag
+	CourtDates        []CourtDate
+	Reminders         []Reminder
+	Violations        []Violation
+	DrugScreens       []DrugScreen
+	Overrides         []Override
+	AddedPayments     []AddedPayment
+	AddedCheckIns     []AddedCheckIn
+	ScheduledCheckIns []ScheduledCheckIn
 }

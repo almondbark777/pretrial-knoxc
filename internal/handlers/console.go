@@ -75,9 +75,10 @@ func (s *Server) Console(w http.ResponseWriter, r *http.Request) {
 	courtDates, _ := db.ListAllCourtDates(s.DB)
 	violations, _ := db.ListAllViolations(s.DB)
 	violations = violationsSinceEpoch(violations) // aggregate tallies count from go-live
+	scheds, _ := db.ListAllScheduledCheckIns(s.DB)
 
 	data := s.consoleBase(r, "dashboard", track)
-	data["D"] = consoleDashboard(clients, track, courtDates, violations, compute.FmtOfficer(auth.User(r)))
+	data["D"] = consoleDashboard(clients, track, courtDates, violations, scheds, compute.FmtOfficer(auth.User(r)))
 	if pins, _ := db.PinnedIDNs(s.DB, auth.User(r)); len(pins) > 0 {
 		data["Pinned"] = pinnedRows(clients, pins)
 	}

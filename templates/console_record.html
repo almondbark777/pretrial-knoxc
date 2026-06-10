@@ -32,6 +32,7 @@
         <button type="button" onclick="cmOpen('courtModal')">Add court date</button>
         <button type="button" onclick="cmOpen('violationModal')">Record violation</button>
         <button type="button" onclick="cmOpen('screenModal')">Record drug screen</button>
+        <button type="button" onclick="cmOpen('scheduleModal')">Schedule check-in</button>
         <button type="button" onclick="cmOpen('tagModal')">Add tag</button>
         <form method="post" action="/admin/pin/toggle" style="margin:0">
           <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
@@ -90,7 +91,24 @@
 
 {{/* ── Check-ins ── */}}
 <div class="tabpane" id="t-checkins">
-  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><button class="btn ghost" onclick="cmOpen('scheduleModal')">Schedule Check-in</button><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
+  {{if $r.Scheduled}}
+  <div class="panel" style="margin-bottom:14px">
+    <div class="h"><h2>Scheduled check-ins</h2><span class="grow"></span><span class="count">{{len $r.Scheduled}}</span></div>
+    <div class="body">
+      {{range $r.Scheduled}}
+      <div class="frow"><span class="rail {{if .Done}}ok{{else if .Missed}}risk{{else}}info{{end}}">{{if .Done}}✓{{else if .Missed}}⚠{{else}}·{{end}}</span><div class="grow">
+        <div class="t" style="font-weight:600">{{.Date}}{{if .Type}} · {{.Type}}{{end}}</div>
+        <div class="m">Scheduled by {{.By}}{{if .Done}} · checked in ✓{{else if .Missed}} · no check-in that day — follow up{{end}}</div>
+      </div>
+      <form method="post" action="/admin/schedule/delete" style="margin:0;align-self:center" onsubmit="return confirm('Cancel this scheduled check-in?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Cancel scheduled check-in">×</button>
+      </form></div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
   {{if $r.LoggedCheckIns}}
   <div class="panel" style="margin-bottom:14px">
     <div class="h"><h2>Logged check-ins</h2><span class="grow"></span><span class="count">{{len $r.LoggedCheckIns}}</span></div>
@@ -242,6 +260,20 @@
       <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, observations, etc.)</span></label><textarea name="note" placeholder="e.g. GPS fitment — strap sized, base unit #1234 issued"></textarea></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('checkinModal')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>
+  </form>
+</div></div>
+
+{{/* ── Schedule a future check-in (any officer) ── */}}
+<div class="backdrop" id="scheduleModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/schedule/add">
+    <div class="mh"><h3>Schedule Check-in</h3><button type="button" class="x" onclick="cmClose('scheduleModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">Books an appointment — it shows on this tab and on the dashboard's Today's Schedule that day. Logging the actual check-in is still done with <b>+ Log Check-in</b>; the booking turns ✓ once a check-in exists on that date.</p>
+      <div class="fld"><label>Date</label><input type="date" name="scheduled_for" required></div>
+      <div class="fld"><label>Type</label><select name="check_in_type"><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('scheduleModal')">Cancel</button><button type="submit" class="btn">Schedule</button></div>
   </form>
 </div></div>
 

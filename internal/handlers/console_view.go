@@ -127,7 +127,8 @@ type ConsoleDashboard struct {
 // extra O(n) pass for "due today" / "next court". courtDates + violations are the
 // app's extension data (may be empty on a fresh DB — that's a real zero).
 func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
-	courtDates []models.CourtDate, violations []models.Violation, officer string) ConsoleDashboard {
+	courtDates []models.CourtDate, violations []models.Violation,
+	scheds []models.ScheduledCheckIn, officer string) ConsoleDashboard {
 
 	d := ConsoleDashboard{AsOf: track.Format("Monday, January 2, 2006")}
 	officerLC := strings.ToLower(strings.TrimSpace(officer))
@@ -182,6 +183,23 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 				Mine: mine(officerForIDN(clients, cd.IDN)),
 			})
 		}
+	}
+
+	// Booked check-in appointments falling due today (scheduled_check_ins).
+	// Distinct from the computed "Check-in due today" rows above: those are
+	// compliance-window deadlines, these are appointments an officer made.
+	for _, sc := range scheds {
+		dt, ok := compute.ParseDay(sc.For)
+		if !ok || !sameDay(dt, track) {
+			continue
+		}
+		d.Schedule = append(d.Schedule, ConsoleSched{
+			IDN: sc.IDN, Time: "Check-in", Title: nameFor(clients, sc.IDN),
+			Sub:  "Scheduled check-in" + appendIf(" · ", sc.Type),
+			Chip: Chip{Tone: "info", Icon: "·", Label: "Scheduled"},
+			// Attribute to the supervising officer so it survives "My caseload".
+			Mine: mine(officerForIDN(clients, sc.IDN)),
+		})
 	}
 
 	d.KPIs.OpenViolations = len(violations)
@@ -444,6 +462,7 @@ type ConsoleRecord struct {
 	CheckIns       []ConsoleTLItem
 	Court          []ConsoleCourtRow
 	LoggedCheckIns []ConsoleLoggedCI
+	Scheduled      []ConsoleSchedCI
 	LoggedPayments []ConsoleLoggedPayment
 	DrugScreens    []ConsoleDrugScreen
 	PTRMonths      []ConsolePTRMonth
@@ -455,6 +474,18 @@ type ConsoleRecord struct {
 
 	CI   compute.CheckInResult
 	AsOf string
+}
+
+// ConsoleSchedCI is one booked check-in appointment on the record's Check-ins
+// tab. Done/Missed are derived at read time: Done when a real check-in exists
+// on the booked day, Missed when the day has passed without one.
+type ConsoleSchedCI struct {
+	ID     int64
+	Date   string
+	Type   string
+	By     string
+	Done   bool
+	Missed bool
 }
 
 func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Time,
@@ -587,6 +618,24 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 			Date: shortStamp(a.Date), Type: dash(a.Type), Note: a.Note,
 			Author: compute.FmtOfficer(a.Author),
 		})
+	}
+
+	// Booked appointments (soonest first from ListScheduledCheckIns). Done =
+	// a real check-in (raw or app-entered — both are in c.CheckIns) exists on
+	// the booked day; Missed = the day passed without one.
+	for _, sc := range extras.ScheduledCheckIns {
+		row := ConsoleSchedCI{ID: sc.ID, Date: sc.For, Type: sc.Type, By: compute.FmtOfficer(sc.CreatedBy)}
+		if dt, ok := compute.ParseDay(sc.For); ok {
+			row.Date = dt.Format("Jan 2, 2006")
+			for _, k := range c.CheckIns {
+				if k.DOK && sameDay(k.D, dt) {
+					row.Done = true
+					break
+				}
+			}
+			row.Missed = !row.Done && dt.Before(track) && !sameDay(dt, track)
+		}
+		rec.Scheduled = append(rec.Scheduled, row)
 	}
 
 	// Court tab.
