@@ -149,6 +149,7 @@ func main() {
 	r.Get("/console/compliance", srv.ConsoleCompliance)
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
+	r.Get("/console/help", srv.ConsoleHelp)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
 
 	// The classic "Direction A" interface was removed (2026-06-09) — old bookmarks
@@ -180,8 +181,12 @@ func main() {
 
 	// Past-Due EM Fees report + memo generation (the show-cause letters).
 	r.Get("/reports/em-fees", srv.ReportEMFees)
-	r.Get("/reports/em-fees/memo", srv.EMFeeMemo)          // one filled .docx
-	r.Get("/reports/em-fees/memos.zip", srv.EMFeeMemosZip) // all memos (Open/ + Closed/)
+	r.Get("/reports/em-fees/memo", srv.EMFeeMemo) // one filled .docx (logged in letter_log)
+	// Batch generation is a CSRF-guarded POST of the report's selection
+	// (checkboxes decide who gets a letter; every memo is logged). The old GET
+	// bookmark lands back on the report to pick a selection.
+	r.With(csrfGuard(a)).Post("/reports/em-fees/memos.zip", srv.EMFeeMemosZip)
+	r.Get("/reports/em-fees/memos.zip", redirectTo("/reports/em-fees"))
 
 	// Admin & data-entry (write/correction surface). Every POST carries a CSRF
 	// token (csrfGuard). Supervisor-gated routes enforce the role inside the

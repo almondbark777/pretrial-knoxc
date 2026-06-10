@@ -231,6 +231,17 @@ CREATE TABLE IF NOT EXISTS scheduled_check_ins (
 );
 CREATE INDEX IF NOT EXISTS idx_sched_idn  ON scheduled_check_ins(idn);
 CREATE INDEX IF NOT EXISTS idx_sched_when ON scheduled_check_ins(scheduled_for);
+
+CREATE TABLE IF NOT EXISTS letter_log (
+    letter_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn          TEXT NOT NULL,
+    case_number  TEXT NULL,
+    letter_type  TEXT NOT NULL DEFAULT 'em_fees',
+    detail       TEXT NULL,
+    generated_by TEXT NULL,
+    created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_letter_idn ON letter_log(idn);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to
@@ -473,7 +484,7 @@ func nz(s string) any {
 var extensionTablesByIDN = []string{
 	"defendant_notes", "defendant_tags", "court_dates", "violations",
 	"reminders", "overrides", "pinned_defendants", "defendant_documents",
-	"scheduled_check_ins", "drug_screens", "fee_waivers",
+	"scheduled_check_ins", "drug_screens", "fee_waivers", "letter_log",
 }
 
 // raw tables physically purged only on the IMPORTER_RETIRED path.

@@ -98,3 +98,40 @@ the letter format is the office's own template, reused verbatim — never recrea
 - ✅ Field overrides now spliced into the EM-fee read (done). Optional: xlsx (not
   just CSV) export; surface an "override (app)" badge on the report rows the way the
   profile does.
+
+## 2026-06-10 — Letter selection toggles + per-client letter history
+
+Alex: "the ability to toggle who gets letters printed and see the last time
+someone had a letter generated." The report is no longer all-or-nothing:
+
+- **`letter_log` table** (migration `007_letterlog_sqlite.sql`, mirrored in
+  `EnsureSchema`, purged on whole-person delete via `extensionTablesByIDN`):
+  one row per generated memo (idn, case, type `em_fees`, detail
+  "behind $X · open/closed", who, when-ET). `db.LogLetters` writes a batch in
+  one transaction with ONE `letters_generated` audit row per generation event;
+  `db.LastLetters` returns each client's newest stamp (tolerant of
+  pre-migration DBs — reads empty).
+- **Selection drives the batch.** Every row on `/reports/em-fees` has a
+  checkbox (checked by default; per-section select-all in the header; live
+  count on the "Generate letters for selected (N)" button, disabled at zero).
+  The button POSTs the `sel` values (`kind|idn|case`, CSRF-guarded — route
+  wrapped in the same `csrfGuard` as `/admin/*`) and the zip contains exactly
+  the ticked memos (`Open/` + `Closed/` folders as before). The old
+  all-memos GET redirects back to the report. Empty selection → 400.
+- **"Last letter" column** on both tables (printable): most recent generation
+  date with "by <officer>" on hover, "never" otherwise. Single `.docx`
+  downloads log too — the column is trustworthy because no letter leaves
+  unlogged (log failure fails the download).
+- **Compute untouched** — `internal/emfees` parity is preserved; the zip
+  filter constructs a subset `Result` and reuses `MemosZip` verbatim.
+
+Tests: `TestLetterLogLifecycle` (batch write → one audit row, newest-stamp
+wins, type isolation, purge-on-delete, pre-migration tolerance),
+`TestEMFeeMemosZipSelection` (zip contains exactly the selected memo, logged;
+unselected not logged; empty selection 400). Live-verified in the preview:
+135 rows all-checked → uncheck/section-toggle/counter/disabled-at-zero; single
+memo + 2-client batch zip (`past-due-em-fee-memos-2-selected-….zip`); reload
+shows "Jun 10, 2026 · by Alexander Bentley" on exactly those 3 rows; audit
+trail carries exactly 2 `letters_generated` events; no console errors. Full
+`go test ./...` green. (Smoke DB now carries those 3 letter_log rows + 2
+audit rows from the e2e check.)
