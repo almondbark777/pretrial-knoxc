@@ -65,7 +65,7 @@ type Bar struct {
 	Pct   int    `json:"-"`
 }
 
-// Analytics is the server-computed summary for analytics.html.
+// Analytics is the server-computed summary for the console Reports page.
 type Analytics struct {
 	Stats        Stats   `json:"stats"`
 	ByLevel      []Bar   `json:"byLevel"`
@@ -90,16 +90,6 @@ type CalDay struct {
 	Events []CalEvent
 }
 
-// MyDay is the logged-in officer's personal worklist: their caseload's
-// due-this-week / behind / missed items (reuses RosterRow).
-type MyDay struct {
-	Officer  string      `json:"officer"`  // display name matched against client.Officer
-	Caseload int         `json:"caseload"` // distinct clients supervised by this officer
-	DueSoon  []RosterRow `json:"dueSoon"`  // check-in window due within 7 days
-	Behind   []RosterRow `json:"behind"`   // behind on GPS
-	Missed   []RosterRow `json:"missed"`   // missed a check-in this month
-}
-
 // RosterDay is one cell of the roster-mode (team) calendar: aggregated counts
 // across all clients for that day. Day 0 == padding cell before the 1st.
 type RosterDay struct {
@@ -110,15 +100,42 @@ type RosterDay struct {
 	Due      int `json:"due"`
 }
 
+// RosterTotals is one aggregate bucket of roster-calendar counts — used for a
+// week-row total and a weekday-column total (STATUS nice-to-have:
+// "roster-calendar weekly/column totals").
+type RosterTotals struct {
+	CheckIns int `json:"checkIns"`
+	Payments int `json:"payments"`
+	Missed   int `json:"missed"`
+	Due      int `json:"due"`
+}
+
+// Any reports whether the bucket has anything to show (keeps templates clean).
+func (t RosterTotals) Any() bool {
+	return t.CheckIns+t.Payments+t.Missed+t.Due > 0
+}
+
+// RosterWeek is one rendered week row: exactly 7 (possibly padded) day cells
+// plus that week's totals, shown as a trailing "Week" column.
+type RosterWeek struct {
+	Days []RosterDay  `json:"days"`
+	Tot  RosterTotals `json:"tot"`
+}
+
 // RosterCalendar is the rendered roster-mode month: padded day cells + the
 // month totals (the "per day / per month" aggregation from Brief 2.9).
+// Weeks/ColTotals carry the same days regrouped into week rows with week
+// totals, plus per-weekday (Sun..Sat) column totals for the footer row.
 type RosterCalendar struct {
-	Title       string      `json:"title"`
-	Days        []RosterDay `json:"days"`
-	TotCheckIns int         `json:"totCheckIns"`
-	TotPayments int         `json:"totPayments"`
-	TotMissed   int         `json:"totMissed"`
-	TotDue      int         `json:"totDue"`
+	Title       string         `json:"title"`
+	Days        []RosterDay    `json:"days"`
+	Weeks       []RosterWeek   `json:"weeks"`
+	ColTotals   []RosterTotals `json:"colTotals"` // len 7, Sun..Sat
+	Month       RosterTotals   `json:"month"`     // grand totals (same as Tot*)
+	TotCheckIns int            `json:"totCheckIns"`
+	TotPayments int            `json:"totPayments"`
+	TotMissed   int            `json:"totMissed"`
+	TotDue      int            `json:"totDue"`
 }
 
 // ── Admin & data-entry shapes (Phase 7) ──────────────────────────────────────
@@ -180,6 +197,30 @@ type Violation struct {
 	CreatedAt     string `json:"createdAt"`
 }
 
+// DrugScreen is one recorded drug-screen result (officer CRUD, audited). A
+// failed screen is typically also recorded as a violation (category
+// failed-drug-screen); this table is the per-test log behind that.
+type DrugScreen struct {
+	ID         int64  `json:"id"`
+	IDN        string `json:"idn"`
+	ScreenDate string `json:"screenDate"`
+	TestType   string `json:"testType"`   // urine / oral swab / hair / breath / other
+	Result     string `json:"result"`     // negative / positive / diluted / refused / pending
+	Substances string `json:"substances"` // when positive, what it was positive for
+	Notes      string `json:"notes"`
+	Officer    string `json:"officer"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+// SavedView is one per-user saved roster filter combo ("saved search"). Query
+// is a sanitized URL query string of the roster's filter params.
+type SavedView struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Query     string `json:"query"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // Tombstone is one row of deleted_idns — a suppressed person or case.
 type Tombstone struct {
 	IDN        string `json:"idn"`
@@ -199,16 +240,30 @@ type Override struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// ReportGroup is one grouped section of a report — e.g. one supervising
+// officer's clients on the per-officer Behind report. When Report.Groups is
+// non-empty the template renders one table per group (with its subtotal line)
+// instead of the flat Rows table; Rows still carries the flat list so the
+// record count and CSV export stay consistent.
+type ReportGroup struct {
+	Label    string     `json:"label"`
+	Rows     [][]string `json:"rows"`
+	Subtotal string     `json:"subtotal"`
+}
+
 // Report is a generic printable/exportable tabular report (rendered by
 // report.html). The same shape backs Behind-on-GPS, Missed-Check-Ins, etc.
 type Report struct {
-	Title    string     `json:"title"`
-	Subtitle string     `json:"subtitle"`
-	AsOf     string     `json:"asOf"`
-	Columns  []string   `json:"columns"`
-	Rows     [][]string `json:"rows"`
-	CSVPath  string     `json:"csvPath"` // link to the matching CSV export, if any
-	Note     string     `json:"note"`    // optional footnote (e.g. show-cause-letter status)
+	Title    string        `json:"title"`
+	Subtitle string        `json:"subtitle"`
+	AsOf     string        `json:"asOf"`
+	Columns  []string      `json:"columns"`
+	Rows     [][]string    `json:"rows"`
+	Groups   []ReportGroup `json:"groups,omitempty"` // per-officer split etc.
+	CSVPath  string        `json:"csvPath"`          // link to the matching CSV export, if any
+	Note     string        `json:"note"`             // optional footnote (e.g. show-cause-letter status)
+	AltLabel string        `json:"altLabel"`         // label for the alternate view link, if any
+	AltURL   string        `json:"altUrl"`           // URL for the alternate view (flat ⇄ grouped)
 }
 
 // AuditRow is one audit_log entry for the supervisor audit viewer.
@@ -256,6 +311,7 @@ type DefendantExtras struct {
 	CourtDates    []CourtDate
 	Reminders     []Reminder
 	Violations    []Violation
+	DrugScreens   []DrugScreen
 	Overrides     []Override
 	AddedPayments []AddedPayment
 	AddedCheckIns []AddedCheckIn

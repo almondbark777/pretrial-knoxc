@@ -14,6 +14,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -134,13 +135,12 @@ func main() {
 	r.Post("/api/login", srv.APILogin)
 	r.Post("/api/logout", srv.APILogout)
 
-	// Landing page = the existing client tracker (shell + iframe); the new app
-	// lives at /dashboard, reached via a top-bar button. Keeps the two separate.
+	// Landing page = the client tracker (shell + iframe). The primary app is the
+	// Case Console at /console.
 	r.Get("/", srv.Home)
 	r.Get("/api/lookup_data", srv.APILookupData)
 
-	// Professional case console (the NEW second dashboard — runs alongside
-	// /dashboard for side-by-side comparison; commercial-inspired direction).
+	// Case Console — the application.
 	r.Get("/console", srv.Console)
 	r.Get("/console/clients", srv.ConsoleClients)
 	r.Get("/console/clients/new", srv.ConsoleIntake) // static segment wins over {idn}
@@ -151,13 +151,15 @@ func main() {
 	r.Get("/console/admin", srv.ConsoleAdmin)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
 
-	// App (the new admin & data-entry / read-only surface).
-	r.Get("/dashboard", srv.Dashboard)
-	r.Get("/my_day.html", srv.MyDay)
-	r.Get("/pretrial_app.html", srv.CaseManagement)
-	r.Get("/analytics.html", srv.Analytics)
-	r.Get("/calendar.html", srv.Calendar)
-	r.Get("/client_profile.html", srv.ClientProfile)
+	// The classic "Direction A" interface was removed (2026-06-09) — old bookmarks
+	// land on the console equivalent. The JSON endpoints below predate the console
+	// but are still real API surface (the console's global search uses /api/lookup).
+	r.Get("/dashboard", redirectTo("/console"))
+	r.Get("/my_day.html", redirectTo("/console"))
+	r.Get("/pretrial_app.html", redirectTo("/console/clients"))
+	r.Get("/analytics.html", redirectTo("/console/reports"))
+	r.Get("/calendar.html", legacyCalendarRedirect)
+	r.Get("/client_profile.html", legacyProfileRedirect)
 	r.Get("/api/lookup", srv.APILookup)
 	r.Get("/api/clients", srv.APIClient)
 	r.Get("/api/stats", srv.APIStats)
@@ -167,6 +169,7 @@ func main() {
 	// CSV exports (read-only; the dependency-free "Export to Excel" equivalent).
 	r.Get("/export/behind.csv", srv.ExportBehind)
 	r.Get("/export/missed.csv", srv.ExportMissed)
+	r.Get("/export/violations.csv", srv.ExportViolations)
 	r.Get("/export/cases.csv", srv.ExportCases)
 	r.Get("/export/em-fees.csv", srv.ExportEMFees)
 
@@ -185,20 +188,24 @@ func main() {
 	// handler; CRUD routes are open to any allowed officer. Everything is audited.
 	r.Route("/admin", func(ar chi.Router) {
 		ar.Use(csrfGuard(a))
-		ar.Get("/delete", srv.DeleteConfirm)          // confirmation screen (supervisor)
-		ar.Post("/delete", srv.Delete)                // perform delete (supervisor)
-		ar.Post("/restore", srv.Restore)              // un-tombstone (supervisor)
-		ar.Get("/deleted", srv.Deleted)               // tombstone list + restore (supervisor)
-		ar.Get("/audit", srv.Audit)                   // audit-log viewer (supervisor)
-		ar.Post("/override", srv.SetOverride)         // set field override (supervisor)
-		ar.Post("/override/clear", srv.ClearOverride) // clear override (supervisor)
+		ar.Get("/delete", srv.DeleteConfirm)             // confirmation screen (supervisor)
+		ar.Post("/delete", srv.Delete)                   // perform delete (supervisor)
+		ar.Post("/restore", srv.Restore)                 // un-tombstone (supervisor)
+		ar.Post("/undo_last_delete", srv.UndoLastDelete) // one-click newest restore (supervisor)
+		ar.Get("/deleted", srv.Deleted)                  // tombstone list + restore (supervisor)
+		ar.Get("/audit", srv.Audit)                      // audit-log viewer (supervisor)
+		ar.Post("/override", srv.SetOverride)            // set field override (supervisor)
+		ar.Post("/override/clear", srv.ClearOverride)    // clear override (supervisor)
 
 		// Data entry (any allowed officer): add a client, payments, check-ins.
-		ar.Get("/add_defendant", srv.AddDefendantForm)
+		// The classic add-client form is gone — the console intake wizard is the
+		// UI; it (and any old bookmark) reaches the same POST endpoint.
+		ar.Get("/add_defendant", redirectTo("/console/clients/new"))
 		ar.Post("/add_defendant", srv.AddDefendant)
 		ar.Post("/payment/add", srv.AddPayment)
 		ar.Post("/payment/delete", srv.DeleteAddedPayment)
 		ar.Post("/checkin/add", srv.AddCheckIn)
+		ar.Post("/checkin/bulk", srv.BulkAddCheckIn)
 		ar.Post("/checkin/delete", srv.DeleteAddedCheckIn)
 
 		// Per-defendant extension CRUD (any allowed officer).
@@ -213,6 +220,11 @@ func main() {
 		ar.Post("/reminder/delete", srv.DeleteReminder)
 		ar.Post("/violation/add", srv.AddViolation)
 		ar.Post("/violation/delete", srv.DeleteViolation)
+		ar.Post("/drugscreen/add", srv.AddDrugScreen)
+		ar.Post("/drugscreen/delete", srv.DeleteDrugScreen)
+		ar.Post("/pin/toggle", srv.TogglePin)
+		ar.Post("/view/save", srv.SaveView)
+		ar.Post("/view/delete", srv.DeleteView)
 	})
 
 	httpSrv := &http.Server{Addr: addr, Handler: r}
@@ -238,6 +250,34 @@ func main() {
 		log.Printf("graceful shutdown timed out: %v", err)
 	}
 	log.Println("server stopped")
+}
+
+// redirectTo returns a handler that 302s to a fixed console path — the landing
+// spot for bookmarks of the removed classic interface.
+func redirectTo(to string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, to, http.StatusFound)
+	}
+}
+
+// legacyCalendarRedirect forwards /calendar.html to /console/calendar, carrying
+// the old page's ?idn= / ?month= query so per-client and month links keep working.
+func legacyCalendarRedirect(w http.ResponseWriter, r *http.Request) {
+	to := "/console/calendar"
+	if q := r.URL.RawQuery; q != "" {
+		to += "?" + q
+	}
+	http.Redirect(w, r, to, http.StatusFound)
+}
+
+// legacyProfileRedirect forwards /client_profile.html?idn=X to /console/clients/X
+// (the client list when no idn is given).
+func legacyProfileRedirect(w http.ResponseWriter, r *http.Request) {
+	to := "/console/clients"
+	if idn := strings.TrimSpace(r.URL.Query().Get("idn")); idn != "" {
+		to += "/" + url.PathEscape(idn)
+	}
+	http.Redirect(w, r, to, http.StatusFound)
 }
 
 // securityHeaders sets conservative, low-risk response headers on every response.
@@ -331,8 +371,6 @@ func tmplFuncs() template.FuncMap {
 			}
 			return *p
 		},
-		"isNil": func(p *float64) bool { return p == nil },
-		"lower": strings.ToLower,
 		// money / moneyP / intP / boolP render the compute layer's numbers (incl.
 		// nil pointers == "missing") as clean currency / counts for the console.
 		"money":  func(f float64) string { return moneyFmt(f) },
@@ -389,17 +427,7 @@ func tmplFuncs() template.FuncMap {
 			return ""
 		},
 		// initials renders an avatar monogram from a display name ("Alex Bentley" → "AB").
-		"initials": func(name string) string {
-			fields := strings.Fields(strings.TrimSpace(name))
-			if len(fields) == 0 {
-				return "?"
-			}
-			out := string([]rune(fields[0])[:1])
-			if len(fields) > 1 {
-				last := fields[len(fields)-1]
-				out += string([]rune(last)[:1])
-			}
-			return strings.ToUpper(out)
-		},
+		// Single source of truth lives in handlers.Initials.
+		"initials": handlers.Initials,
 	}
 }

@@ -59,7 +59,6 @@
             <button class="avatar" id="userbtn" title="{{.User}}" aria-label="User menu">{{initials .UserName}}</button>
             <div class="pop" id="userpop">
               <a class="who" style="pointer-events:none"><b>{{.UserName}}</b></a>
-              <a href="/dashboard">Classic admin view</a>
               <a href="/">← Client Tracker</a>
               <button type="button" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login')">Sign out</button>
             </div>
@@ -73,7 +72,7 @@
   </div>
 </div>
 
-{{/* demo write-action modal (note / check-in / reminder / court / coming-soon) */}}
+{{/* lightweight action modal: the "coming soon" stubs only (pin / waive / upload / admin demos). Real note/check-in/reminder/court writes use the cmOpen() POST modals on the record page. */}}
 <div class="backdrop" id="actionModal" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="mh"><h3 id="am-title">Action</h3><button type="button" class="x" onclick="closeAction()" aria-label="Close">×</button></div>
@@ -140,6 +139,58 @@ function ptToast(title, msg, tone){
   if(rb){rb.addEventListener('click',function(){document.cookie='ptc_asof=;path=/;max-age=0';location.reload();});}
 })();
 
+/* ── roster rows: keyboard-operable navigation ──────────────────────────────
+      Server-rendered rosters (compliance, calendar, …) use clickable
+      <tr data-href> rows. Make them focusable + Enter/Space-activatable so they
+      match the windowed clients table, instead of being mouse-only. Runs at
+      parse time, so the clients table's later-rendered rows (which already carry
+      tabindex + their own key handler) are skipped by the guard below. */
+(function(){
+  document.querySelectorAll('table.data tbody tr[data-href]').forEach(function(tr){
+    if(tr.hasAttribute('tabindex'))return;
+    tr.setAttribute('tabindex','0');
+    tr.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();location.href=tr.dataset.href;}
+    });
+  });
+})();
+
+/* ── modal focus trap ───────────────────────────────────────────────────────
+      While any dialog (.backdrop.show) is open, keep Tab / Shift+Tab focus
+      inside it — aria-modal hides the background for screen readers but does
+      not stop the keyboard from tabbing into the page behind. */
+(function(){
+  function focusables(m){
+    return [].slice.call(m.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(function(el){return el.offsetParent!==null;});
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Tab')return;
+    var open=document.querySelectorAll('.backdrop.show');
+    if(!open.length)return;
+    var m=open[open.length-1]; // trap within the topmost open dialog
+    var f=focusables(m);
+    if(!f.length){e.preventDefault();return;}
+    var first=f[0],last=f[f.length-1],a=document.activeElement;
+    if(e.shiftKey){if(a===first||!m.contains(a)){e.preventDefault();last.focus();}}
+    else{if(a===last||!m.contains(a)){e.preventDefault();first.focus();}}
+  });
+})();
+
+/* ── associate modal field labels with their controls ───────────────────────
+      Modal fields keep <label> and control as siblings (for the stacked
+      layout); without for/id the label isn't tied to the field for screen
+      readers or click-to-focus. Wire them up generically — no markup change. */
+(function(){
+  var n=0;
+  document.querySelectorAll('.modal .mb .fld').forEach(function(fld){
+    var lab=fld.querySelector('label');
+    var ctl=fld.querySelector('input:not([type=hidden]),select,textarea');
+    if(!lab||!ctl||lab.htmlFor)return;
+    if(!ctl.id)ctl.id='fld'+(++n)+'-'+((ctl.name||'x').replace(/[^a-z0-9_-]/gi,''));
+    lab.htmlFor=ctl.id;
+  });
+})();
+
 /* ── keyboard shortcuts (Brief §6): "/" focus search (handled below), g+letter
       jumps between sections, "n" opens a new note on a client record. */
 (function(){
@@ -149,10 +200,9 @@ function ptToast(title, msg, tone){
     if(tag==='input'||tag==='textarea'||tag==='select')return;
     if(e.metaKey||e.ctrlKey||e.altKey)return;
     if(e.key==='?'){e.preventDefault();var km=document.getElementById('kbdModal');if(km){km.classList.add('show');km.setAttribute('aria-hidden','false');}return;}
-    if(e.key==='n'&&window.openAction&&document.querySelector('.rechead')){
+    if(e.key==='n'&&document.getElementById('noteModal')&&typeof cmOpen==='function'){
       e.preventDefault();
-      var h=document.querySelector('.rechead h1');
-      openAction('note',h?h.textContent:'this client');return;
+      cmOpen('noteModal');return; // the real, persisting note form on the record page
     }
     if(e.key==='g'){seq='g';setTimeout(function(){seq='';},800);return;}
     if(seq==='g'){
@@ -205,27 +255,8 @@ function ptToast(title, msg, tone){
   });
 })();
 
-/* ── demo write-action modal ──────────────────────────────────────────────── */
-function _now(){var d=new Date();var p=function(n){return (n<10?'0':'')+n};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())}
+/* ── lightweight action modal ("coming soon" stubs only) ──────────────────── */
 var ACTIONS={
-  note:{title:'Add Note',submit:'Save note',toast:['Note saved','Recorded on the client record.'],
-    body:function(n){return '<div class="note-hint">Demo: this opens the real note form. In this build it confirms with a toast rather than writing.</div><div class="fld"><label>Note</label><textarea placeholder="Type a note about '+n+'…" autofocus></textarea></div>'}},
-  checkin:{title:'Log Check-in',submit:'Save check-in',toast:['Check-in logged','Compliance state updated on the record.'],
-    body:function(n){return '<div class="fld"><label>Type</label><select><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>'+
-      '<div class="fld"><label>Date &amp; time</label><input type="datetime-local" value="'+_now()+'"></div>'+
-      '<div class="fld"><label>Outcome</label><select><option>Compliant</option><option>Non-compliant</option><option>No-show</option></select></div>'+
-      '<div class="fld"><label>Notes</label><textarea placeholder="Optional notes…"></textarea></div>'+
-      '<div class="fld"><label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" style="width:auto"> Flag as violation</label></div>'}},
-  reminder:{title:'Send Court Reminder',submit:'Log reminder',tone:'warn',toast:['Reminder logged (not sent)','v1 is log-only — no SMS/email provider is wired yet.'],
-    body:function(n){return '<div class="note-hint">v1 is <b>log-only</b>: the reminder is recorded and marked “logged (not sent).” A provider (SMS/email) can be wired later with no UI change.</div>'+
-      '<div class="fld"><label>Channel</label><select><option>SMS</option><option>Email</option><option>Phone call</option></select></div>'+
-      '<div class="fld"><label>Lead time</label><select><option>24 hours before</option><option>48 hours before</option><option>1 week before</option></select></div>'+
-      '<div class="fld"><label>Message</label><textarea>Reminder: you have a court date scheduled. Please contact your officer with questions.</textarea></div>'}},
-  court:{title:'Add Court Date',submit:'Save court date',toast:['Court date added','Added to the client’s Court tab.'],
-    body:function(n){return '<div class="fld"><label>Event type</label><select><option>Arraignment</option><option>Preliminary hearing</option><option>Pretrial conference</option><option>Trial</option></select></div>'+
-      '<div class="fld"><label>Date &amp; time</label><input type="datetime-local"></div>'+
-      '<div class="fld"><label>Location</label><input type="text" placeholder="Courtroom / division"></div>'+
-      '<div class="fld"><label>Notes</label><textarea></textarea></div>'}},
   soon:{title:'Coming soon',submit:null,toast:['Coming soon','This action is part of a later build milestone.'],
     body:function(n){return '<div class="note-hint">This control is wired into the UI but its write path lands in a later milestone. Read views are fully live.</div>'}}
 };

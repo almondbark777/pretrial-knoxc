@@ -16,6 +16,8 @@
       {{template "chip" $r.StatusChip}}
       {{range $r.Badges}}{{template "chip" .}}{{end}}
       {{if $r.Closed}}<span class="chip neutral">Closed {{$r.ClosedDate}}</span>{{end}}
+      {{if .Pinned}}<span class="chip info" title="On your pinned list">📌 Pinned</span>{{end}}
+      {{range $r.Tags}}<span class="chip">{{.Label}}<form method="post" action="/admin/tag/delete" style="display:inline" onsubmit="return confirm('Remove tag {{.Label}}?')"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}"><button type="submit" aria-label="Remove tag {{.Label}}">×</button></form></span>{{end}}
     </div>
   </div>
   <div class="acts">
@@ -29,9 +31,15 @@
         <button type="button" onclick="cmOpen('paymentModal')">Record payment</button>
         <button type="button" onclick="cmOpen('courtModal')">Add court date</button>
         <button type="button" onclick="cmOpen('violationModal')">Record violation</button>
-        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Add tag</button>
-        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Pin client</button>
-        <button type="button" onclick="openAction('soon','{{$r.Name}}')">Correct field (override)</button>
+        <button type="button" onclick="cmOpen('screenModal')">Record drug screen</button>
+        <button type="button" onclick="cmOpen('tagModal')">Add tag</button>
+        <form method="post" action="/admin/pin/toggle" style="margin:0">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+          <button type="submit">{{if .Pinned}}Unpin client{{else}}Pin client{{end}}</button>
+        </form>
+        {{if .IsSupervisor}}<button type="button" onclick="cmOpen('overrideModal')">Correct field (override)</button>
+        <a href="/admin/audit?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">Audit history</a>
+        <a href="/admin/delete?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--risk-ink);font-size:13px">Delete client…</a>{{end}}
         <button type="button" onclick="openAction('soon','{{$r.Name}}')">Waive fee</button>
         <button type="button" onclick="window.print()">Print case file</button>
       </div>
@@ -39,10 +47,11 @@
   </div>
 </div>
 
-<div class="tabs">
+<div class="tabs" role="tablist" aria-label="Client record sections">
   <button class="active" data-tab="t-summary">Case Summary</button>
   <button data-tab="t-conditions">Conditions</button>
   <button data-tab="t-checkins">Check-ins</button>
+  <button data-tab="t-screens">Drug Screens</button>
   <button data-tab="t-court">Court</button>
   <button data-tab="t-fees">Payments / Fees</button>
   <button data-tab="t-docs">Documents</button>
@@ -94,13 +103,28 @@
   </div>
   {{end}}
   {{if $r.CheckIns}}
-  <div class="timeline">
+  <div class="timeline cv-auto">
     {{range $r.CheckIns}}
     <div class="tl"><div class="rail"><div class="dot {{.Tone}}">{{.Icon}}</div><div class="line"></div></div>
       <div class="card"><div class="top"><span class="t">{{.Title}}</span><span class="d">{{.Date}}</span></div>{{if .Detail}}<div class="x">{{.Detail}}</div>{{end}}</div></div>
     {{end}}
   </div>
   {{else}}<div class="panel"><div class="emptybox"><div class="big">◯</div>No check-ins recorded yet.{{if $r.CI.Error}}<div class="m" style="margin-top:6px">{{$r.CI.Error}} — windows can't be computed.</div>{{end}}</div></div>{{end}}
+</div>
+
+{{/* ── Drug Screens ── */}}
+<div class="tabpane" id="t-screens">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="cmOpen('screenModal')">+ Record Drug Screen</button></div>
+  {{if $r.DrugScreens}}
+  <div class="tablewrap"><div class="tscroll"><table class="data">
+    <thead><tr><th>Date</th><th>Test</th><th>Result</th><th>Substances</th><th>Notes</th><th>By</th><th></th></tr></thead>
+    <tbody>{{range $r.DrugScreens}}<tr style="cursor:default"><td>{{.Date}}</td><td>{{.Test}}</td><td>{{template "chip" .Result}}</td><td>{{if .Substances}}{{.Substances}}{{else}}—{{end}}</td><td class="muted">{{if .Notes}}{{.Notes}}{{else}}—{{end}}</td><td class="muted">{{.Author}}</td>
+      <td class="qc"><form method="post" action="/admin/drugscreen/delete" style="margin:0" onsubmit="return confirm('Delete this drug screen?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Delete drug screen">×</button></form></td></tr>{{end}}</tbody>
+  </table></div></div>
+  <p class="muted" style="margin:10px 2px 0;font-size:12px">A positive or refused screen should usually also be recorded as a violation (⋯ → Record violation → Failed drug screen).</p>
+  {{else}}<div class="panel"><div class="emptybox"><div class="big">◯</div>No drug screens recorded yet. Use <b>+ Record Drug Screen</b> to log the first one.</div></div>{{end}}
 </div>
 
 {{/* ── Court ── */}}
@@ -183,7 +207,7 @@
 {{/* ── Activity ── */}}
 <div class="tabpane" id="t-activity">
   {{if $r.Activity}}
-  <div class="timeline">
+  <div class="timeline cv-auto">
     {{range $r.Activity}}
     <div class="tl"><div class="rail"><div class="dot {{.Tone}}">{{.Icon}}</div><div class="line"></div></div>
       <div class="card"><div class="top"><span class="t">{{.Title}}</span><span class="d">{{.Date}}</span></div>{{if .Detail}}<div class="x">{{.Detail}}</div>{{end}}</div></div>
@@ -249,6 +273,22 @@
   </form>
 </div></div>
 
+<div class="backdrop" id="screenModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/drugscreen/add">
+    <div class="mh"><h3>Record Drug Screen</h3><button type="button" class="x" onclick="cmClose('screenModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Date</label><input type="date" name="screen_date" value="{{.AsOfInput}}" required></div>
+      <div class="fld"><label>Test type</label><select name="test_type"><option>urine</option><option>oral swab</option><option>hair</option><option>breath</option><option>other</option></select></div>
+      <div class="fld"><label>Result</label><select name="result" required><option>negative</option><option>positive</option><option>diluted</option><option>refused</option><option>pending</option></select></div>
+      <div class="fld"><label>Substances <span class="muted" style="font-weight:400">(if positive)</span></label><input type="text" name="substances" placeholder="e.g. THC, methamphetamine"></div>
+      <div class="fld"><label>Notes</label><textarea name="notes" placeholder="Observed collection, retest scheduled, …"></textarea></div>
+      <div class="note-hint">A <b>positive</b> or <b>refused</b> screen should usually also be recorded as a violation (category “Failed drug screen”).</div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('screenModal')">Cancel</button><button type="submit" class="btn">Record screen</button></div>
+  </form>
+</div></div>
+
 <div class="backdrop" id="courtModal" data-cm><div class="modal" role="dialog" aria-modal="true">
   <form method="post" action="/admin/courtdate/add">
     <div class="mh"><h3>Add Court Date</h3><button type="button" class="x" onclick="cmClose('courtModal')" aria-label="Close">×</button></div>
@@ -289,12 +329,41 @@
   </form>
 </div></div>
 
+{{/* ── Add tag (any officer) ── */}}
+<div class="backdrop" id="tagModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/tag/add">
+    <div class="mh"><h3>Add Tag</h3><button type="button" class="x" onclick="cmClose('tagModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="fld"><label>Tag label</label><input type="text" name="label" required placeholder="e.g. High risk, Veteran, Interpreter needed"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('tagModal')">Cancel</button><button type="submit" class="btn">Add tag</button></div>
+  </form>
+</div></div>
+
+{{/* ── Correct field / override (supervisor only — server also enforces) ── */}}
+{{if .IsSupervisor}}
+<div class="backdrop" id="overrideModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/override">
+    <div class="mh"><h3>Correct Field (Override)</h3><button type="button" class="x" onclick="cmClose('overrideModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">Supervisor correction of an imported field. The corrected value shows everywhere, survives the daily import, and is audited &amp; reversible.</p>
+      <div class="fld"><label>Field</label><select name="field">{{range .OverridableFields}}<option value="{{.Key}}">{{.Label}}</option>{{end}}</select></div>
+      <div class="fld"><label>Corrected value <span class="muted" style="font-weight:400">(blank to clear)</span></label><input type="text" name="value" placeholder="New value"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('overrideModal')">Cancel</button><button type="submit" class="btn">Apply override</button></div>
+  </form>
+</div></div>
+{{end}}
+
 <script>
-function cmOpen(id){var m=document.getElementById(id);m.classList.add('show');var f=m.querySelector('textarea,input:not([type=hidden]),select');if(f)setTimeout(function(){f.focus()},30);}
+var cmLastFocus=null;
+function cmOpen(id){var m=document.getElementById(id);cmLastFocus=document.activeElement;m.classList.add('show');var f=m.querySelector('textarea,input:not([type=hidden]),select');if(f)setTimeout(function(){f.focus()},30);}
 function cmOutcome(id){document.getElementById('oc_id').value=id;cmOpen('outcomeModal');}
-function cmClose(id){document.getElementById(id).classList.remove('show');}
-document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('.backdrop[data-cm].show').forEach(function(m){m.classList.remove('show')});});
-document.querySelectorAll('.backdrop[data-cm]').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('show');});});
+function cmClose(id){document.getElementById(id).classList.remove('show');if(cmLastFocus&&cmLastFocus.focus){cmLastFocus.focus();cmLastFocus=null;}}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('.backdrop[data-cm].show').forEach(function(m){cmClose(m.id);});});
+document.querySelectorAll('.backdrop[data-cm]').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m)cmClose(m.id);});});
 </script>
 
 <style>
@@ -306,13 +375,41 @@ document.querySelectorAll('.backdrop[data-cm]').forEach(function(m){m.addEventLi
 </style>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
-  // tabs
-  document.querySelectorAll('.tabs button').forEach(function(b){
-    b.addEventListener('click',function(){
-      document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('active')});
-      document.querySelectorAll('.tabpane').forEach(function(x){x.classList.remove('active')});
-      b.classList.add('active');
-      var p=document.getElementById(b.dataset.tab); if(p)p.classList.add('active');
+  // tabs — WAI-ARIA tablist: role/aria-selected, roving tabindex, arrow-key nav
+  var tabs=[].slice.call(document.querySelectorAll('.tabs button'));
+  function selectTab(b,focus){
+    tabs.forEach(function(x){
+      var on=(x===b);
+      x.classList.toggle('active',on);
+      x.setAttribute('aria-selected',on?'true':'false');
+      x.tabIndex=on?0:-1;
+      var p=document.getElementById(x.dataset.tab);
+      if(p)p.classList.toggle('active',on);
+    });
+    if(focus)b.focus();
+  }
+  tabs.forEach(function(b,i){
+    b.type='button';
+    b.setAttribute('role','tab');
+    b.id='tab-'+b.dataset.tab;
+    b.setAttribute('aria-controls',b.dataset.tab);
+    var on=b.classList.contains('active');
+    b.setAttribute('aria-selected',on?'true':'false');
+    b.tabIndex=on?0:-1;
+    var p=document.getElementById(b.dataset.tab);
+    if(p){
+      p.setAttribute('role','tabpanel');
+      p.setAttribute('aria-labelledby',b.id);
+      if(!p.querySelector('a,button,input,select,textarea,[tabindex]'))p.setAttribute('tabindex','0');
+    }
+    b.addEventListener('click',function(){selectTab(b,false);});
+    b.addEventListener('keydown',function(e){
+      var n=null,L=tabs.length;
+      if(e.key==='ArrowRight'||e.key==='ArrowDown')n=tabs[(i+1)%L];
+      else if(e.key==='ArrowLeft'||e.key==='ArrowUp')n=tabs[(i-1+L)%L];
+      else if(e.key==='Home')n=tabs[0];
+      else if(e.key==='End')n=tabs[L-1];
+      if(n){e.preventDefault();selectTab(n,true);}
     });
   });
   // overflow menu

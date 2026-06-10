@@ -116,6 +116,49 @@ func TestConsoleDashboardViolationMine(t *testing.T) {
 	}
 }
 
+// The compliance page's Violations roster resolves each violation to its client,
+// composes a detail string, sorts newest-first (undated last), and falls back to
+// "IDN x" for an unknown client. This is what makes the dashboard's
+// "Open Violations" KPI deep-link land on actual rows instead of an empty page.
+func TestViolationRoster(t *testing.T) {
+	clients := map[string][]*compute.Client{
+		"1": {{IDN: "1", Name: "Bravo, Bob", Status: "Open", Officer: "Alice Smith", Level: "2"}},
+		"2": {{IDN: "2", Name: "Alpha, Ann", Status: "Open", Officer: "Carol Jones", Level: "1"}},
+	}
+	viols := []models.Violation{
+		{IDN: "1", Category: "Curfew", Description: "home late", ViolationDate: "2026-06-01"},
+		{IDN: "2", Category: "", Description: "", ViolationDate: "2026-06-05"},
+		{IDN: "9", Category: "Travel", Description: "left county", ViolationDate: ""}, // unknown client, undated
+	}
+	rows := violationRoster(clients, viols)
+	if len(rows) != 3 {
+		t.Fatalf("got %d rows, want 3", len(rows))
+	}
+	// newest dated first (Jun 5 → Jun 1), undated last.
+	if rows[0].IDN != "2" || rows[1].IDN != "1" || rows[2].IDN != "9" {
+		t.Errorf("sort order = %s,%s,%s; want 2,1,9", rows[0].IDN, rows[1].IDN, rows[2].IDN)
+	}
+	// name + officer + level resolved from the clients map.
+	if rows[1].Name != "Bravo, Bob" || rows[1].Officer != "Alice Smith" || rows[1].Level != 2 {
+		t.Errorf("row resolve = %+v, want Bravo,Bob / Alice Smith / L2", rows[1])
+	}
+	// unknown client falls back to "IDN 9".
+	if rows[2].Name != "IDN 9" {
+		t.Errorf("unknown client name = %q, want %q", rows[2].Name, "IDN 9")
+	}
+	// detail composes category + description; empty → placeholder.
+	if rows[1].Detail != "Curfew — home late" {
+		t.Errorf("detail = %q, want %q", rows[1].Detail, "Curfew — home late")
+	}
+	if rows[0].Detail != "Violation recorded" {
+		t.Errorf("empty detail = %q, want placeholder", rows[0].Detail)
+	}
+	// dated rows are display-formatted.
+	if rows[1].Date != "Jun 1, 2026" {
+		t.Errorf("date = %q, want %q", rows[1].Date, "Jun 1, 2026")
+	}
+}
+
 func TestConsoleClientRowsParity(t *testing.T) {
 	d := testDB(t)
 	clients, err := db.BuildClients(d, adminTrack)
@@ -341,9 +384,120 @@ func TestProfileBackNext(t *testing.T) {
 		t.Errorf("same-origin next not honored: %q", to)
 	}
 	for _, bad := range []string{"https://evil.com", "//evil.com", ""} {
-		if to := mk(bad); !strings.HasPrefix(to, "/client_profile.html") {
-			t.Errorf("next %q should fall back to profile, got %q", bad, to)
+		if to := mk(bad); to != "/console/clients/123" {
+			t.Errorf("next %q should fall back to the console record, got %q", bad, to)
 		}
+	}
+}
+
+// TestSanitizeViewQuery pins that saved views only carry the roster's known
+// filter params, re-encoded deterministically — junk and injected params drop.
+func TestSanitizeViewQuery(t *testing.T) {
+	got := sanitizeViewQuery("comp=behind&evil=<script>&level=3&next=//evil.com&q=smith")
+	if got != "comp=behind&level=3&q=smith" {
+		t.Errorf("sanitizeViewQuery = %q, want comp/level/q only, sorted", got)
+	}
+	if got := sanitizeViewQuery(""); got != "" {
+		t.Errorf("empty query = %q, want empty", got)
+	}
+	if got := sanitizeViewQuery("q=O%27Brien"); got != "q=O%27Brien" {
+		t.Errorf("escaped value mangled: %q", got)
+	}
+}
+
+// TestPinnedRows pins the dashboard quick-list resolution: pin order kept
+// (newest first as PinnedIDNs returns), deleted/unknown IDNs skipped silently.
+func TestPinnedRows(t *testing.T) {
+	clients := map[string][]*compute.Client{
+		"1": {{IDN: "1", Name: "ALPHA TEST", Status: "Open", Level: "3", Officer: "Alice Smith"}},
+		"2": {{IDN: "2", Name: "BRAVO TEST", Status: "Open", Level: "2"}},
+	}
+	rows := pinnedRows(clients, []string{"2", "999", "1"}) // 999 = deleted/unknown
+	if len(rows) != 2 {
+		t.Fatalf("pinnedRows = %d rows, want 2 (unknown skipped)", len(rows))
+	}
+	if rows[0].IDN != "2" || rows[1].IDN != "1" {
+		t.Errorf("pin order = [%s %s], want [2 1]", rows[0].IDN, rows[1].IDN)
+	}
+	if rows[1].Detail != "L3 · Alice Smith" {
+		t.Errorf("detail = %q, want %q", rows[1].Detail, "L3 · Alice Smith")
+	}
+	if rows[0].Detail != "L2" {
+		t.Errorf("officer-less detail = %q, want %q", rows[0].Detail, "L2")
+	}
+}
+
+func TestDrugScreenChip(t *testing.T) {
+	cases := []struct{ result, tone, label string }{
+		{"positive", "risk", "Positive"},
+		{"refused", "risk", "Refused"},
+		{"diluted", "warn", "Diluted"},
+		{"negative", "ok", "Negative"},
+		{"pending", "neutral", "Pending"},
+		{" Positive ", "risk", "Positive"}, // trimmed + case-insensitive
+		{"", "neutral", "—"},
+		{"inconclusive", "neutral", "Inconclusive"},
+	}
+	for _, c := range cases {
+		got := drugScreenChip(c.result)
+		if got.Tone != c.tone || got.Label != c.label {
+			t.Errorf("drugScreenChip(%q) = {%s %s}, want {%s %s}", c.result, got.Tone, got.Label, c.tone, c.label)
+		}
+	}
+}
+
+// TestConsoleRecordDrugScreens pins the record carry-through: screen rows with
+// toned result chips, the "Last Drug Screen" summary field (newest, risk-toned
+// when positive), and the screens merged into the Activity timeline.
+func TestConsoleRecordDrugScreens(t *testing.T) {
+	c := &compute.Client{IDN: "1", Name: "Test Client", Status: "Open", Level: "2",
+		RefD: compute.Noon(2026, 1, 1), RefOK: true}
+	track := compute.Noon(2026, 6, 1)
+	ci := compute.ComputeCheckIns(*c, track)
+	ptr := compute.ComputePTRFees(*c, track, "")
+	gps := compute.ComputeGPS(*c, track, nil, "")
+	extras := models.DefendantExtras{DrugScreens: []models.DrugScreen{ // newest first, like ListDrugScreens
+		{ID: 2, IDN: "1", ScreenDate: "2026-05-20", TestType: "urine", Result: "positive",
+			Substances: "THC", Officer: "tester@knoxsheriff.org"},
+		{ID: 1, IDN: "1", ScreenDate: "2026-05-01", TestType: "urine", Result: "negative",
+			Officer: "tester@knoxsheriff.org"},
+	}}
+	rec := consoleRecord(c, []*compute.Client{c}, track, ci, ptr, gps, extras)
+
+	if len(rec.DrugScreens) != 2 {
+		t.Fatalf("DrugScreens = %d rows, want 2", len(rec.DrugScreens))
+	}
+	if rec.DrugScreens[0].Result.Tone != "risk" || rec.DrugScreens[0].Result.Label != "Positive" {
+		t.Errorf("newest screen chip = %+v, want risk/Positive", rec.DrugScreens[0].Result)
+	}
+	if rec.DrugScreens[1].Result.Tone != "ok" {
+		t.Errorf("older screen chip tone = %q, want ok", rec.DrugScreens[1].Result.Tone)
+	}
+	if rec.DrugScreens[0].Author != "Tester" {
+		t.Errorf("screen author = %q, want display name Tester", rec.DrugScreens[0].Author)
+	}
+
+	var last *ConsoleField
+	for i := range rec.Summary {
+		if rec.Summary[i].K == "Last Drug Screen" {
+			last = &rec.Summary[i]
+		}
+	}
+	if last == nil {
+		t.Fatal("summary is missing the Last Drug Screen field")
+	}
+	if !strings.Contains(last.V, "May 20, 2026") || !strings.Contains(last.V, "Positive") || last.Tone != "risk" {
+		t.Errorf("Last Drug Screen = %q (tone %q), want newest positive screen with risk tone", last.V, last.Tone)
+	}
+
+	found := false
+	for _, a := range rec.Activity {
+		if strings.HasPrefix(a.Title, "Drug screen") && strings.Contains(a.Detail, "THC") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("activity timeline has no drug-screen entry")
 	}
 }
 
@@ -405,8 +559,8 @@ func TestInitials(t *testing.T) {
 		"":                    "?",
 	}
 	for in, want := range cases {
-		if got := initials(in); got != want {
-			t.Errorf("initials(%q) = %q, want %q", in, got, want)
+		if got := Initials(in); got != want {
+			t.Errorf("Initials(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

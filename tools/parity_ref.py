@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
-parity_ref.py — faithful Python port of the canonical PTR Client Lookup v0.82
+parity_ref.py — faithful Python port of the canonical PTR Client Lookup
 JS data layer (assets/8a6913e5-*.js): parsePretrialLevel, _parseDay,
 computeCheckIns, computePTRFees, computeGPS.
+
+Tracks tracker v0.83 / Go compute (2026-06-02 phone-vs-in-person rule): a
+check-in window is satisfied only when BOTH an in-person and a phone contact
+occur in it; _ci_kind() mirrors compute.CheckInKind / the bundle's _ciKind
+byte-for-byte. (v0.82 counted any check-in type — goldens generated before
+2026-06-02 used that older rule.)
 
 Purpose (Phase 2 parity audit + Phase 4 Go seed):
   * The LIVE webapp (app_lookup.py -> /api/lookup_data -> lookup_datasets())
@@ -124,51 +130,94 @@ def parse_level(raw):
 
 # ── check-in compliance ──
 
+_re_letters = re.compile(r"[^a-z]")
+
+
+def _ci_kind(typ):
+    """Mirror of Go compute.CheckInKind / tracker v0.83 _ciKind: classify a
+    check-in type into (in_person, phone). Unknown/junk satisfies neither."""
+    n = _re_letters.sub("", str(typ or "").lower())
+    if "inperson" in n or "office" in n or "walkin" in n:
+        return True, False
+    if any(k in n for k in ("phone", "text", "call", "virtual", "video", "tele")):
+        return False, True
+    return False, False
+
+
 def compute_check_ins(c, today_str=None):
     level = c["_level"]
     refdate = c["_refD"]
     today = parse_day(today_str) if today_str else c["_today"]
     if not refdate:
         return {"level": level, "refDate": None, "today": today, "windows": [],
-                "missed": [], "lastCheckIn": None, "nextDue": None, "error": "No referral date"}
+                "missed": [], "lastCheckIn": None, "lastInPerson": None,
+                "lastPhone": None, "nextDue": None, "error": "No referral date"}
     closed = c["_closedD"]
     eff_end = closed if (closed and closed < today) else today
 
-    all_ci = sorted([x for x in (ci["_d"] for ci in c["checkIns"]) if x], )
+    # v0.83 rule: each window needs BOTH an in-person and a phone contact.
+    in_person_ci, phone_ci, all_ci = [], [], []
+    for ci in c["checkIns"]:
+        d = ci["_d"]
+        if not d:
+            continue
+        all_ci.append(d)
+        ip, ph = _ci_kind(ci.get("type"))
+        if ip:
+            in_person_ci.append(d)
+        if ph:
+            phone_ci.append(d)
+    all_ci.sort()
+    in_person_ci.sort()
+    phone_ci.sort()
     last_ci = all_ci[-1] if all_ci else None
+    last_in_person = in_person_ci[-1] if in_person_ci else None
+    last_phone = phone_ci[-1] if phone_ci else None
+
+    def _hit(dates, start, end):
+        return any(start <= d <= end for d in dates)
 
     initial_deadline = add_days(refdate, 3)
-    initial_made = any(refdate <= d <= initial_deadline for d in all_ci)
+    init_ip = _hit(in_person_ci, refdate, initial_deadline)
+    init_ph = _hit(phone_ci, refdate, initial_deadline)
+    initial_made = init_ip and init_ph
     initial_missed = (not initial_made) and eff_end > initial_deadline
 
     windows = [{
         "type": "initial", "start": refdate, "end": initial_deadline,
         "deadline": initial_deadline, "satisfied": initial_made,
+        "satisfiedInPerson": init_ip, "satisfiedPhone": init_ph,
         "missed": initial_missed, "label": "Initial (3-day)",
     }]
 
+    common = {"refDate": refdate, "today": eff_end, "lastCheckIn": last_ci,
+              "lastInPerson": last_in_person, "lastPhone": last_phone}
+
     if level == 1:
-        return {"level": level, "refDate": refdate, "today": eff_end, "windows": windows,
-                "missed": [w for w in windows if w["missed"]], "lastCheckIn": last_ci,
-                "nextDue": None if initial_made else {"type": "initial"}}
+        return {"level": level, "windows": windows,
+                "missed": [w for w in windows if w["missed"]],
+                "nextDue": None if initial_made else {"type": "initial"}, **common}
 
     if level == 2:
         cur = next_month(first_of_month(initial_deadline))
         while cur <= eff_end:
             month_end = last_of_month(cur)
             window_end = month_end if month_end < eff_end else eff_end
-            hit = any(cur <= d <= window_end for d in all_ci)
+            ip = _hit(in_person_ci, cur, window_end)
+            ph = _hit(phone_ci, cur, window_end)
+            hit = ip and ph
             month_closed = eff_end >= month_end or (closed and closed <= month_end)
             is_future = cur > eff_end
             windows.append({
                 "type": "month", "start": cur, "end": month_end, "deadline": month_end,
-                "satisfied": hit, "missed": (not hit and bool(month_closed) and not is_future),
+                "satisfied": hit, "satisfiedInPerson": ip, "satisfiedPhone": ph,
+                "missed": (not hit and bool(month_closed) and not is_future),
                 "label": cur.strftime("%B %Y"),
             })
             cur = next_month(cur)
         missed = [w for w in windows if w["missed"]]
-        return {"level": level, "refDate": refdate, "today": eff_end, "windows": windows,
-                "missed": missed, "lastCheckIn": last_ci, "nextDue": _next_due(windows, eff_end)}
+        return {"level": level, "windows": windows, "missed": missed,
+                "nextDue": _next_due(windows, eff_end), **common}
 
     # Level 3 (or anything not 1/2 — incl GPS-as-L3 and unknown). Mon-Fri weeks.
     week_mon = add_days(monday_of_week(initial_deadline), 7)
@@ -177,19 +226,22 @@ def compute_check_ins(c, today_str=None):
         guard += 1
         week_fri = add_days(week_mon, 4)
         window_end = week_fri if week_fri < eff_end else eff_end
-        hit = any(week_mon <= d <= window_end for d in all_ci)
+        ip = _hit(in_person_ci, week_mon, window_end)
+        ph = _hit(phone_ci, week_mon, window_end)
+        hit = ip and ph
         week_closed = eff_end >= week_fri
         is_future = week_mon > eff_end
         windows.append({
             "type": "week", "start": week_mon, "end": week_fri, "deadline": week_fri,
-            "satisfied": hit, "missed": (not hit and week_closed and not is_future),
+            "satisfied": hit, "satisfiedInPerson": ip, "satisfiedPhone": ph,
+            "missed": (not hit and week_closed and not is_future),
             "label": "Week of " + week_mon.strftime("%b %d"),
         })
         week_mon = add_days(week_mon, 7)
     missed = [w for w in windows if w["missed"]]
     out_level = level if level else (3 if c["gpsActive"] else None)
-    return {"level": out_level, "refDate": refdate, "today": eff_end, "windows": windows,
-            "missed": missed, "lastCheckIn": last_ci, "nextDue": _next_due(windows, eff_end)}
+    return {"level": out_level, "windows": windows, "missed": missed,
+            "nextDue": _next_due(windows, eff_end), **common}
 
 
 def _next_due(windows, eff_end):
@@ -433,10 +485,12 @@ def dump(c, today_str):
     print(f"  #checkIns={len(c['checkIns'])}  #payments={len(c['payments'])}")
     print(f"  CHECK-INS: level={ci['level']} windows={len(ci['windows'])} "
           f"missed={len(ci['missed'])} lastCheckIn={_fmt(ci['lastCheckIn'])} "
+          f"lastInPerson={_fmt(ci.get('lastInPerson'))} lastPhone={_fmt(ci.get('lastPhone'))} "
           f"err={ci.get('error')}")
     for w in ci["windows"][:8]:
         print(f"      {w['type']:7} {_fmt(w['start'])}..{_fmt(w['end'])} "
-              f"sat={int(w['satisfied'])} miss={int(w['missed'])} [{w['label']}]")
+              f"sat={int(w['satisfied'])} ip={int(w.get('satisfiedInPerson', 0))} "
+              f"ph={int(w.get('satisfiedPhone', 0))} miss={int(w['missed'])} [{w['label']}]")
     if len(ci["windows"]) > 8:
         print(f"      ... (+{len(ci['windows'])-8} more)")
     print(f"  PTR FEES: applies={ptr['applies']} months={len(ptr['monthsOwed'])} "

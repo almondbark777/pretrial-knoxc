@@ -16,13 +16,29 @@
   <select id="f-gps"><option value="">GPS: any</option><option value="1">GPS active</option><option value="0">No GPS</option></select>
   <span class="count" id="f-count"></span>
   <span style="flex:1"></span>
+  <button type="button" class="btn ghost" id="saveViewBtn" title="Save the current filter combination as a named one-click view">★ Save view</button>
   <button type="button" class="btn ghost" id="exportBtn" title="Download the filtered roster as CSV">Export CSV ⤓</button>
   <a class="btn" href="/console/clients/new">+ New Referral</a>
 </div>
 
+{{if .Views}}
+<div class="viewsrow" role="navigation" aria-label="Saved views">
+  <span class="muted" style="font-size:12px;font-weight:600">Saved views:</span>
+  {{range .Views}}
+  <span class="viewchip">
+    <a href="{{.URL}}">{{.Name}}</a>
+    <form method="post" action="/admin/view/delete" style="margin:0;display:inline" onsubmit="return confirm('Delete saved view “{{.Name}}”?');">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients">
+      <button type="submit" aria-label="Delete saved view {{.Name}}">×</button>
+    </form>
+  </span>
+  {{end}}
+</div>
+{{end}}
+
 <div class="bulkbar" id="bulkbar" role="region" aria-label="Bulk actions">
   <span class="bb-count" id="bulk-count">0 selected</span>
-  <a href="#" class="bb-link" id="bulk-selall" style="display:none">Select all filtered</a>
+  <button type="button" class="bb-link" id="bulk-selall" style="display:none">Select all filtered</button>
   <span style="flex:1"></span>
   <button type="button" class="btn ghost sm" id="bulk-export">Export selected ⤓</button>
   <button type="button" class="btn ghost sm" id="bulk-checkin">✓ Check-in selected</button>
@@ -33,16 +49,16 @@
   <div class="tscroll">
     <table class="data" id="ctable">
       <thead><tr>
-        <th class="cbcol"><input type="checkbox" id="cb-all" aria-label="Select all clients on this page"></th>
-        <th data-col="1" data-type="text">Client <span class="arr">↕</span></th>
-        <th data-col="2" data-type="text">Case # <span class="arr">↕</span></th>
-        <th data-col="3" data-type="num">Level <span class="arr">↕</span></th>
-        <th data-col="4" data-type="text">Status <span class="arr">↕</span></th>
-        <th data-col="5" data-type="text">Next Court <span class="arr">↕</span></th>
-        <th data-col="6" data-type="text">Next Check-in <span class="arr">↕</span></th>
-        <th data-col="7" data-type="text">Compliance <span class="arr">↕</span></th>
-        <th data-col="8" data-type="text">Officer <span class="arr">↕</span></th>
-        <th aria-label="Quick actions"></th>
+        <th class="cbcol" scope="col"><input type="checkbox" id="cb-all" aria-label="Select all clients on this page"></th>
+        <th data-col="1" data-type="text" scope="col" tabindex="0" aria-sort="none">Client <span class="arr">↕</span></th>
+        <th data-col="2" data-type="text" scope="col" tabindex="0" aria-sort="none">Case # <span class="arr">↕</span></th>
+        <th data-col="3" data-type="num" scope="col" tabindex="0" aria-sort="none">Level <span class="arr">↕</span></th>
+        <th data-col="4" data-type="text" scope="col" tabindex="0" aria-sort="none">Status <span class="arr">↕</span></th>
+        <th data-col="5" data-type="text" scope="col" tabindex="0" aria-sort="none">Next Court <span class="arr">↕</span></th>
+        <th data-col="6" data-type="text" scope="col" tabindex="0" aria-sort="none">Next Check-in <span class="arr">↕</span></th>
+        <th data-col="7" data-type="text" scope="col" tabindex="0" aria-sort="none">Compliance <span class="arr">↕</span></th>
+        <th data-col="8" data-type="text" scope="col" tabindex="0" aria-sort="none">Officer <span class="arr">↕</span></th>
+        <th scope="col" aria-label="Quick actions"></th>
       </tr></thead>
       {{/* Rows are windowed: only the visible page is rendered into the DOM by JS
             from the compact ROWS array below, so a multi-thousand-row roster stays
@@ -57,6 +73,19 @@
   <span id="pgInfo" class="muted"></span>
   <button type="button" class="btn ghost sm" id="pgNext">Next ›</button>
 </div>
+
+<div class="backdrop" id="svModal"><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/view/save">
+    <div class="mh"><h3>Save View</h3><button type="button" class="x" onclick="document.getElementById('svModal').classList.remove('show')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="query" id="svQuery">
+      <div class="fld"><label>View name</label><input type="text" name="name" id="svName" required maxlength="60" placeholder="e.g. My L3 · behind on GPS"></div>
+      <div class="note-hint" id="svSummary"></div>
+      <div class="note-hint">Saved views are yours only. Re-saving an existing name replaces it.</div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="document.getElementById('svModal').classList.remove('show')">Cancel</button><button type="submit" class="btn">Save view</button></div>
+  </form>
+</div></div>
 
 <div class="backdrop" id="qcModal"><div class="modal" role="dialog" aria-modal="true">
   <form method="post" action="/admin/checkin/add">
@@ -86,12 +115,18 @@ table.data tbody tr.selected,table.data tbody tr.selected:hover{background:var(-
 .bulkbar.show{display:flex}
 .bulkbar .bb-count{font-weight:700;color:var(--brand)}
 html[data-theme="dark"] .bulkbar .bb-count,html[data-theme="dark"] .bulkbar .bb-link{color:var(--accent-ink)}
-.bulkbar .bb-link{font-size:12.5px;font-weight:600;color:var(--brand);text-decoration:underline;cursor:pointer}
+.bulkbar .bb-link{font-size:12.5px;font-weight:600;color:var(--brand);text-decoration:underline;cursor:pointer;-webkit-appearance:none;appearance:none;background:transparent;border:0;padding:0;font-family:inherit}
 @keyframes bbIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .empty-row td{padding:0}
 .empty-row:hover{background:transparent;cursor:default}
 .empty-state{display:flex;flex-direction:column;align-items:center;gap:12px;padding:56px 20px;color:var(--muted);text-align:center;font-size:14px}
 .empty-state .es-ic{font-size:30px;opacity:.45;line-height:1}
+.viewsrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 0}
+.viewchip{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);padding:4px 6px 4px 12px}
+.viewchip a{font-size:12.5px;font-weight:600;color:var(--brand)}
+html[data-theme="dark"] .viewchip a{color:var(--accent-ink)}
+.viewchip button{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;padding:0 6px;border-radius:50%}
+.viewchip button:hover{color:var(--risk-ink)}
 </style>
 <script>
 /* ── Windowed roster ──────────────────────────────────────────────────────────
@@ -271,18 +306,31 @@ document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('bulk-clear').addEventListener('click',function(){sel.clear();renderPage()});
   document.getElementById('bulk-export').addEventListener('click',function(){exportRows(view.filter(function(r){return sel.has(r.i)}),'selected')});
   document.getElementById('bulk-checkin').addEventListener('click',function(){
-    var n=sel.size, plural=(n===1?'':'s');
-    bulkDemo('Bulk check-in — '+n+' client'+plural,
-      '<div class="note-hint">Demo: this would log a check-in for the '+n+' selected client'+plural+' in one step. Single check-ins already persist to the record; the bulk write path lands in a later milestone.</div>',
-      'Check-ins logged (demo)', n+' selected client'+plural+' would be marked checked-in.');
-  });
-  function bulkDemo(title,bodyHtml,tt,tm){
-    document.getElementById('am-title').textContent=title;
-    document.getElementById('am-body').innerHTML=bodyHtml;
-    document.getElementById('am-foot').innerHTML='<button type="button" class="btn ghost" onclick="closeAction()">Cancel</button><button type="button" class="btn" id="am-bulk-go">Confirm</button>';
-    document.getElementById('am-bulk-go').addEventListener('click',function(){closeAction();ptToast(tt,tm,'info')});
+    var n=sel.size; if(!n)return;
+    var plural=(n===1?'':'s');
+    var csrf=(document.querySelector('#qcModal input[name=csrf]')||{}).value||'';
+    var asof=(document.querySelector('#qcModal input[name=date]')||{}).value||'';
+    document.getElementById('am-title').textContent='Bulk check-in — '+n+' client'+plural;
+    document.getElementById('am-body').innerHTML=
+      '<p class="note-hint" style="margin:0 0 12px">Logs one check-in for each selected client. This writes to every selected record.</p>'+
+      '<div class="fld"><label for="bc-type">Type</label><select id="bc-type"><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>'+
+      '<div class="fld"><label for="bc-date">Date</label><input type="date" id="bc-date" value="'+asof+'"></div>'+
+      '<div class="fld"><label for="bc-note">Note <span class="muted" style="font-weight:400">(applied to all)</span></label><textarea id="bc-note" placeholder="Optional — e.g. monthly compliance sweep"></textarea></div>';
+    document.getElementById('am-foot').innerHTML='<button type="button" class="btn ghost" onclick="closeAction()">Cancel</button><button type="button" class="btn" id="bc-go">Log '+n+' check-in'+plural+'</button>';
+    document.getElementById('bc-go').addEventListener('click',function(){
+      var go=this; go.disabled=true;
+      var body=new URLSearchParams({csrf:csrf, idns:Array.from(sel).join(','), date:document.getElementById('bc-date').value, type_of_check_in:document.getElementById('bc-type').value, note:document.getElementById('bc-note').value});
+      fetch('/admin/checkin/bulk',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},credentials:'same-origin',body:body})
+        .then(function(r){return r.json().catch(function(){return {ok:false};});})
+        .then(function(j){
+          closeAction();
+          if(j&&j.ok){ ptToast('Check-ins logged', j.logged+' client'+(j.logged===1?'':'s')+' marked checked-in.','info'); sel.clear(); renderPage(); }
+          else { ptToast('Bulk check-in failed',(j&&j.error)||'No check-ins were logged.','warn'); go.disabled=false; }
+        })
+        .catch(function(){ closeAction(); ptToast('Bulk check-in failed','Network error — please retry.','warn'); });
+    });
     var m=document.getElementById('actionModal');m.classList.add('show');m.setAttribute('aria-hidden','false');
-  }
+  });
 
   /* ── paging ──────────────────────────────────────────────────────────────── */
   pgPrev.addEventListener('click',function(){page--;renderPage();window.scrollTo(0,0)});
@@ -303,14 +351,43 @@ document.addEventListener('DOMContentLoaded',function(){
 
   /* ── sorting (reorder the data, re-page) ─────────────────────────────────── */
   document.querySelectorAll('#ctable th[data-col]').forEach(function(th){
-    th.addEventListener('click',function(){
+    function doSort(){
       var col=+th.dataset.col;
       sortDir=(sortCol===col)?-sortDir:1; sortCol=col;
-      document.querySelectorAll('#ctable th').forEach(function(x){x.classList.remove('sorted')});
+      document.querySelectorAll('#ctable th[data-col]').forEach(function(x){
+        x.classList.remove('sorted'); x.setAttribute('aria-sort','none');
+        var a=x.querySelector('.arr'); if(a)a.textContent='↕';
+      });
       th.classList.add('sorted');
+      th.setAttribute('aria-sort',sortDir===1?'ascending':'descending');
+      var arr=th.querySelector('.arr'); if(arr)arr.textContent=(sortDir===1?'▲':'▼');
       applySort(); page=0; renderPage();
+    }
+    th.addEventListener('click',doSort);
+    th.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();doSort();}
     });
   });
+
+  /* ── saved views: capture the current filter combo into the save modal ───── */
+  var svBtn=document.getElementById('saveViewBtn'),svModal=document.getElementById('svModal');
+  if(svBtn){
+    svBtn.addEventListener('click',function(){
+      var parts=[],labels=[];
+      function add(k,el,label){
+        var v=(el.value||'').trim(); if(!v)return;
+        parts.push(k+'='+encodeURIComponent(v));
+        labels.push(label+': '+(el.tagName==='SELECT'?el.options[el.selectedIndex].text:'“'+v+'”'));
+      }
+      add('q',fName,'Search'); add('status',fStatus,'Status'); add('level',fLevel,'Level');
+      add('officer',fOff,'Officer'); add('comp',fComp,'Compliance'); add('gps',fGps,'GPS');
+      document.getElementById('svQuery').value=parts.join('&');
+      document.getElementById('svSummary').textContent=labels.length?('Saves: '+labels.join(' · ')):'No filters set — this saves an “all clients” view.';
+      svModal.classList.add('show');
+      setTimeout(function(){document.getElementById('svName').focus()},30);
+    });
+    svModal.addEventListener('click',function(e){if(e.target===svModal)svModal.classList.remove('show')});
+  }
 
   /* ── seed from URL params (shareable filters / KPI deep-links), then render ── */
   if(F.q)fName.value=F.q;

@@ -11,9 +11,9 @@
 <div class="panel" style="margin-bottom:18px">
   <div class="h"><h2>Behind on GPS</h2><span class="grow"></span><span class="count">{{len .Behind}}</span>
     <a class="btn ghost sm" href="/export/behind.csv" style="margin-left:10px">Export CSV ⤓</a></div>
-  <div class="tscroll">
+  <div class="tscroll cv-auto">
     {{if .Behind}}<table class="data">
-      <thead><tr><th>Client</th><th>Officer</th><th>Level</th><th class="num">Owed</th><th class="num">Paid</th><th class="num">Behind</th><th>Fees</th></tr></thead>
+      <thead><tr><th scope="col">Client</th><th scope="col">Officer</th><th scope="col">Level</th><th class="num" scope="col">Owed</th><th class="num" scope="col">Paid</th><th class="num" scope="col">Behind</th><th scope="col">Fees</th></tr></thead>
       <tbody>{{range .Behind}}<tr data-href="/console/clients/{{.IDN}}" onclick="location.href='/console/clients/{{.IDN}}'">
         <td><div class="namecell"><span class="av">{{initials .Name}}</span><span class="nm">{{.Name}}</span></div></td>
         <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td>
@@ -27,14 +27,27 @@
 <div class="panel">
   <div class="h"><h2>Missed Check-Ins this month</h2><span class="grow"></span><span class="count">{{len .Missed}}</span>
     <a class="btn ghost sm" href="/export/missed.csv" style="margin-left:10px">Export CSV ⤓</a></div>
-  <div class="tscroll">
+  <div class="tscroll cv-auto">
     {{if .Missed}}<table class="data">
-      <thead><tr><th>Client</th><th>Officer</th><th>Level</th><th>Detail</th></tr></thead>
+      <thead><tr><th scope="col">Client</th><th scope="col">Officer</th><th scope="col">Level</th><th scope="col">Detail</th></tr></thead>
       <tbody>{{range .Missed}}<tr data-href="/console/clients/{{.IDN}}" onclick="location.href='/console/clients/{{.IDN}}'">
         <td><div class="namecell"><span class="av">{{initials .Name}}</span><span class="nm">{{.Name}}</span></div></td>
         <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody>
     </table>{{else}}<div class="emptybox"><div class="big">✓</div>Everyone has checked in this month.</div>{{end}}
   </div>
 </div>
-<p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">Both rosters are the current standing as of the selected date (system go-live · {{.Epoch}}). L1 clients are excluded from the monthly Missed roster and the 3-day grace is honored, matching the tracker (Brief 2.8).</p>
+
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Violations <span class="muted" style="font-weight:400;font-size:12px">since {{.Epoch}}</span></h2><span class="grow"></span><span class="count">{{len .Violations}}</span>
+    <a class="btn ghost sm" href="/export/violations.csv" style="margin-left:10px">Export CSV ⤓</a></div>
+  <div class="tscroll cv-auto">
+    {{if .Violations}}<table class="data">
+      <thead><tr><th scope="col">Client</th><th scope="col">Officer</th><th scope="col">Level</th><th scope="col">Date</th><th scope="col">Detail</th></tr></thead>
+      <tbody>{{range .Violations}}<tr data-href="/console/clients/{{.IDN}}" onclick="location.href='/console/clients/{{.IDN}}'">
+        <td><div class="namecell"><span class="av">{{initials .Name}}</span><span class="nm">{{.Name}}</span></div></td>
+        <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td><td>{{.Date}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody>
+    </table>{{else}}<div class="emptybox"><div class="big">✓</div>No violations recorded since {{.Epoch}}.</div>{{end}}
+  </div>
+</div>
+<p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">These rosters are the current standing as of the selected date (system go-live · {{.Epoch}}). L1 clients are excluded from the monthly Missed roster and the 3-day grace is honored, matching the tracker (Brief 2.8).</p>
 {{template "c_bot" .}}

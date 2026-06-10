@@ -176,6 +176,39 @@ CREATE TABLE IF NOT EXISTS added_check_ins (
     created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_added_ci_idn ON added_check_ins(idn);
+
+CREATE TABLE IF NOT EXISTS drug_screens (
+    screen_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn         INTEGER NOT NULL,
+    screen_date TEXT NOT NULL,
+    test_type   TEXT NULL,
+    result      TEXT NULL,
+    substances  TEXT NULL,
+    notes       TEXT NULL,
+    officer     TEXT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_screen_idn ON drug_screens(idn);
+
+CREATE TABLE IF NOT EXISTS pinned_defendants (
+    pin_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT NOT NULL,
+    idn         INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_pin UNIQUE(user_id, idn)
+);
+CREATE INDEX IF NOT EXISTS idx_pin_user ON pinned_defendants(user_id);
+
+CREATE TABLE IF NOT EXISTS saved_searches (
+    search_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    spec        TEXT NOT NULL,
+    page_path   TEXT NULL,
+    is_pinned   INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_search_user ON saved_searches(user_id);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to
@@ -418,7 +451,7 @@ func nz(s string) any {
 var extensionTablesByIDN = []string{
 	"defendant_notes", "defendant_tags", "court_dates", "violations",
 	"reminders", "overrides", "pinned_defendants", "defendant_documents",
-	"scheduled_check_ins",
+	"scheduled_check_ins", "drug_screens",
 }
 
 // raw tables physically purged only on the IMPORTER_RETIRED path.

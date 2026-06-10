@@ -376,6 +376,9 @@ func LoadExtras(d *sql.DB, idn string) (models.DefendantExtras, error) {
 	if e.Violations, err = ListViolations(d, idn); err != nil {
 		return e, err
 	}
+	if e.DrugScreens, err = ListDrugScreens(d, idn); err != nil {
+		return e, err
+	}
 	if e.Overrides, err = ListOverrides(d, idn); err != nil {
 		return e, err
 	}

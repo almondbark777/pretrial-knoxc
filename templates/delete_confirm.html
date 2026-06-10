@@ -7,7 +7,7 @@
 </head>
 <body>
 <header class="topbar">
-  <a href="/client_profile.html?idn={{.IDN}}">&larr; Back to profile</a>
+  <a href="/console/clients/{{.IDN}}">&larr; Back to client record</a>
   <span class="grow"></span><span class="muted">{{.User}}</span>
 </header>
 
@@ -48,7 +48,7 @@
     <input type="text" name="reason" placeholder="e.g. duplicate / wrong person / data-entry error">
   </label>
   <button type="submit" class="btn-danger">Yes, delete {{if .CaseTok}}this case{{else}}this person{{end}}</button>
-  <a href="/client_profile.html?idn={{.IDN}}" class="btn btn-ghost" style="text-decoration:none">Cancel</a>
+  <a href="/console/clients/{{.IDN}}" class="btn btn-ghost" style="text-decoration:none">Cancel</a>
 </form>
 </body>
 </html>

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/db"
 )
 
 // CSV exports of the cross-client rosters and the cases grid — the dependency-free
@@ -61,6 +62,25 @@ func (s *Server) ExportMissed(w http.ResponseWriter, r *http.Request) {
 	}
 	writeCSV(w, "missed-checkins-"+track.Format("2006-01-02")+".csv",
 		[]string{"Name", "IDN", "Officer", "Level", "Detail"}, rows)
+}
+
+// ExportViolations streams the recorded-violations roster (since the stats epoch)
+// as CSV — the download companion to the compliance page's Violations panel, using
+// the same epoch filter so the file matches the on-screen roster row-for-row.
+func (s *Server) ExportViolations(w http.ResponseWriter, r *http.Request) {
+	clients, err := s.clients()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	track := s.trackFrom(r) // used only to date-stamp the filename (the roster is epoch-scoped, not as-of-scoped)
+	violations, _ := db.ListAllViolations(s.DB)
+	rows := [][]string{}
+	for _, x := range violationRoster(clients, violationsSinceEpoch(violations)) {
+		rows = append(rows, []string{x.Name, x.IDN, x.Officer, levelLabel(x.Level), x.Date, x.Detail})
+	}
+	writeCSV(w, "violations-"+track.Format("2006-01-02")+".csv",
+		[]string{"Name", "IDN", "Officer", "Level", "Date", "Detail"}, rows)
 }
 
 // ExportCases streams the full case-management grid as CSV.

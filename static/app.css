@@ -100,7 +100,7 @@ p{padding-left:24px;padding-right:24px}
 }
 .nav a:hover{color:var(--ink);background:rgba(255,255,255,.05)}
 .nav a.active{color:var(--ink);background:var(--accent-weak);box-shadow:0 0 0 1px rgba(59,130,246,.25) inset}
-.pilllink{color:var(--muted);padding:6px 12px;border-radius:var(--r-pill);font-size:13.5px;font-weight:550;transition:color var(--t),background var(--t)}
+.pilllink{color:var(--muted);font:inherit;font-size:13.5px;font-weight:550;-webkit-appearance:none;appearance:none;background:transparent;border:0;cursor:pointer;padding:6px 12px;border-radius:var(--r-pill);transition:color var(--t),background var(--t)}
 .pilllink:hover{color:var(--ink);background:rgba(255,255,255,.05);text-decoration:none}
 /* link back to the client tracker from inside the new app */
 .nav a.tracker-link{color:var(--accent-ink);background:var(--accent-weak);box-shadow:0 0 0 1px rgba(59,130,246,.25) inset;font-weight:600}
@@ -308,6 +308,11 @@ label{font-size:12.5px;color:var(--muted)}
 .ev-missed{border-left-color:var(--risk);color:#ffcaa0}
 .ev-due{border-left-color:var(--warn-ink)}
 .ev-closed{border-left-color:var(--faint);color:var(--muted)}
+/* roster-calendar totals: trailing week-total column + weekday footer row */
+.cal.tot{grid-template-columns:repeat(7,1fr) minmax(92px,.75fr)}
+.cal-d.sum{background:transparent;border:1px dashed var(--line);min-height:0}
+.cal-d.sum.grand{border-style:solid}
+.ev-nil{border-left-color:var(--line);color:var(--muted);background:transparent}
 
 /* ── width cap on the big pages so lines don't run forever on wide screens ── */
 .cards,.grid,.cal,.cal-legend{max-width:var(--maxw);margin-left:auto;margin-right:auto}

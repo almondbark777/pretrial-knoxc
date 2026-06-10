@@ -80,8 +80,6 @@ pretrial-knoxc/
 ├── CLAUDE.md                        project memory for Claude Code
 ├── README.md                        (you are here)
 ├── .gitignore
-├── .github/workflows/
-│   └── azure-deploy.yml.example     rename to .yml when ready to auto-deploy
 ├── db/                              SQL schema + ETL scripts + built SQLite copy
 │   ├── schema_azure_sql.sql
 │   ├── load_azure.sql

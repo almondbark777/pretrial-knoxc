@@ -27,7 +27,7 @@ func (s *Server) requireSupervisor(w http.ResponseWriter, r *http.Request) (stri
 		s.render(w, "message.html", map[string]any{
 			"User": user, "Title": "Not permitted",
 			"Message": "This action is restricted to supervisors. Ask a supervisor to perform deletions, restores, or field overrides.",
-			"Back":    backOr(r, "/dashboard"),
+			"Back":    backOr(r, "/console"),
 		})
 	}
 	return user, false
@@ -73,7 +73,7 @@ func (s *Server) DeleteConfirm(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		s.render(w, "message.html", map[string]any{
 			"User": user, "Title": "Not found",
-			"Message": "No active client with IDN " + idn + " (already deleted?).", "Back": "/dashboard",
+			"Message": "No active client with IDN " + idn + " (already deleted?).", "Back": "/console/clients",
 		})
 		return
 	}
@@ -103,7 +103,7 @@ func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	caseTok := strings.TrimSpace(r.FormValue("case"))
 	reason := strings.TrimSpace(r.FormValue("reason"))
 	if idn == "" {
-		redirectMsg(w, r, "/dashboard", "Delete failed: no IDN supplied.")
+		redirectMsg(w, r, "/console/clients", "Delete failed: no IDN supplied.")
 		return
 	}
 	var err error
@@ -148,6 +148,46 @@ func (s *Server) Restore(w http.ResponseWriter, r *http.Request) {
 	}
 	s.clearCache()
 	redirectMsg(w, r, "/admin/deleted", "Restored IDN "+idn+".")
+}
+
+// UndoLastDelete restores the most recently deleted person or case in one
+// click — the dashboard backstop for a slip of the finger. Supervisor-gated
+// like Restore. POST /admin/undo_last_delete (next?)
+func (s *Server) UndoLastDelete(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.requireSupervisor(w, r)
+	if !ok {
+		return
+	}
+	_ = r.ParseForm()
+	back := safeNext(r, "/console/admin")
+	tombs, err := db.ListTombstones(s.DB)
+	if err != nil {
+		redirectMsg(w, r, back, "Undo failed: "+err.Error())
+		return
+	}
+	if len(tombs) == 0 {
+		redirectMsg(w, r, back, "Nothing to undo — no deleted records.")
+		return
+	}
+	t := tombs[0] // ListTombstones is newest-first
+	if t.CaseNumber != "" {
+		err = db.RestoreCase(s.DB, t.IDN, t.CaseNumber, user)
+	} else {
+		err = db.RestorePerson(s.DB, t.IDN, user)
+	}
+	if err != nil {
+		redirectMsg(w, r, back, "Undo failed: "+err.Error())
+		return
+	}
+	s.clearCache()
+	what := "IDN " + t.IDN
+	if t.Name != "" {
+		what = t.Name + " (IDN " + t.IDN + ")"
+	}
+	if t.CaseNumber != "" {
+		what = "case " + t.CaseNumber + " of " + what
+	}
+	redirectMsg(w, r, back, "Restored "+what+".")
 }
 
 // Deleted lists current tombstones with restore buttons. GET /admin/deleted
@@ -199,7 +239,7 @@ func (s *Server) SetOverride(w http.ResponseWriter, r *http.Request) {
 	idn := strings.TrimSpace(r.FormValue("idn"))
 	field := strings.TrimSpace(r.FormValue("field"))
 	value := strings.TrimSpace(r.FormValue("value"))
-	back := "/client_profile.html?idn=" + url.QueryEscape(idn)
+	back := safeNext(r, "/console/clients/"+url.PathEscape(idn))
 	if !db.IsOverridable(field) {
 		redirectMsg(w, r, back, "Override failed: field not overridable.")
 		return
@@ -221,7 +261,7 @@ func (s *Server) ClearOverride(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	idn := strings.TrimSpace(r.FormValue("idn"))
 	field := strings.TrimSpace(r.FormValue("field"))
-	back := "/client_profile.html?idn=" + url.QueryEscape(idn)
+	back := safeNext(r, "/console/clients/"+url.PathEscape(idn))
 	if err := db.ClearOverride(s.DB, idn, field, user); err != nil {
 		redirectMsg(w, r, back, "Clear override failed: "+err.Error())
 		return
@@ -232,10 +272,9 @@ func (s *Server) ClearOverride(w http.ResponseWriter, r *http.Request) {
 
 // ── Per-defendant CRUD (any allowed officer) ─────────────────────────────────
 
-// profileBack returns the profile redirect target for the posted idn.
 // safeNext returns the request's `next` form value if it's a same-origin path
-// (starts with "/" but not "//"), else def. Guards against open redirects so the
-// new console can post to shared /admin/* endpoints and come back to /console/*.
+// (starts with "/" but not "//"), else def. Guards against open redirects on the
+// shared /admin/* endpoints.
 func safeNext(r *http.Request, def string) string {
 	if n := strings.TrimSpace(r.FormValue("next")); strings.HasPrefix(n, "/") && !strings.HasPrefix(n, "//") {
 		return n
@@ -243,9 +282,10 @@ func safeNext(r *http.Request, def string) string {
 	return def
 }
 
+// profileBack returns the client-record redirect target for the posted idn.
 func profileBack(r *http.Request) (idn, to string) {
 	idn = strings.TrimSpace(r.FormValue("idn"))
-	return idn, safeNext(r, "/client_profile.html?idn="+url.QueryEscape(idn))
+	return idn, safeNext(r, "/console/clients/"+url.PathEscape(idn))
 }
 
 func (s *Server) AddNote(w http.ResponseWriter, r *http.Request) {

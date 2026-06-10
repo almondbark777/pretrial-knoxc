@@ -6,9 +6,9 @@
     <div class="sub">{{$d.AsOf}} · {{$d.KPIs.ActiveClients}} active clients</div>
   </div>
   <div class="right">
-    <div class="seg" role="tablist" aria-label="Caseload scope">
-      <button class="segbtn active" data-scope="all">All</button>
-      <button class="segbtn" data-scope="mine">My caseload</button>
+    <div class="seg" role="group" aria-label="Caseload scope">
+      <button type="button" class="segbtn active" data-scope="all" aria-pressed="true">All</button>
+      <button type="button" class="segbtn" data-scope="mine" aria-pressed="false">My caseload</button>
     </div>
     <span class="asof">{{if .IsToday}}as of today · EST{{else}}as of {{.Today}} · historical{{end}}</span>
   </div>
@@ -22,6 +22,20 @@
   <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OverdueCheckIns}}</div><div class="l">Overdue Check-ins (mo.)</div></a>
 </div>
 <div class="epoch-note">Roster counts are current as of the selected date. Activity tallies (violations) count from go-live · <b>{{.Epoch}}</b>.</div>
+
+{{if .Pinned}}
+<div class="panel" style="margin-bottom:18px">
+  <div class="h"><h2>📌 Pinned Clients</h2><span class="grow"></span><span class="count">{{len .Pinned}}</span></div>
+  <div class="pad pinstrip">
+    {{range .Pinned}}
+    <a class="pincard" href="/console/clients/{{.IDN}}" title="Open {{.Name}}">
+      <span class="av">{{.Initials}}</span>
+      <span><b>{{.Name}}</b><small>{{if .Detail}}{{.Detail}} · {{end}}IDN {{.IDN}}</small></span>
+    </a>
+    {{end}}
+  </div>
+</div>
+{{end}}
 
 <div class="grid2">
   <div class="panel">
@@ -61,6 +75,12 @@
 body.scope-mine .frow[data-mine="false"]{display:none}
 .kpi-since{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-top:3px;letter-spacing:.02em;text-transform:none}
 .epoch-note{margin:10px 2px 0;font-size:12px;color:var(--muted)}
+.pinstrip{display:flex;flex-wrap:wrap;gap:10px}
+.pincard{display:flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--panel);color:var(--ink);min-width:200px}
+.pincard:hover{border-color:var(--brand);box-shadow:var(--shadow)}
+.pincard .av{width:30px;height:30px;border-radius:50%;background:var(--panel-3);display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;flex:none}
+.pincard b{display:block;font-size:13px}
+.pincard small{display:block;color:var(--muted);font-size:11.5px}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
@@ -76,8 +96,8 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   document.querySelectorAll('.segbtn').forEach(function(b){
     b.addEventListener('click',function(){
-      document.querySelectorAll('.segbtn').forEach(function(x){x.classList.remove('active')});
-      b.classList.add('active');
+      document.querySelectorAll('.segbtn').forEach(function(x){x.classList.remove('active');x.setAttribute('aria-pressed','false')});
+      b.classList.add('active');b.setAttribute('aria-pressed','true');
       var mine=b.dataset.scope==='mine';
       document.body.classList.toggle('scope-mine',mine);
       document.getElementById('ch1').textContent=mine?('My Caseload — '+(name||'me')):'Division Caseload';

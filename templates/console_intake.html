@@ -17,7 +17,7 @@
 </ol>
 
 <div class="panel wcard">
-  <div class="note-hint" style="margin:16px 16px 0">Demo build — this wizard validates each step and saves a draft locally, then confirms with a toast. Native record creation (this app as system of record) lands in a later milestone.</div>
+  <div class="note-hint" style="margin:16px 16px 0">This wizard validates each step and can save a draft to this browser. <b>Create client</b> adds the record to the app and opens the new client.</div>
   <form id="intakeForm" autocomplete="off" method="post" action="/admin/add_defendant">
     {{/* hidden fields mapped to what /admin/add_defendant expects; populated on submit */}}
     <input type="hidden" name="csrf" value="{{.CSRF}}">
@@ -31,6 +31,9 @@
     <input type="hidden" name="birthdate" id="h_dob">
     <input type="hidden" name="gps" id="h_gps">
     <input type="hidden" name="gps_type" id="h_gpstype">
+    <input type="hidden" name="case_status" id="h_status">
+    <input type="hidden" name="supervision_type" id="h_suptype">
+    <input type="hidden" name="intake_summary" id="h_summary">
 
     <section class="wpane active" data-step="0">
       <h3 class="wh">Identity</h3>
@@ -211,6 +214,25 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('reviewBox').innerHTML='<h3 class="wh" style="margin-top:18px">Review</h3>'+
       rows.map(function(r){return '<div class="rrow"><span class="muted">'+r[0]+'</span><b>'+(r[1]?String(r[1]).replace(/[<>&]/g,''):'—')+'</b></div>'}).join('');
   }
+  // The added-client schema has no column for the richer intake fields below; pack
+  // them into a single note so the officer's entries are kept on the record
+  // instead of being silently dropped on submit.
+  function buildIntakeSummary(){
+    var L=[];
+    function add(label,el){var v=((el&&el.value)||'').trim();if(v)L.push(label+': '+v);}
+    add('Booking #',form.booking); add('Phone',form.phone); add('Address',form.address);
+    add('Statute',form.statute); add('Severity',form.severity);
+    add('Arrest date',form.arrest); add('Arresting agency',form.agency);
+    add('Bond type',form.bondtype); add('Assessment score',form.score); add('Level note',form.lvlnote);
+    var conds=[];
+    if(form.c_drug.checked)conds.push('Drug testing');
+    if(form.c_nocontact.checked)conds.push('No-contact order');
+    if(form.c_curfew.checked)conds.push('Curfew');
+    if(conds.length)L.push('Conditions: '+conds.join(', '));
+    if(form.signed.checked)L.push('Release agreement signed'+(form.signdate.value?(' '+form.signdate.value.trim()):''));
+    add('First check-in',form.firstcheckin); add('First court',form.firstcourt);
+    return L.length ? ('Intake details — '+L.join(' · ')) : '';
+  }
   next.addEventListener('click',function(){
     if(done)return;
     if(!validate(cur))return;
@@ -227,6 +249,9 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('h_dob').value=form.dob.value;
     document.getElementById('h_gps').value=form.c_gps.checked ? 'true' : 'false';
     document.getElementById('h_gpstype').value=form.c_gps.checked ? form.vendor.value : '';
+    document.getElementById('h_status').value='Open'; // a new referral is an open case
+    document.getElementById('h_suptype').value=form.level.value ? ('Level '+form.level.value) : '';
+    document.getElementById('h_summary').value=buildIntakeSummary(); // preserve fields with no column
     document.getElementById('h_next').value='/console/clients/'+encodeURIComponent(idn);
     try{localStorage.removeItem('ptc-intake-draft')}catch(e){}
     form.submit(); // server creates the client, then lands on the new record with a flash toast

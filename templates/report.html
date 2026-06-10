@@ -10,6 +10,7 @@
   <a href="/reports" class="pilllink">&larr; Reports</a>
   <span class="grow"></span>
   <span class="muted">{{.User}}</span>
+  {{if .R.AltURL}}<a class="export" href="{{.R.AltURL}}">{{.R.AltLabel}}</a>{{end}}
   {{if .R.CSVPath}}<a class="export" href="{{.R.CSVPath}}">CSV ⤓</a>{{end}}
   <button onclick="window.print()">Print</button>
 </header>
@@ -21,7 +22,17 @@
     <p class="muted" style="padding:0">{{.R.Subtitle}} · As of {{.R.AsOf}} · {{len .R.Rows}} record(s)</p>
   </div>
 
-  {{if .R.Rows}}
+  {{if .R.Groups}}
+    {{range .R.Groups}}
+    <h2 style="margin:18px 24px 6px;padding:0">{{.Label}} <span class="muted" style="text-transform:none;letter-spacing:0">— {{.Subtotal}}</span></h2>
+    <table style="margin-bottom:6px">
+      <thead><tr>{{range $.R.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+      <tbody>
+      {{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
+      </tbody>
+    </table>
+    {{end}}
+  {{else if .R.Rows}}
   <table>
     <thead><tr>{{range .R.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
     <tbody>

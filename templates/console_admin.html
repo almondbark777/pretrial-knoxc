@@ -49,7 +49,7 @@
 </div>
 
 <div class="panel" style="margin-top:18px">
-  <div class="h"><h2>Recent Audit Trail</h2><span class="grow"></span><span class="count">{{len .Audit}}</span></div>
+  <div class="h"><h2>Recent Audit Trail</h2><span class="grow"></span><span class="count">{{len .Audit}}</span>{{if .IsSupervisor}}<a class="btn ghost sm" style="margin-left:10px" href="/admin/audit">Full audit log →</a>{{end}}</div>
   <div class="tscroll">
     {{if .Audit}}<table class="data">
       <thead><tr><th>When</th><th>User</th><th>Action</th><th>Table</th><th>Record</th><th>Change</th></tr></thead>
@@ -59,8 +59,17 @@
 </div>
 
 {{if .Tombstones}}
+{{$t := index .Tombstones 0}}
 <div class="panel" style="margin-top:18px">
-  <div class="h"><h2>Deleted (tombstoned) records</h2><span class="grow"></span><span class="count">{{len .Tombstones}}</span></div>
+  <div class="h"><h2>Deleted (tombstoned) records</h2><span class="grow"></span><span class="count">{{len .Tombstones}}</span>
+    {{if .IsSupervisor}}
+    <form method="post" action="/admin/undo_last_delete" style="margin:0 0 0 10px"
+          onsubmit="return confirm('Restore {{if $t.Name}}{{$t.Name}} {{end}}(IDN {{$t.IDN}}{{if $t.CaseNumber}}, case {{$t.CaseNumber}}{{end}})?');">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="next" value="/console/admin">
+      <button type="submit" class="btn ghost sm" title="Restore the most recently deleted record">↩ Undo last delete</button>
+    </form>
+    <a class="btn ghost sm" style="margin-left:8px" href="/admin/deleted">Manage / restore →</a>
+    {{end}}</div>
   <div class="tscroll"><table class="data">
     <thead><tr><th>IDN</th><th>Name</th><th>Case</th><th>Deleted by</th><th>When</th><th>Reason</th></tr></thead>
     <tbody>{{range .Tombstones}}<tr style="cursor:default"><td>{{.IDN}}</td><td>{{.Name}}</td><td>{{if .CaseNumber}}{{.CaseNumber}}{{else}}(whole person){{end}}</td><td>{{.DeletedBy}}</td><td>{{.DeletedAt}}</td><td class="muted">{{.Reason}}</td></tr>{{end}}</tbody>

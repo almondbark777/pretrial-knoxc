@@ -50,46 +50,41 @@ func TestRosterCalendarMonth(t *testing.T) {
 	if rc.TotMissed == 0 {
 		t.Error("expected some missed windows in the stale offline snapshot")
 	}
-}
 
-// TestMyDay verifies the per-officer worklist only contains that officer's
-// clients, reports a non-zero caseload, and is empty for an unknown officer.
-func TestMyDay(t *testing.T) {
-	d := testDB(t)
-	clients, err := db.BuildClients(d, adminTrack)
-	if err != nil {
-		t.Fatalf("BuildClients: %v", err)
+	// Week-row + weekday-column totals (STATUS nice-to-have) must reconcile
+	// with the grand totals, and every week row must hold exactly 7 cells.
+	if len(rc.ColTotals) != 7 {
+		t.Fatalf("ColTotals len = %d, want 7", len(rc.ColTotals))
 	}
-	var officer string
-	for _, cs := range clients {
-		if c := openRep(cs); c != nil && strings.TrimSpace(c.Officer) != "" {
-			officer = c.Officer
-			break
+	if want := (wantLen + 6) / 7; len(rc.Weeks) != want {
+		t.Errorf("Weeks len = %d, want %d", len(rc.Weeks), want)
+	}
+	var wk, col models.RosterTotals
+	for i, w := range rc.Weeks {
+		if len(w.Days) != 7 {
+			t.Fatalf("Weeks[%d] has %d cells, want 7", i, len(w.Days))
 		}
+		wk.CheckIns += w.Tot.CheckIns
+		wk.Payments += w.Tot.Payments
+		wk.Missed += w.Tot.Missed
+		wk.Due += w.Tot.Due
 	}
-	if officer == "" {
-		t.Skip("no supervising officer in offline data")
+	for _, c := range rc.ColTotals {
+		col.CheckIns += c.CheckIns
+		col.Payments += c.Payments
+		col.Missed += c.Missed
+		col.Due += c.Due
 	}
-
-	md := myDay(clients, adminTrack, officer)
-	if md.Caseload == 0 {
-		t.Fatalf("expected caseload > 0 for officer %q", officer)
+	want := models.RosterTotals{CheckIns: rc.TotCheckIns, Payments: rc.TotPayments,
+		Missed: rc.TotMissed, Due: rc.TotDue}
+	if wk != want {
+		t.Errorf("sum of week totals %+v != month totals %+v", wk, want)
 	}
-	belongs := func(label string, rows []models.RosterRow) {
-		for _, r := range rows {
-			c := openRep(clients[r.IDN])
-			if c == nil || !strings.EqualFold(strings.TrimSpace(c.Officer), strings.TrimSpace(officer)) {
-				t.Errorf("%s row IDN %s is not supervised by %q", label, r.IDN, officer)
-			}
-		}
+	if col != want {
+		t.Errorf("sum of column totals %+v != month totals %+v", col, want)
 	}
-	belongs("behind", md.Behind)
-	belongs("missed", md.Missed)
-	belongs("dueSoon", md.DueSoon)
-
-	empty := myDay(clients, adminTrack, "Nobody McNoone")
-	if empty.Caseload != 0 || len(empty.Behind) != 0 || len(empty.Missed) != 0 || len(empty.DueSoon) != 0 {
-		t.Errorf("unknown officer should yield an empty MyDay, got caseload=%d", empty.Caseload)
+	if rc.Month != want {
+		t.Errorf("rc.Month %+v != month totals %+v", rc.Month, want)
 	}
 }
 

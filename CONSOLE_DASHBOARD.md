@@ -69,8 +69,9 @@ merged into every view by IDN) and lands on the new record — verified live. Th
 Tag / Pin / Override / Waive remain demo-safe "coming soon" stubs this pass; the clients
 table also has a hover **"✓ Check-in"** quick-action that persists. The roster's
 **bulk-select** bar (appears on selection) offers **Export selected** (real — client-side
-CSV of the chosen rows) and **Check-in selected** (demo-safe modal; the bulk write path is
-deferred). Selection is keyed by IDN so it survives paging and sort, and is cleared when a
+CSV of the chosen rows) and **Check-in selected** (real — POSTs to `/admin/checkin/bulk`,
+which logs one audited check-in per selected client and returns a real count toast).
+Selection is keyed by IDN so it survives paging and sort, and is cleared when a
 filter changes (so the count never refers to hidden rows).
 
 All real write forms (those POSTing to `/admin/*`) carry a **double-submit guard**: once a
@@ -234,9 +235,11 @@ Three asks from an officer using the system:
    version bumped to v0.83. **Verified live in the repacked bundle running in the browser: Littlejohn
    20902 → lastInPerson 2026-04-01 / lastPhone 2026-04-28, phone-only weeks Apr 6/13/20 = missed —
    byte-identical to the Go API result. No console errors.** Go ↔ tracker now agree. Backup of the
-   pre-edit HTML at `_tracker_work/PTR_Client_Lookup.BEFORE.html` (gitignored). **Still TODO (dev-only,
-   non-gating): update `tools/parity_ref.py` to the both-types rule (it's the golden-value generator,
-   not shipped).**
+   pre-edit HTML at `_tracker_work/PTR_Client_Lookup.BEFORE.html` (gitignored). ~~Still TODO (dev-only,
+   non-gating): update `tools/parity_ref.py` to the both-types rule~~ **DONE 2026-06-09** — `_ci_kind()`
+   added (mirrors `CheckInKind`), all three window loops require both types, output gains
+   `satisfiedInPerson`/`satisfiedPhone`/`lastInPerson`/`lastPhone`; re-verified on Littlejohn 20902
+   (lastInPerson 2026-04-01 / lastPhone 2026-04-28, Apr 6/13/20 phone-only weeks missed — matches Go).
 
 ## Parked (revisit)
 
@@ -283,6 +286,122 @@ All verified live (rows render, no console errors), full `go test ./...` green, 
 
 - ~~True virtualization for the roster~~ **DONE 2026-06-02** — windowing: only the visible 50-row page is in the DOM; full roster held as compact JSON. See "Performance hardening" above.
 - Capture the full intake (score, statute, conditions, signed agreement) — only the core fields persist today; the rest are collected but not yet stored.
-- Pin/unpin clients (no endpoint yet). *(Bulk select + Export-selected is now built; the bulk-check-in write path is still a demo-safe stub.)*
+- ~~Pin/unpin clients (no endpoint yet)~~ **DONE 2026-06-09** — `/admin/pin/toggle`, record ⋯ toggle + badge, dashboard Pinned Clients strip. *(Bulk select, Export-selected, AND the bulk check-in write path (`/admin/checkin/bulk`) are all built.)*
 - Add a `channel` column to `reminders` (currently folded into the body) when a real SMS/email provider is wired.
 - Promote roles/conditions/templates from placeholders to real config tables.
+
+## Entry — 2026-06-09 — Classic interface REMOVED; drug screens on the record
+
+Alex: **"GET RID OF THE CLASSIC INTERFACE."** The Direction-A dark `/dashboard` app
+(demoted to a "Classic view" link on 2026-06-02) is gone. The console is now the
+only app UI; the bundled client tracker stays the landing page at `/`.
+
+**Removed** (handlers + templates deleted): `/dashboard` (index.html), `/my_day.html`,
+`/pretrial_app.html`, `/analytics.html`, `/calendar.html`, `/client_profile.html`
+(profile.html), `GET /admin/add_defendant` (add_defendant.html), the `myDay` helper +
+`models.MyDay` + its test. **Every old URL 302s to its console equivalent** —
+`/client_profile.html?idn=X` → `/console/clients/X`, `/calendar.html?idn&month` →
+`/console/calendar` with the query carried over, add-form → the intake wizard
+(pinned in `cmd/server/main_test.go` TestLegacyRedirects).
+
+**Kept** (not "the classic interface"): the printable `/reports/*` pages, the
+supervisor utilities `/admin/{delete,deleted,audit}` (re-chromed — `sitenav` now
+links Tracker/Console/Reports/Deleted/Audit only), all `/api/*` endpoints (the
+console's global search uses `/api/lookup`), CSV exports, and all `/admin/*` POSTs.
+
+**Console parity added for what only classic had:**
+1. **Drug Screens on the record** (the feature shipped earlier today existed only on
+   the classic profile): new "Drug Screens" tab (toned result chips, delete, violation
+   hint), "Record Drug Screen" modal POSTing to the existing `/admin/drugscreen/add`,
+   a "Last Drug Screen" Case-Summary field (risk-toned when positive/refused), screens
+   merged into the Activity timeline, and a "Record drug screen" overflow-menu item.
+   `ConsoleDrugScreen` VM + `drugScreenChip` in console_view.go; tests
+   `TestDrugScreenChip` + `TestConsoleRecordDrugScreens`.
+2. **Supervisor actions on the record's ⋯ menu**: "Audit history" (`/admin/audit?idn=`)
+   and "Delete client…" (`/admin/delete?idn=` confirm flow — was only reachable from
+   the classic profile).
+3. **Cross-links**: console Admin → "Full audit log →" + "Manage / restore →";
+   console Reports → "Printable reports →" (`/reports`).
+
+**Redirect-default fixes**: `profileBack`/`safeNext` defaults, the override handlers
+(which previously hardcoded the classic profile and ignored the console's `next` —
+latent bug), `AddDefendant`, and `requireSupervisor`'s message-page Back all now
+default to `/console/...`.
+
+Verified live in the preview: all 7 legacy URLs redirect (with query carry-over),
+tracker top bar has no Classic pill, every console page 200s with zero classic
+references and no JS errors, drug screen add → renders in tab/summary/activity →
+delete works (flash toasts both ways), supervisor pages render under the new chrome.
+`go build`/`go vet`/`gofmt` clean; full `go test ./...` green.
+
+## Entry — 2026-06-09 (later) — Undo last delete, real Pin client, parity_ref rule
+
+Alex: "lets keep improving things." Three open items off the notes:
+
+1. **One-click "Undo last delete" — rebuilt for the console** (the old
+   `feature/undo-last-delete` branch had built it into the now-deleted classic
+   dashboard; that branch + its `ptr-wt-undo` worktree are fully superseded and
+   can be discarded). New `handlers.UndoLastDelete` (`POST
+   /admin/undo_last_delete`, supervisor-gated, CSRF, reuses
+   RestoreCase/RestorePerson which audit) restores the newest tombstone
+   (`ListTombstones` is newest-first) and flashes "Restored NAME (IDN …)".
+   Console Admin's tombstone panel header now carries the ↩ button (named
+   confirm) next to "Manage / restore →". Graceful "Nothing to undo" when the
+   table is empty. Test `TestUndoLastDelete` (blocked non-supervisor / restore /
+   empty). Closes the STATUS nice-to-have.
+
+2. **Pin client is real** (was an `openAction('soon')` stub). The
+   `pinned_defendants` table from migration 001 (per-user, `UNIQUE(user_id,
+   idn)`) is now mirrored into `ensureSchemaSQL` and actually used:
+   `db.TogglePin/IsPinned/PinnedIDNs` (pins.go — audited `pin_add`/`pin_remove`,
+   tolerant of pre-001 snapshots), `POST /admin/pin/toggle`
+   (handlers/pins.go), record ⋯ menu toggles Pin/Unpin + a "📌 Pinned" badge,
+   and the dashboard shows a **Pinned Clients** quick-list strip (pincard chips →
+   records) between the KPIs and the feeds. Pins are per-officer; purged on
+   whole-person delete (already in extensionTablesByIDN — note a delete→undo
+   round-trip therefore drops the pin, same as notes/tags). Tests:
+   `TestPinToggle`, `TestPinsPurgedOnPersonDelete`, `TestPinnedRows`.
+
+3. **`tools/parity_ref.py` updated to the v0.83 both-types check-in rule**
+   (closed the dev-only TODO above — see strikethrough).
+
+Verified live in the preview: pin → flash + badge + dashboard strip → unpin →
+strip gone; record ⋯ → Delete client → confirm page → delete → `/admin/deleted`
+→ console Admin → ↩ Undo → "Restored ROBERTSON, CHARLES (IDN 148445)" →
+record back. No JS errors. `go build`/`vet`/`gofmt` clean, full `go test ./...`
+green. (Preview screenshots of `/console` time out on the stale fixture's huge
+alert feed — rasterization only; the page itself responds fine.)
+
+## Entry — 2026-06-09 (later still) — Saved views, render-on-demand rosters
+
+Continuing "keep improving":
+
+1. **Saved views on the roster** — the `saved_searches` table from migration 001
+   (unused since the Python days) now backs per-officer named filter combos.
+   "★ Save view" in the filter bar captures the current controls into a named,
+   sanitized query (`sanitizeViewQuery` keeps only q/status/level/officer/comp/gps
+   — injected params drop); chips under the filter bar re-apply a view in one
+   click (they're plain URLs, so they compose with the existing URL-param
+   seeding); × deletes (owner-scoped — `DeleteSavedView` matches user_id, so a
+   guessed id does nothing). Upsert by name. Audited `view_save`/`view_delete`.
+   Table mirrored into `ensureSchemaSQL`. Files: `internal/db/savedviews.go`,
+   `internal/handlers/savedviews.go`, `models.SavedView`, `viewChips` VM
+   (template.URL safe — query re-encoded server-side at save time), routes
+   `POST /admin/view/{save,delete}`. Tests: `TestSavedViews` (lifecycle +
+   foreign-delete blocked + audit), `TestSanitizeViewQuery`.
+
+2. **Render-on-demand for the long scan/print lists** — implemented the
+   approach the perf notes prescribed: `.cv-auto{content-visibility:auto;
+   contain-intrinsic-size:auto 900px}` on the three compliance roster
+   containers and the record's Check-ins/Activity timelines. Off-screen rosters
+   skip layout+paint on weak office PCs; the DOM stays intact so find-in-page
+   still matches and print renders in full (plus a `@media print` visible
+   fallback). Verified live: computed `content-visibility:auto` on all three
+   compliance `.tscroll`s (713 fixture rows).
+
+3. Stale doc fixes: bulk check-in write path has been real for a while
+   (`/admin/checkin/bulk`) — the "demo-safe stub" notes above are corrected.
+
+All live-verified in the preview (save → chip → re-apply 140/2158 filtered →
+delete; compliance + record render clean, no JS errors). Full `go test ./...`
+green, vet/gofmt clean.

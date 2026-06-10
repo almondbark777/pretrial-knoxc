@@ -145,48 +145,7 @@ func (s *Server) APILookupData(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, data)
 }
 
-// ── Dashboard (server-side stats + rosters) — the new app's home (/dashboard) ──
-
-func (s *Server) Dashboard(w http.ResponseWriter, r *http.Request) {
-	clients, err := s.clients()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	track := compute.TodayET()
-	user := auth.User(r)
-	s.render(w, "index.html", map[string]any{
-		"User":         user,
-		"IsSupervisor": s.Auth.IsSupervisor(user),
-		"ActiveNav":    "dashboard",
-		"Today":        track.Format("January 2, 2006"),
-		"Stats":        computeStats(clients, track),
-		"Behind":       behindRoster(clients, track),
-		"Missed":       missedCheckInsRoster(clients, track),
-		"Msg":          r.URL.Query().Get("msg"),
-	})
-}
-
-// ── My Day (the logged-in officer's personal worklist) ────────────────────────
-
-func (s *Server) MyDay(w http.ResponseWriter, r *http.Request) {
-	clients, err := s.clients()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	track := compute.TodayET()
-	user := auth.User(r)
-	s.render(w, "my_day.html", map[string]any{
-		"User":         user,
-		"IsSupervisor": s.Auth.IsSupervisor(user),
-		"ActiveNav":    "myday",
-		"Today":        track.Format("January 2, 2006"),
-		"MD":           myDay(clients, track, compute.FmtOfficer(user)),
-	})
-}
-
-// ── Live lookup search ────────────────────────────────────────────────────────
+// ── Live lookup search (feeds the console's global search) ────────────────────
 
 func (s *Server) APILookup(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -219,52 +178,6 @@ func (s *Server) APILookup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, hits)
 }
 
-// ── Client profile (server-rendered, server-side math) ────────────────────────
-
-func (s *Server) ClientProfile(w http.ResponseWriter, r *http.Request) {
-	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
-	clients, err := s.clients()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	track := compute.TodayET()
-	user := auth.User(r)
-	cases := clients[idn]
-	if len(cases) == 0 {
-		s.render(w, "profile.html", map[string]any{
-			"User": user, "NotFound": idn, "IsSupervisor": s.Auth.IsSupervisor(user),
-			"Msg": r.URL.Query().Get("msg"),
-		})
-		return
-	}
-	c, caseFilter := selectCase(cases, r.URL.Query().Get("case"))
-	ci := compute.ComputeCheckIns(*c, track)
-	ptr := compute.ComputePTRFees(*c, track, caseFilter)
-	gps := compute.ComputeGPS(*c, track, nil, caseFilter)
-	extras, err := db.LoadExtras(s.DB, idn)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	s.render(w, "profile.html", map[string]any{
-		"User":              user,
-		"IsSupervisor":      s.Auth.IsSupervisor(user),
-		"CSRF":              s.Auth.CSRF(w, r),
-		"C":                 c,
-		"CI":                ci,
-		"PTR":               ptr,
-		"GPS":               gps,
-		"Today":             track.Format("January 2, 2006"),
-		"Waived":            compute.IsFeesWaived(c.GpNotes),
-		"Cases":             caseOptions(cases),
-		"SelectedCase":      caseFilter,
-		"Extras":            extras,
-		"OverridableFields": db.OverridableFields(),
-		"Msg":               r.URL.Query().Get("msg"),
-	})
-}
-
 // APIClient returns one client's full computed bundle as JSON (for API users /
 // future SPA). Demonstrates the server-side math is the single source of truth.
 func (s *Server) APIClient(w http.ResponseWriter, r *http.Request) {
@@ -290,7 +203,7 @@ func (s *Server) APIClient(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ── Dashboard stats + case-management bundle (JSON) ───────────────────────────
+// ── Stats + case-grid bundles (JSON) ──────────────────────────────────────────
 
 func (s *Server) APIStats(w http.ResponseWriter, r *http.Request) {
 	clients, err := s.clients()
@@ -308,95 +221,6 @@ func (s *Server) APIDefendants(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, defendantRows(clients, compute.TodayET()))
-}
-
-// ── Case management grid (server-rendered) ────────────────────────────────────
-
-func (s *Server) CaseManagement(w http.ResponseWriter, r *http.Request) {
-	clients, err := s.clients()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	track := compute.TodayET()
-	user := auth.User(r)
-	s.render(w, "pretrial_app.html", map[string]any{
-		"User":         user,
-		"IsSupervisor": s.Auth.IsSupervisor(user),
-		"ActiveNav":    "cases",
-		"Today":        track.Format("January 2, 2006"),
-		"Rows":         defendantRows(clients, track),
-		"Stats":        computeStats(clients, track),
-	})
-}
-
-// ── Analytics (server-rendered, dependency-free CSS bars) ──────────────────────
-
-func (s *Server) Analytics(w http.ResponseWriter, r *http.Request) {
-	clients, err := s.clients()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	track := compute.TodayET()
-	user := auth.User(r)
-	s.render(w, "analytics.html", map[string]any{
-		"User":         user,
-		"IsSupervisor": s.Auth.IsSupervisor(user),
-		"ActiveNav":    "analytics",
-		"Today":        track.Format("January 2, 2006"),
-		"A":            analyticsData(clients, track),
-	})
-}
-
-// ── Per-client calendar (month grid) ──────────────────────────────────────────
-
-func (s *Server) Calendar(w http.ResponseWriter, r *http.Request) {
-	clients, err := s.clients()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	track := compute.TodayET()
-	year, month := track.Year(), track.Month()
-	if mp := r.URL.Query().Get("month"); mp != "" {
-		if t, e := time.Parse("2006-01", mp); e == nil {
-			year, month = t.Year(), t.Month()
-		}
-	}
-	cur := compute.Noon(year, month, 1)
-	prev, next := cur.AddDate(0, -1, 0).Format("2006-01"), cur.AddDate(0, 1, 0).Format("2006-01")
-	user := auth.User(r)
-
-	// No idn → roster mode: aggregated team calendar across all clients (Brief 2.9).
-	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
-	if idn == "" {
-		rc := rosterCalendarMonth(clients, track, year, month)
-		s.render(w, "calendar.html", map[string]any{
-			"User": user, "IsSupervisor": s.Auth.IsSupervisor(user),
-			"ActiveNav": "calendar",
-			"Roster":    true, "RC": rc, "Title": rc.Title,
-			"PrevMonth": prev, "NextMonth": next,
-		})
-		return
-	}
-
-	// idn present → per-client calendar (existing behavior).
-	cases := clients[idn]
-	if len(cases) == 0 {
-		s.render(w, "calendar.html", map[string]any{"User": user, "NotFound": idn})
-		return
-	}
-	c, _ := selectCase(cases, r.URL.Query().Get("case"))
-	title, days := calendarMonth(c, track, year, month)
-	s.render(w, "calendar.html", map[string]any{
-		"User":      user,
-		"C":         c,
-		"Title":     title,
-		"Days":      days,
-		"PrevMonth": prev,
-		"NextMonth": next,
-	})
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data any) {

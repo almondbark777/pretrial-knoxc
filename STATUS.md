@@ -29,11 +29,19 @@ backup drive. **Netdata monitoring** is running with phone push alerts via ntfy.
       canonical JS by unit + DB golden tests.
 - [x] Two-gate auth: Cloudflare-Access header + 12h session cookie + Basic fallback.
 
-**Landing / structure (Alex's call: keep the tracker primary during transition)**
+**Landing / structure**
 - [x] `/` serves the **existing client tracker** (untouched bundle in an iframe),
       fed by a Go reimplementation of `/api/lookup_data` (honors tombstones/overrides).
-- [x] New admin/data-entry app at `/dashboard`, reached via a top-bar button;
-      every new page has a "← Client Tracker" link back.
+- [x] The **Case Console** (`/console`) is the app UI. The classic `/dashboard`
+      interface was **removed 2026-06-09** (Alex: "get rid of the classic
+      interface") — `/dashboard`, `/client_profile.html?idn=`, `/calendar.html`,
+      `/my_day.html`, `/pretrial_app.html`, `/analytics.html`, and
+      `GET /admin/add_defendant` all 302 to their console equivalents (query
+      params carried over; pinned in `cmd/server/main_test.go`). The printable
+      `/reports` pages and supervisor utilities (`/admin/{delete,deleted,audit}`)
+      remain, re-chromed to link only tracker/console. The console record gained
+      the classic profile's last exclusives: a Drug Screens tab, and supervisor
+      "Audit history" / "Delete client…" menu actions.
 
 **Data entry (Phase 10) — add records from the website**
 - [x] **Add a client** (`/admin/add_defendant`, "+ Add client" on the dashboard),
@@ -55,10 +63,11 @@ backup drive. **Netdata monitoring** is running with phone push alerts via ntfy.
 - [x] **Every write audited** in ET → viewable at `/admin/audit` (global + per-person).
 - [x] Supervisor tier via `SUPERVISOR_EMAILS`; allow-list via `ALLOWED_EMAILS`.
 
-**Read-side features**
+**Read-side features** *(now all served by the console — the classic pages that
+first carried them were removed 2026-06-09; My Day's role is covered by the
+console dashboard's "My caseload" scope toggle)*
 - [x] Dashboard (stats + Behind/Missed rosters), case grid, analytics.
 - [x] Per-client calendar **and roster (team) calendar**.
-- [x] **My Day** — each officer's own caseload worklist (due / behind / missed).
 - [x] Profile **Case Info panel** with MISSING critical-field badges (Brief 2.7).
 - [x] Live lookup search.
 
@@ -113,9 +122,42 @@ backup drive. **Netdata monitoring** is running with phone push alerts via ntfy.
    rqlite 3-node + Cloudflare LB failover. Do at the end of the testing phase.
 
 ### Nice-to-have / optional (not blocking)
-- Roster-calendar weekly/column totals; per-officer split on the Behind report.
-- Drug-screen logging (table + CRUD) — was on the old Python roadmap.
-- "Undo last delete" one-click on the dashboard (restore already exists at `/admin/deleted`).
+- [x] Roster-calendar weekly/column totals — **done 2026-06-09**: both team calendars
+      (`/calendar.html` + `/console/calendar`) now have a trailing week-total column
+      and a weekday-totals footer row + month grand-total cell. Same numbers as the
+      day cells, re-aggregated server-side (`rosterCalendarMonth`); reconciliation
+      pinned in `TestRosterCalendarMonth`.
+- [x] Per-officer split on the Behind report — **done 2026-06-09**:
+      `/reports/behind?by=officer` renders one section per supervising officer
+      (alphabetical, Unassigned last) with a count + behind-$ subtotal; toggle
+      link flips between flat and grouped views, print-ready like the flat
+      report. Subtotals reconcile with the flat roster (pinned in
+      `TestGroupBehindByOfficer` + live check: 141 clients / $97,822 both views).
+- [x] Drug-screen logging (table + CRUD) — **done 2026-06-09**: `drug_screens`
+      extension table (migration 005 + EnsureSchema self-provision), officer
+      CRUD (date / test type / result / substances / notes), color-coded
+      results, every write audited, rows purged on whole-person delete.
+      CSRF-guarded `/admin/drugscreen/{add,delete}`. UI lives on the **console
+      record** (Drug Screens tab + Record-Drug-Screen modal + "Last Drug
+      Screen" summary field + Activity-timeline merge) since the classic
+      profile was removed the same day. Tests:
+      `internal/db/drugscreens_test.go`, `TestDrugScreenChip`,
+      `TestConsoleRecordDrugScreens` + live e2e add/render/delete check.
+- [x] "Undo last delete" one-click — **done 2026-06-09** (rebuilt for the console;
+      the old classic-dashboard branch is superseded): supervisor ↩ button on the
+      console Admin tombstone panel restores the newest tombstone
+      (`POST /admin/undo_last_delete`, CSRF, audited via Restore*). Test
+      `TestUndoLastDelete` + live e2e delete→undo check.
+- [x] Pin/star clients — **done 2026-06-09**: per-officer pins
+      (`pinned_defendants` from migration 001, now also self-provisioned),
+      `POST /admin/pin/toggle` (audited), Pin/Unpin on the record's ⋯ menu +
+      "📌 Pinned" badge, and a Pinned Clients quick-list strip on the console
+      dashboard. Purged on whole-person delete. Tests: `TestPinToggle`,
+      `TestPinsPurgedOnPersonDelete`, `TestPinnedRows`.
+- [x] Saved views — **done 2026-06-09**: per-officer named roster filter combos
+      (`saved_searches` from migration 001, finally in use). "★ Save view" on
+      `/console/clients`, one-click chips, owner-scoped delete, sanitized
+      query params, audited. Tests: `TestSavedViews`, `TestSanitizeViewQuery`.
 - DB-backed allow-list (currently env/`ALLOWED_EMAILS` with a built-in fallback).
 
 ---

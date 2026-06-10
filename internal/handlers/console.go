@@ -1,11 +1,9 @@
-// console.go serves the NEW professional case console at /console — a second,
-// commercial-inspired dashboard that runs ALONGSIDE the existing /dashboard app
-// for side-by-side comparison (same coexistence pattern as the tracker split).
+// console.go serves the professional case console at /console — the primary
+// (and, since the classic interface was removed 2026-06-09, only) app UI.
 //
 // Every read view renders REAL data from the shared server-side math. Write
-// actions are rendered as demo-safe modals/slide-overs (client-side success /
-// "logged (not sent)" / "coming soon" toasts) this pass — no POST handler here
-// can error or 404 in front of an audience.
+// actions POST to the shared CSRF-guarded /admin/* endpoints and come back here
+// via `next`; a few not-yet-built actions remain demo-safe "coming soon" toasts.
 package handlers
 
 import (
@@ -80,6 +78,9 @@ func (s *Server) Console(w http.ResponseWriter, r *http.Request) {
 
 	data := s.consoleBase(r, "dashboard", track)
 	data["D"] = consoleDashboard(clients, track, courtDates, violations, compute.FmtOfficer(auth.User(r)))
+	if pins, _ := db.PinnedIDNs(s.DB, auth.User(r)); len(pins) > 0 {
+		data["Pinned"] = pinnedRows(clients, pins)
+	}
 	s.renderConsole(w, "console_dashboard.html", data)
 }
 
@@ -110,6 +111,9 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	data["Fcomp"] = q.Get("comp")
 	data["Fgps"] = q.Get("gps")
 	data["CSRF"] = s.Auth.CSRF(w, r) // for the row quick-action (log check-in)
+	if views, _ := db.ListSavedViews(s.DB, auth.User(r), "/console/clients"); len(views) > 0 {
+		data["Views"] = viewChips(views)
+	}
 	s.renderConsole(w, "console_clients.html", data)
 }
 
@@ -179,7 +183,9 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data["R"] = consoleRecord(c, cases, track, ci, ptr, gps, extras)
-	data["CSRF"] = s.Auth.CSRF(w, r) // available if a real write is wired later
+	data["CSRF"] = s.Auth.CSRF(w, r)
+	data["OverridableFields"] = db.OverridableFields() // for the supervisor "Correct field" modal
+	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)
 	s.renderConsole(w, "console_record.html", data)
 }
 
@@ -271,6 +277,10 @@ func (s *Server) ConsoleCompliance(w http.ResponseWriter, r *http.Request) {
 	data := s.consoleBase(r, "compliance", track)
 	data["Behind"] = behindRoster(clients, track)
 	data["Missed"] = missedCheckInsRoster(clients, track)
+	violations, _ := db.ListAllViolations(s.DB)
+	// Scope to the stats epoch so the roster count matches the dashboard's
+	// "Open Violations since {epoch}" KPI that links here.
+	data["Violations"] = violationRoster(clients, violationsSinceEpoch(violations))
 	data["MatchTime"] = now.Format("3:04 PM")
 	s.renderConsole(w, "console_compliance.html", data)
 }
@@ -307,6 +317,7 @@ func (s *Server) ConsoleAdmin(w http.ResponseWriter, r *http.Request) {
 	data["Tombstones"] = tomb
 	data["Audit"] = audit
 	data["Fields"] = db.OverridableFields()
+	data["CSRF"] = s.Auth.CSRF(w, r) // for the one-click "Undo last delete" form
 	s.renderConsole(w, "console_admin.html", data)
 }
 

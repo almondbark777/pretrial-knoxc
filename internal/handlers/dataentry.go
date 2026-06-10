@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,16 +15,8 @@ import (
 // supervisor delete (tombstone) is the backstop for a wrong entry. All writes go
 // to app-owned tables only and are merged into every view (see db/dataentry.go).
 
-// AddDefendantForm renders the new-client form. GET /admin/add_defendant
-func (s *Server) AddDefendantForm(w http.ResponseWriter, r *http.Request) {
-	user := auth.User(r)
-	s.render(w, "add_defendant.html", map[string]any{
-		"User": user, "IsSupervisor": s.Auth.IsSupervisor(user), "ActiveNav": "",
-		"CSRF": s.Auth.CSRF(w, r), "Msg": r.URL.Query().Get("msg"),
-	})
-}
-
-// AddDefendant creates a new client and redirects to their profile.
+// AddDefendant creates a new client and redirects to their record. The UI is
+// the console intake wizard (/console/clients/new).
 // POST /admin/add_defendant
 func (s *Server) AddDefendant(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
@@ -45,12 +38,19 @@ func (s *Server) AddDefendant(w http.ResponseWriter, r *http.Request) {
 		Birthdate:       r.FormValue("birthdate"),
 	}
 	if err := db.AddDefendant(s.DB, nd, auth.User(r)); err != nil {
-		redirectMsg(w, r, "/admin/add_defendant", "Could not add client: "+err.Error())
+		redirectMsg(w, r, "/console/clients/new", "Could not add client: "+err.Error())
 		return
+	}
+	// The console intake wizard collects richer detail than the added_defendants
+	// schema has columns for (charges, bond type, conditions, schedule, …). It
+	// packs those into intake_summary; keep them as an initial note rather than
+	// dropping them. Best-effort: the client already exists if this fails.
+	if summary := strings.TrimSpace(r.FormValue("intake_summary")); summary != "" {
+		_ = db.AddNote(s.DB, strings.TrimSpace(nd.IDN), summary, auth.User(r))
 	}
 	s.clearCache()
 	idn := strings.TrimSpace(nd.IDN)
-	redirectMsg(w, r, safeNext(r, "/client_profile.html?idn="+url.QueryEscape(idn)),
+	redirectMsg(w, r, safeNext(r, "/console/clients/"+url.PathEscape(idn)),
 		"Client added: "+strings.TrimSpace(nd.Name)+" (IDN "+idn+").")
 }
 
@@ -82,6 +82,43 @@ func (s *Server) AddCheckIn(w http.ResponseWriter, r *http.Request) {
 	idn, back := profileBack(r)
 	err := db.AddCheckIn(s.DB, idn, r.FormValue("date"), r.FormValue("type_of_check_in"), r.FormValue("note"), auth.User(r))
 	s.afterWrite(w, r, back, err, "Check-in recorded.")
+}
+
+// BulkAddCheckIn logs one check-in for many clients at once (the console's bulk
+// action). Takes a comma-separated `idns` plus the usual date/type/note and
+// returns JSON {ok, logged, error?} so the UI can show a real count rather than a
+// demo toast. Best-effort per client: one bad IDN doesn't abort the rest.
+// POST /admin/checkin/bulk
+func (s *Server) BulkAddCheckIn(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	date := r.FormValue("date")
+	ctype := r.FormValue("type_of_check_in")
+	note := r.FormValue("note")
+	by := auth.User(r)
+	logged := 0
+	var firstErr error
+	for _, idn := range strings.Split(r.FormValue("idns"), ",") {
+		if strings.TrimSpace(idn) == "" {
+			continue
+		}
+		if err := db.AddCheckIn(s.DB, idn, date, ctype, note, by); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		logged++
+	}
+	s.clearCache()
+	resp := map[string]any{"ok": logged > 0, "logged": logged}
+	if firstErr != nil {
+		resp["error"] = firstErr.Error()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if logged == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // DeleteAddedCheckIn removes an app-entered check-in. POST /admin/checkin/delete

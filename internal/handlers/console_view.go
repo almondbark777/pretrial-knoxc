@@ -1,11 +1,11 @@
 package handlers
 
-// console_view.go builds the view-models for the NEW professional case console
+// console_view.go builds the view-models for the professional case console
 // (mounted at /console). It is a pure presentation layer: every number comes from
-// the same server-side math the tracker and the existing /dashboard use
-// (computeStats, behindRoster, missedCheckInsRoster, ComputeCheckIns/PTRFees/GPS,
-// GetEventsForClient). Nothing here reimplements a business rule — it only shapes
-// those outputs into cards, chips, timelines, and tabs.
+// the same server-side math the tracker uses (computeStats, behindRoster,
+// missedCheckInsRoster, ComputeCheckIns/PTRFees/GPS, GetEventsForClient).
+// Nothing here reimplements a business rule — it only shapes those outputs into
+// cards, chips, timelines, and tabs.
 
 import (
 	"encoding/json"
@@ -265,14 +265,7 @@ func consoleClientRows(clients map[string][]*compute.Client, track time.Time, co
 	// directly: behind/missed once each, then a single ComputeCheckIns per client
 	// (defendantRows would compute GPS + PTR + a second ComputeCheckIns per client,
 	// all discarded here — wasteful on a ~3,300-row caseload).
-	behind := map[string]bool{}
-	for _, r := range behindRoster(clients, track) {
-		behind[r.IDN] = true
-	}
-	missed := map[string]bool{}
-	for _, r := range missedCheckInsRoster(clients, track) {
-		missed[r.IDN] = true
-	}
+	behind, missed := behindMissedSets(clients, track)
 
 	rows := make([]ConsoleClientRow, 0, len(clients))
 	for idn, cases := range clients {
@@ -294,7 +287,7 @@ func consoleClientRows(clients map[string][]*compute.Client, track time.Time, co
 			nextCourt, nextCourtSort = "—", blankDateSort
 		}
 		row := ConsoleClientRow{
-			IDN: idn, Name: c.Name, Initials: initials(c.Name), CaseNo: dash(c.CaseNo),
+			IDN: idn, Name: c.Name, Initials: Initials(c.Name), CaseNo: dash(c.CaseNo),
 			Level: lvl, LevelChip: levelChip(lvl), StatusChip: statusChip(c.Status),
 			Officer: dash(c.Officer), NextCourt: nextCourt, NextCourtSort: nextCourtSort,
 			NextCheckIn: nextCI, NextCheckInSort: nextCISort,
@@ -385,7 +378,6 @@ type ConsoleCourtRow struct {
 	ID         int64
 	Event      string
 	Date       string
-	Location   string
 	Notes      string
 	Outcome    Chip
 	HasOutcome bool
@@ -419,6 +411,17 @@ type ConsoleLoggedPayment struct {
 	Author string
 }
 
+// ConsoleDrugScreen is one drug-screen log row on the record's Drug Screens tab.
+type ConsoleDrugScreen struct {
+	ID         int64
+	Date       string
+	Test       string
+	Result     Chip
+	Substances string
+	Notes      string
+	Author     string
+}
+
 // ConsoleRecord is the full client-record view-model.
 type ConsoleRecord struct {
 	IDN        string
@@ -427,11 +430,11 @@ type ConsoleRecord struct {
 	CaseNo     string
 	Cases      []string
 	DOB        string
-	Booking    string
 	Officer    string
 	LevelChip  Chip
 	StatusChip Chip
 	Badges     []Chip
+	Tags       []models.Tag
 	Closed     bool
 	ClosedDate string
 	Missing    []string
@@ -442,6 +445,7 @@ type ConsoleRecord struct {
 	Court          []ConsoleCourtRow
 	LoggedCheckIns []ConsoleLoggedCI
 	LoggedPayments []ConsoleLoggedPayment
+	DrugScreens    []ConsoleDrugScreen
 	PTRMonths      []ConsolePTRMonth
 	PTR            compute.PTRResult
 	GPS            compute.GPSResult
@@ -449,9 +453,8 @@ type ConsoleRecord struct {
 	Notes          []models.Note
 	Activity       []ConsoleTLItem
 
-	CI    compute.CheckInResult
-	AsOf  string
-	track time.Time
+	CI   compute.CheckInResult
+	AsOf string
 }
 
 func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Time,
@@ -460,11 +463,11 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 
 	level, _ := compute.ParseLevel(c.Level)
 	rec := ConsoleRecord{
-		IDN: c.IDN, Name: c.Name, Initials: initials(c.Name), CaseNo: dash(c.CaseNo),
+		IDN: c.IDN, Name: c.Name, Initials: Initials(c.Name), CaseNo: dash(c.CaseNo),
 		Cases: caseOptions(allCases), DOB: dash(c.Birthdate), Officer: dash(c.Officer),
 		LevelChip: levelChip(level), StatusChip: statusChip(c.Status),
 		GpsWaived: compute.IsFeesWaived(c.GpNotes), CI: ci, PTR: ptr, GPS: gps,
-		Notes: extras.Notes, AsOf: track.Format("January 2, 2006"), track: track,
+		Notes: extras.Notes, Tags: extras.Tags, AsOf: track.Format("January 2, 2006"),
 	}
 	if c.ClosedOK {
 		rec.Closed = true
@@ -526,6 +529,17 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		return t.Format("Jan 2, 2006")
 	}
 
+	// Most recent drug screen (ListDrugScreens is screen_date DESC).
+	lastScreen, lastScreenTone := "— none on record", ""
+	if len(extras.DrugScreens) > 0 {
+		ds := extras.DrugScreens[0]
+		chip := drugScreenChip(ds.Result)
+		lastScreen = shortStamp(ds.ScreenDate) + " · " + chip.Label
+		if chip.Tone == "risk" {
+			lastScreenTone = "risk"
+		}
+	}
+
 	// Case Summary grid.
 	rec.Summary = []ConsoleField{
 		{K: "Charges", V: dash(c.ChargeType)},
@@ -537,6 +551,7 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		{K: "Next Check-in", V: nextCI, Tone: nextTone},
 		{K: "Last In-Person", V: lastStr(ci.LastInPerson), Tone: toneIf(ci.LastInPerson == nil, "risk")},
 		{K: "Last Phone", V: lastStr(ci.LastPhone)},
+		{K: "Last Drug Screen", V: lastScreen, Tone: lastScreenTone},
 		{K: "GPS Status", V: gpsSummary(c, gps), Missing: c.GpsActive && gps.Vendor == ""},
 		{K: "PTR Fee Balance", V: ptrBalanceText(ptr), Tone: toneForBalance(ptr.Balance, ptr.Applies)},
 		{K: "Order From", V: dash(c.OrderFrom)},
@@ -593,7 +608,7 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 			nextDate = nd.Format("Jan 2, 2006")
 		}
 		rec.Court = append(rec.Court, ConsoleCourtRow{
-			ID: cd.ID, Event: orDash(cd.Court != "", cd.Court), Date: dateStr, Location: dash(cd.Court),
+			ID: cd.ID, Event: orDash(cd.Court != "", cd.Court), Date: dateStr,
 			Notes: dash(cd.Notes), Outcome: outcome, HasOutcome: cd.Outcome != "", NextDate: nextDate,
 			Reminder: Chip{Tone: "warn", Icon: "◯", Label: "Logged (not sent)"},
 		})
@@ -612,6 +627,15 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 	// Payments / Fees — PTR months.
 	for _, m := range ptr.MonthsOwed {
 		rec.PTRMonths = append(rec.PTRMonths, ConsolePTRMonth{Label: m.Label, Amount: m.Amount})
+	}
+
+	// Drug-screen log (newest first from ListDrugScreens).
+	for _, ds := range extras.DrugScreens {
+		rec.DrugScreens = append(rec.DrugScreens, ConsoleDrugScreen{
+			ID: ds.ID, Date: shortStamp(ds.ScreenDate), Test: dash(ds.TestType),
+			Result: drugScreenChip(ds.Result), Substances: ds.Substances,
+			Notes: ds.Notes, Author: compute.FmtOfficer(ds.Officer),
+		})
 	}
 
 	// Activity timeline — every dated item (events incl. app-added check-ins /
@@ -654,11 +678,100 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 			Date: shortStamp(rm.CreatedAt), Title: "Reminder logged (not sent)",
 			Detail: rm.Body, Tone: "warn", Icon: "◯"}})
 	}
+	for _, ds := range extras.DrugScreens {
+		t, _ := compute.ParseDay(ds.ScreenDate)
+		chip := drugScreenChip(ds.Result)
+		var parts []string
+		for _, p := range []string{ds.TestType, ds.Substances, ds.Notes} {
+			if strings.TrimSpace(p) != "" {
+				parts = append(parts, strings.TrimSpace(p))
+			}
+		}
+		acts = append(acts, act{t, ConsoleTLItem{
+			Date: shortStamp(ds.ScreenDate), Title: "Drug screen — " + chip.Label,
+			Detail: strings.Join(parts, " · "), Tone: chip.Tone, Icon: chip.Icon}})
+	}
 	sort.SliceStable(acts, func(i, j int) bool { return acts[i].t.After(acts[j].t) })
 	for _, a := range acts {
 		rec.Activity = append(rec.Activity, a.item)
 	}
 	return rec
+}
+
+// ViewChip is one saved-view chip on the roster page. URL is pre-built from
+// the stored query — safe as template.URL because SaveView sanitizes to known
+// filter keys and re-encodes via url.Values before storing.
+type ViewChip struct {
+	ID   int64
+	Name string
+	URL  template.URL
+}
+
+func viewChips(views []models.SavedView) []ViewChip {
+	out := make([]ViewChip, 0, len(views))
+	for _, v := range views {
+		u := "/console/clients"
+		if v.Query != "" {
+			u += "?" + v.Query
+		}
+		out = append(out, ViewChip{ID: v.ID, Name: v.Name, URL: template.URL(u)})
+	}
+	return out
+}
+
+// PinnedRow is one entry in the dashboard's "Pinned clients" quick list.
+type PinnedRow struct {
+	IDN      string
+	Name     string
+	Initials string
+	Detail   string
+}
+
+// pinnedRows resolves the user's pinned IDNs against the live client set,
+// newest pin first. Pins whose client no longer exists (deleted/tombstoned)
+// are skipped silently — the pin row stays in the table and simply reappears
+// if the client is restored.
+func pinnedRows(clients map[string][]*compute.Client, idns []string) []PinnedRow {
+	var out []PinnedRow
+	for _, idn := range idns {
+		c := openRep(clients[idn])
+		if c == nil {
+			continue
+		}
+		var parts []string
+		if lvl, _ := compute.ParseLevel(c.Level); lvl > 0 {
+			parts = append(parts, "L"+itoa(lvl))
+		}
+		if strings.TrimSpace(c.Officer) != "" {
+			parts = append(parts, c.Officer)
+		}
+		out = append(out, PinnedRow{
+			IDN: c.IDN, Name: c.Name, Initials: Initials(c.Name),
+			Detail: strings.Join(parts, " · "),
+		})
+	}
+	return out
+}
+
+// drugScreenChip maps a screen result onto the shared chip tones: positive and
+// refused read as risk, diluted as warn, negative as ok, anything else neutral.
+func drugScreenChip(result string) Chip {
+	switch strings.ToLower(strings.TrimSpace(result)) {
+	case "positive":
+		return Chip{Tone: "risk", Icon: "⚠", Label: "Positive"}
+	case "refused":
+		return Chip{Tone: "risk", Icon: "⚠", Label: "Refused"}
+	case "diluted":
+		return Chip{Tone: "warn", Icon: "◯", Label: "Diluted"}
+	case "negative":
+		return Chip{Tone: "ok", Icon: "✓", Label: "Negative"}
+	case "pending":
+		return Chip{Tone: "neutral", Icon: "◯", Label: "Pending"}
+	case "":
+		return Chip{Tone: "neutral", Label: "—"}
+	default:
+		return Chip{Tone: "neutral", Label: titleCase(result)}
+	}
 }
 
 func consoleConditions(c *compute.Client, level int, ci compute.CheckInResult,
@@ -745,7 +858,9 @@ func rec_isWaived(c *compute.Client) bool { return compute.IsFeesWaived(c.GpNote
 
 // ── small formatting helpers (display only) ───────────────────────────────────
 
-func initials(name string) string {
+// Initials renders an avatar monogram from a display name ("Alex Bentley" → "AB").
+// Exported so the template FuncMap (cmd/server) reuses the same logic.
+func Initials(name string) string {
 	parts := strings.Fields(strings.TrimSpace(name))
 	if len(parts) == 0 {
 		return "?"

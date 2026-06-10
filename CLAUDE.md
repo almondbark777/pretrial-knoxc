@@ -11,8 +11,15 @@ Officers look up defendants, check-in history, payment history, and GPS status.
 Replaces a SharePoint-list-plus-Excel workflow. Self-hosted on a Linux server
 called ptr1 inside the office, exposed via Cloudflare Tunnel.
 
-**Current status: pre-production. Not yet in active use. Cleaning up and
-rewriting before first real test.**
+**Current status: pre-production. The Go rewrite is complete and is the primary
+app; final cleanup and verification before the first real test. Not yet in
+active use.**
+
+**UI structure:** the bundled client tracker is the landing page at `/`; the
+**Case Console at `/console` is the (only) app UI**. The classic `/dashboard`
+interface was removed 2026-06-09 — its old URLs 302-redirect to console
+equivalents. The printable `/reports` pages and the supervisor utilities
+(`/admin/{delete,deleted,audit}`) are separate, still-live surfaces.
 
 ---
 
@@ -36,18 +43,21 @@ Browser -> Cloudflare Access (allowlist email + emailed one-time code)
 
 ---
 
-## Planned rewrite: Python/FastAPI -> Go
+## Architecture: Go + SQLite (the implemented stack)
 
-**The current Python/FastAPI app is being rewritten in Go before production use.**
+**The Go rewrite is done.** The app is a single Go binary + native SQLite
+(`cmd/server` + `internal/…`), server-rendered with `html/template`. The
+Python/FastAPI app under `webapp/` is legacy reference only, retained during the
+cutover. The notes below record why the rewrite happened and what it delivered.
 
-Reasons:
+Reasons it was done:
 - Current codebase has a T-SQL -> SQLite runtime translation shim (sqlglot)
   that adds overhead and is hard to debug. All queries need to be rewritten as
   native SQLite anyway.
 - Go: single binary deploy, no dependencies on ptr1, much faster, easy to read.
 - Deploy story: `go build`, `scp` binary to ptr1, `systemctl restart ptr-webapp`.
 
-### Go rewrite goals
+### What the rewrite delivered
 - Native SQLite queries (no T-SQL, no sqlglot shim)
 - `html/template` for server-rendered pages
 - Single binary — no venv, no pip, no Python version management
@@ -56,11 +66,11 @@ Reasons:
 - Same systemd service and cloudflared setup unchanged
 - Database renamed from `kh222.db` to `pretrial_release.db`
 
-### Recommended Go packages
-- `github.com/mattn/go-sqlite3` or `modernc.org/sqlite` (pure Go, no CGO) for SQLite
-- `github.com/gorilla/sessions` or built-in `net/http` sessions for auth
-- Standard library `html/template` for templates
-- Standard library `net/http` for the server (or `github.com/go-chi/chi` for routing)
+### Key packages (in use)
+- `modernc.org/sqlite` — pure-Go SQLite, no CGO
+- `github.com/go-chi/chi/v5` — HTTP routing
+- `github.com/gorilla/sessions` — session cookies (auth), alongside the Cloudflare-Access header
+- standard library `html/template` — server-rendered pages
 
 ---
 
@@ -89,18 +99,19 @@ Schema: `db/migrations/001_app_extensions_sqlite.sql`
 
 ## Allowed users
 
-22 `@knoxsheriff.org` emails in `webapp/users.py` (Python) — will move to
-a config file or the database in the Go rewrite.
+The allow-list is config-driven via the `ALLOWED_EMAILS` env var (comma-separated),
+with a built-in fallback list in `internal/auth/auth.go`. `SUPERVISOR_EMAILS` (∩ the
+allow-list) gates the supervisor tier. The legacy Python `webapp/users.py` is gone.
 
 ---
 
-## Current Python app (reference only — being replaced)
+## Legacy Python app (reference only — superseded by the Go app)
 
 `webapp/` — FastAPI + Jinja2. Routes in `app.py`. Queries in `queries.py`
 (T-SQL translated at runtime by `sqlite_compat.py` via sqlglot). Extension
 queries in `queries_ext.py`. TTL cache (60s), clear with `GET /api/refresh`.
 
-Keep this running on ptr1 until the Go rewrite is ready to swap in.
+Superseded by the Go app; retained only for reference during the cutover.
 
 ---
 

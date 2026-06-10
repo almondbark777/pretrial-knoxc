@@ -1,9 +1,9 @@
 /* ===========================================================================
    Knox County Pre-Trial — PROFESSIONAL CASE CONSOLE (/console)
-   A second, commercial-inspired direction (equivant / Tyler / Journal-style):
-   a light enterprise SaaS shell — dark navy left sidebar, white panels, dense
-   data tables, status chips everywhere. Deliberately DISTINCT from the dark
-   top-nav /dashboard app so the two directions contrast at a glance.
+   Commercial-inspired (equivant / Tyler / Journal-style): a light enterprise
+   SaaS shell — dark navy left sidebar, white panels, dense data tables, status
+   chips everywhere. The primary (and only) app UI since the classic dark
+   top-nav interface was removed (2026-06-09).
 
    Status color is Wong colorblind-safe (vermillion=risk, sky=ok, amber=warn)
    and ALWAYS paired with an icon + text label. Full dark-mode variant via
@@ -91,6 +91,14 @@ a:hover{text-decoration:underline}
 .grow{flex:1}
 .num{font-variant-numeric:tabular-nums;text-align:right}
 .risk-t{color:var(--risk-ink)} .ok-t{color:var(--ok-ink)} .warn-t{color:var(--warn-ink)}
+
+/* Render-on-demand for long scan/print lists (compliance rosters, record
+   timelines): skips layout+paint of off-screen content on weak office PCs while
+   keeping the DOM intact — find-in-page still matches, and printing renders in
+   full (auto contents are always laid out for print; the @media rule is belt
+   and braces). */
+.cv-auto{content-visibility:auto;contain-intrinsic-size:auto 900px}
+@media print{.cv-auto{content-visibility:visible}}
 
 /* ── app frame ───────────────────────────────────────────────────────────── */
 .capp{display:flex;min-height:100vh}
@@ -207,7 +215,6 @@ a.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var
 .frow .m{color:var(--muted);font-size:12px;margin-top:1px}
 .frow .grow{min-width:0}
 .frow .grow .t,.frow .grow .m{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.frow .when{flex:0 0 auto;color:var(--faint);font-size:12px}
 
 .emptybox{padding:30px 16px;text-align:center;color:var(--muted)}
 .emptybox .big{font-size:26px;margin-bottom:6px;opacity:.7}
@@ -226,12 +233,10 @@ a.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var
   background:var(--brand);color:#fff;border:1px solid transparent;padding:8px 15px;border-radius:var(--r-sm);box-shadow:var(--shadow-sm);transition:filter var(--t),transform var(--t),background var(--t)}
 .btn:hover{filter:brightness(1.07);text-decoration:none}
 .btn:active{transform:translateY(1px)}
-.btn.accent{background:var(--accent)}
 .btn.ghost{background:var(--panel);color:var(--brand);border-color:var(--line-2);box-shadow:none}
 html[data-theme="dark"] .btn.ghost{color:var(--accent-ink)}
 .btn.ghost:hover{background:var(--panel-3);filter:none}
 .btn.sm{padding:5px 10px;font-size:12px}
-.btn.link{background:none;border:0;box-shadow:none;color:var(--link);padding:6px 8px}
 
 /* ── tables ──────────────────────────────────────────────────────────────── */
 .tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);overflow:hidden}
@@ -347,16 +352,19 @@ html[data-theme="dark"] .tabs button.active{color:var(--accent-ink);border-botto
 .ev.missed{border-left-color:var(--risk);color:var(--risk-ink)}
 .ev.due{border-left-color:var(--warn-ink)}
 .ev.closed{border-left-color:var(--faint);color:var(--muted)}
+/* roster-calendar totals: trailing week-total column + weekday footer row */
+.cal.tot{grid-template-columns:repeat(7,1fr) minmax(96px,.75fr)}
+.cal-d.sum{background:transparent;border:1px dashed var(--line);min-height:0}
+.cal-d.sum.grand{border-style:solid}
+.ev.nil{border-left-color:var(--line);color:var(--muted);background:transparent}
 .callegend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;font-size:11.5px;color:var(--muted)}
 .callegend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
 
-/* ── modal / slide-over (demo write actions) ─────────────────────────────── */
+/* ── modal ───────────────────────────────────────────────────────────────── */
 .backdrop{position:fixed;inset:0;background:rgba(15,28,44,.45);backdrop-filter:blur(2px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
 .backdrop.show{display:flex;animation:fade .15s ease both}
 .modal{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);width:480px;max-width:100%;max-height:90vh;overflow:auto;animation:pop .2s cubic-bezier(.2,.7,.2,1) both}
-.slide .modal{width:440px;max-height:100vh;height:100vh;border-radius:0;margin-left:auto;animation:slidein .22s cubic-bezier(.2,.7,.2,1) both}
 @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
-@keyframes slidein{from{transform:translateX(40px);opacity:.4}to{transform:none;opacity:1}}
 .modal .mh{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
 .modal .mh h3{margin:0;font-size:15px;font-weight:700}
 .modal .mh .x{margin-left:auto;background:none;border:0;font-size:20px;color:var(--muted);cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}

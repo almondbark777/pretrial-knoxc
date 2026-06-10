@@ -112,9 +112,5 @@ const StatsEpochLabel = "Jun 1, 2026"
 // compute math is unchanged, so per-client profile detail still shows every
 // window): (1) aggregate "missed" counts/rosters ignore windows whose deadline
 // is before the floor; (2) a client with NO check-in records at all is not
-// flagged as missing. Mirrors the StatsEpoch pattern. Surfaced as the label.
+// flagged as missing. Mirrors the StatsEpoch pattern.
 func CheckInDataFloor() time.Time { return Noon(2026, 3, 1) }
-
-// CheckInDataFloorLabel is the human-readable floor date for the UI, so officers
-// know missed-check-in tracking begins when digital records do.
-const CheckInDataFloorLabel = "Mar 1, 2026"

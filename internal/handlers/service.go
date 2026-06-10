@@ -261,18 +261,26 @@ func computeStats(clients map[string][]*compute.Client, track time.Time) models.
 	return s
 }
 
+// behindMissedSets builds IDN→true lookup sets for the Behind-on-GPS and
+// Missed-check-ins rosters, from the same roster functions both views use (so
+// the flags never diverge). Shared by consoleClientRows and defendantRows.
+func behindMissedSets(clients map[string][]*compute.Client, track time.Time) (behind, missed map[string]bool) {
+	behind = map[string]bool{}
+	for _, r := range behindRoster(clients, track) {
+		behind[r.IDN] = true
+	}
+	missed = map[string]bool{}
+	for _, r := range missedCheckInsRoster(clients, track) {
+		missed[r.IDN] = true
+	}
+	return
+}
+
 // defendantRows builds one row per IDN (open-preferred rep) with computed
 // compliance, for the case-management grid + /api/defendants. Behind/Missed
 // flags are taken from the SAME roster functions (no divergence).
 func defendantRows(clients map[string][]*compute.Client, track time.Time) []models.DefendantRow {
-	behind := map[string]bool{}
-	for _, r := range behindRoster(clients, track) {
-		behind[r.IDN] = true
-	}
-	missed := map[string]bool{}
-	for _, r := range missedCheckInsRoster(clients, track) {
-		missed[r.IDN] = true
-	}
+	behind, missed := behindMissedSets(clients, track)
 	rows := make([]models.DefendantRow, 0, len(clients))
 	for idn, cases := range clients {
 		c := openRep(cases)
@@ -418,53 +426,6 @@ func calendarMonth(c *compute.Client, track time.Time, year int, month time.Mont
 	return title, days
 }
 
-// myDay builds the logged-in officer's personal worklist: among the clients THEY
-// supervise (open rep's Officer == their display name), the ones behind on GPS,
-// who missed a check-in this month, and whose next check-in window falls due
-// within 7 days. Reuses the roster fns (filtered by officer) so there's no
-// divergence. A user who supervises no one (e.g. an admin) gets an empty list.
-func myDay(clients map[string][]*compute.Client, track time.Time, officer string) models.MyDay {
-	md := models.MyDay{Officer: officer}
-	officerLC := strings.ToLower(strings.TrimSpace(officer))
-	mine := map[string]bool{}
-	for _, cases := range clients {
-		c := openRep(cases)
-		if c != nil && strings.ToLower(strings.TrimSpace(c.Officer)) == officerLC && officerLC != "" {
-			mine[c.IDN] = true
-			md.Caseload++
-		}
-	}
-	for _, x := range behindRoster(clients, track) {
-		if mine[x.IDN] {
-			md.Behind = append(md.Behind, x)
-		}
-	}
-	for _, x := range missedCheckInsRoster(clients, track) {
-		if mine[x.IDN] {
-			md.Missed = append(md.Missed, x)
-		}
-	}
-	weekEnd := track.AddDate(0, 0, 7)
-	for _, cases := range clients {
-		c := openRep(cases)
-		if c == nil || !mine[c.IDN] {
-			continue
-		}
-		ci := compute.ComputeCheckIns(*c, track)
-		if ci.NextDue != nil && !ci.NextDue.Deadline.After(weekEnd) {
-			lvl, _ := compute.ParseLevel(c.Level)
-			md.DueSoon = append(md.DueSoon, models.RosterRow{
-				IDN: c.IDN, Name: c.Name, Officer: c.Officer, Level: lvl,
-				Detail: "due " + ci.NextDue.Deadline.Format("Mon Jan 2") + " · " + ci.NextDue.Label,
-			})
-		}
-	}
-	sortByName(md.DueSoon)
-	sortByName(md.Behind)
-	sortByName(md.Missed)
-	return md
-}
-
 // rosterCalendarMonth aggregates events across ALL clients into per-day counts
 // for the roster-mode (team standup) calendar — Brief 2.9's second calendar mode.
 // One representative per IDN (open-preferred) is used so a multi-case person's
@@ -527,7 +488,97 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 		}
 	}
 	rc.Days = days
+
+	// Week rows (with week totals) + per-weekday column totals — the
+	// "roster-calendar weekly/column totals" nice-to-have. Same numbers as the
+	// day cells, just re-aggregated; the grand totals above stay authoritative.
+	// rc.Days stays exactly leading-pad + month days (JSON/test contract); only
+	// this week grouping gets trailing padding so every row has 7 cells.
+	padded := days
+	for len(padded)%7 != 0 {
+		padded = append(padded, models.RosterDay{Day: 0})
+	}
+	rc.ColTotals = make([]models.RosterTotals, 7)
+	for w := 0; w < len(padded); w += 7 {
+		week := models.RosterWeek{Days: padded[w : w+7]}
+		for i, rd := range week.Days {
+			week.Tot.CheckIns += rd.CheckIns
+			week.Tot.Payments += rd.Payments
+			week.Tot.Missed += rd.Missed
+			week.Tot.Due += rd.Due
+			rc.ColTotals[i].CheckIns += rd.CheckIns
+			rc.ColTotals[i].Payments += rd.Payments
+			rc.ColTotals[i].Missed += rd.Missed
+			rc.ColTotals[i].Due += rd.Due
+		}
+		rc.Weeks = append(rc.Weeks, week)
+	}
+	rc.Month = models.RosterTotals{
+		CheckIns: rc.TotCheckIns, Payments: rc.TotPayments,
+		Missed: rc.TotMissed, Due: rc.TotDue,
+	}
 	return rc
+}
+
+// ViolationRow is one recorded violation resolved to its client, for the
+// compliance page's violations roster. It mirrors the Behind/Missed rosters'
+// client + officer + level shape, plus the violation's (display-formatted) date
+// and a category/description detail.
+type ViolationRow struct {
+	IDN     string
+	Name    string
+	Officer string
+	Level   int
+	Date    string // display-formatted (shortStamp); a dash when undated
+	Detail  string // category + description
+}
+
+// violationRoster resolves each recorded violation to its client and returns the
+// list sorted newest-first (undated rows last, then by name). Callers pass
+// violations already scoped to the stats epoch (violationsSinceEpoch) so the row
+// count matches the dashboard's "Open Violations" KPI.
+func violationRoster(clients map[string][]*compute.Client, violations []models.Violation) []ViolationRow {
+	rows := make([]ViolationRow, 0, len(violations))
+	for _, v := range violations {
+		lvl := 0
+		if c := openRep(clients[v.IDN]); c != nil {
+			lvl, _ = compute.ParseLevel(c.Level)
+		}
+		detail := strings.TrimSpace(v.Category)
+		if d := strings.TrimSpace(v.Description); d != "" {
+			if detail != "" {
+				detail += " — " + d
+			} else {
+				detail = d
+			}
+		}
+		if detail == "" {
+			detail = "Violation recorded"
+		}
+		rows = append(rows, ViolationRow{
+			IDN:     v.IDN,
+			Name:    nameFor(clients, v.IDN),
+			Officer: officerForIDN(clients, v.IDN),
+			Level:   lvl,
+			Date:    v.ViolationDate, // raw for sorting; display-formatted below
+			Detail:  clipText(detail, 120),
+		})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		di, oki := compute.ParseDay(rows[i].Date)
+		dj, okj := compute.ParseDay(rows[j].Date)
+		if oki != okj {
+			return oki // dated rows before undated
+		}
+		if oki && okj && !di.Equal(dj) {
+			return di.After(dj) // newest first
+		}
+		return strings.ToUpper(rows[i].Name) < strings.ToUpper(rows[j].Name)
+	})
+	for i := range rows {
+		rows[i].Date = shortStamp(rows[i].Date)
+	}
+	return rows
 }
 
 func sortByName(rows []models.RosterRow) {
