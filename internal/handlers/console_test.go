@@ -321,6 +321,24 @@ func TestRosterRowsJSON(t *testing.T) {
 	}
 }
 
+// The alert feed shows at most the 40 most urgent rows, but AlertTotal must
+// carry the real pre-cap count so the dashboard can say "40 of N" honestly.
+func TestConsoleDashboardAlertCap(t *testing.T) {
+	track := compute.Noon(2026, 6, 10)
+	clients := map[string][]*compute.Client{}
+	var viols []models.Violation
+	for i := 0; i < 55; i++ {
+		viols = append(viols, models.Violation{IDN: "1", Category: "Other", Description: "x"})
+	}
+	d := consoleDashboard(clients, track, nil, viols, nil, "")
+	if len(d.Alerts) != 40 {
+		t.Errorf("alerts shown = %d, want capped at 40", len(d.Alerts))
+	}
+	if d.AlertTotal != 55 {
+		t.Errorf("AlertTotal = %d, want 55 (the pre-cap count)", d.AlertTotal)
+	}
+}
+
 // Aggregate violation tallies count only from the go-live epoch; pre-go-live,
 // undated, and unparseable rows are dropped. Per-client history is unaffected
 // (this filter is only applied to the dashboard aggregate).

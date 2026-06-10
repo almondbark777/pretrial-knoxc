@@ -19,7 +19,7 @@
   <a class="kpi" href="/console/clients?status=active&due=today"><div class="n">{{$d.KPIs.DueToday}}</div><div class="l">Check-ins Due Today</div></a>
   <a class="kpi" href="/console/calendar"><div class="n">{{$d.KPIs.CourtThisWeek}}</div><div class="l">Court Dates This Week</div></a>
   <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OpenViolations}}</div><div class="l">Open Violations <span class="kpi-since">since {{.Epoch}}</span></div></a>
-  <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OverdueCheckIns}}</div><div class="l">Overdue Check-ins (mo.)</div></a>
+  <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OverdueCheckIns}}</div><div class="l">Missed Check-ins (this mo.)</div></a>
 </div>
 <div class="epoch-note">Roster counts are current as of the selected date. Activity tallies (violations) count from go-live · <b>{{.Epoch}}</b>.</div>
 
@@ -39,7 +39,8 @@
 
 <div class="grid2">
   <div class="panel">
-    <div class="h"><h2>Alerts Needing Attention</h2><span class="grow"></span><span class="count">{{len $d.Alerts}}</span></div>
+    <div class="h"><h2>Alerts Needing Attention</h2><span class="grow"></span><span class="count">{{$d.AlertTotal}}</span></div>
+    {{if gt $d.AlertTotal (len $d.Alerts)}}<div class="muted" style="padding:8px 18px 0;font-size:12px">Showing the {{len $d.Alerts}} most urgent of {{$d.AlertTotal}} — full rosters in <a href="/console/compliance">Compliance</a>.</div>{{end}}
     <div class="body" id="alertfeed">
       {{range $d.Alerts}}
       <div class="frow" data-mine="{{.Mine}}">

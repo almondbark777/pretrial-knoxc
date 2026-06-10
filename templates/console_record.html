@@ -22,8 +22,8 @@
   </div>
   <div class="acts">
     <button class="btn ghost" onclick="cmOpen('noteModal')">+ Note</button>
-    <button class="btn ghost" onclick="cmOpen('checkinModal')">Log Check-in</button>
-    <button class="btn" onclick="cmOpen('reminderModal')">Send Reminder</button>
+    <button class="btn ghost" onclick="cmOpen('reminderModal')">Log Reminder</button>
+    <button class="btn" onclick="cmOpen('checkinModal')">Log Check-in</button>
     <div class="recmenu">
       <button class="btn ghost" id="ovbtn" aria-label="More actions">⋯</button>
       <div class="pop" id="ovpop">
@@ -268,8 +268,8 @@
 
 {{/* ── Documents ── */}}
 <div class="tabpane" id="t-docs">
-  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" onclick="openAction('soon','{{$r.Name}}')">+ Upload Document</button></div>
-  <div class="panel"><div class="emptybox"><div class="big">▤</div>No documents on file yet.<div class="m" style="margin-top:6px">Release agreements, orders, and assessments will appear here once uploaded.</div></div></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" disabled style="opacity:.45;cursor:not-allowed" title="Document upload arrives in a later build">+ Upload Document</button></div>
+  <div class="panel"><div class="emptybox"><div class="big">▤</div>Document upload isn't built yet.<div class="m" style="margin-top:6px">Release agreements, orders, and assessments will live here in a later build — until then, keep them in the usual shared location.</div></div></div>
 </div>
 
 {{/* ── Activity ── */}}
@@ -343,7 +343,7 @@
 
 <div class="backdrop" id="reminderModal" data-cm><div class="modal" role="dialog" aria-modal="true">
   <form method="post" action="/admin/reminder/add" onsubmit="this.body.value='['+this.channel.value+', logged not sent] '+this.body.value">
-    <div class="mh"><h3>Send Court Reminder</h3><button type="button" class="x" onclick="cmClose('reminderModal')" aria-label="Close">×</button></div>
+    <div class="mh"><h3>Log Court Reminder</h3><button type="button" class="x" onclick="cmClose('reminderModal')" aria-label="Close">×</button></div>
     <div class="mb">
       <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
       <div class="note-hint">v1 is <b>log-only</b> — the reminder is recorded and marked “logged (not sent).” A provider (SMS/email) can be wired later with no UI change.</div>

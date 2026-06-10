@@ -576,3 +576,43 @@ The "Parked (revisit)" item above — the Open-Violations KPI pointing at a page
 with no violations roster — was already resolved when the compliance page
 gained its Violations panel (the console-only commit, 2026-06-09); noted here
 so nobody re-fixes it.
+
+## UX fit-for-purpose pass (2026-06-10)
+
+Alex: "make sure the UX is clean and makes sense for the job the people doing
+are using it for." Walked the console through the officer workflows (morning
+triage, client walk-in, court prep, compliance sweep) and fixed six friction
+points; all live-verified, full test suite green.
+
+1. **Record header matches the job.** "Log Check-in" (the everyday action) is
+   now the solid primary button; "Send Reminder" was the primary but is
+   log-only — renamed **Log Reminder** (ghost) and the modal retitled "Log
+   Court Reminder". No more implying the app sends anything.
+2. **Alert feed is honest about truncation.** It caps at the 40 most-urgent
+   rows, but the badge said "40" even with 1,500 underneath. Badge now shows
+   the true total (new `AlertTotal` on the VM, set pre-cap) and a "Showing the
+   40 most urgent of N — full rosters in Compliance" note appears when capped.
+   Test `TestConsoleDashboardAlertCap`. Verified the badge total reconciles
+   with the compliance page (715 = 143 behind + 570 missed + 2 violations).
+3. **Terminology unified.** KPI "Overdue Check-ins (mo.)" → **"Missed
+   Check-ins (this mo.)"** — same word as the roster it counts ("Missed
+   Check-Ins this month") and the row chips; "overdue" now belongs solely to
+   the deadline-passed roster filter.
+4. **Roster officer filter has real names.** The dropdown only offered
+   All/My-caseload; a supervisor couldn't pull a specific officer's caseload.
+   Now lists every supervising officer (reuses `distinctOfficers`), exact-match
+   in the JS pipeline, URL-seedable + saveable like every other filter.
+5. **Compliance page quick filter.** One input narrows all three rosters
+   (name/officer/detail), turns each panel badge into "shown of total", shows a
+   global "x of y rows match", 150ms debounce for weak hardware. The live
+   Missed roster runs ~1,400 rows — Ctrl+F was the only tool before. CSV
+   exports unaffected (server-side, full roster).
+6. **Documents tab stops pretending.** "+ Upload Document" opened a
+   coming-soon toast — looked broken. Now visibly disabled with a tooltip, and
+   the empty state says uploads land in a later build (keep using the shared
+   location meanwhile).
+
+Preview-cookie gotcha recorded: `ptc_asof` set during as-of testing persists
+per-host in the preview browser (localhost vs 127.0.0.1 are different cookie
+jars) — clear it (or check `document.cookie`) before trusting dashboard
+numbers in a later session.

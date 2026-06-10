@@ -207,6 +207,15 @@ console dashboard's "My caseload" scope toggle)*
       (Python run instructions, App Service deploy plan, pymssql quirks,
       Azure security TODOs) replaced with the current Go repo layout, the
       ptr1 deploy procedure, and the real security posture.
+- [x] UX fit-for-purpose pass — **done 2026-06-10** (see
+      `CONSOLE_DASHBOARD.md` for detail): Log Check-in is the record's
+      primary action ("Send Reminder" → honest "Log Reminder"); the alert
+      feed badge shows the true total with a "40 most urgent of N" note when
+      capped; the missed-check-ins KPI uses the same wording as the roster it
+      counts; the roster officer filter lists real officer names (supervisor
+      use case); the compliance page gained a quick filter across all three
+      rosters (live Missed roster is ~1,400 rows); the Documents tab's fake
+      upload button is visibly disabled instead of toasting "coming soon".
 - DB-backed allow-list (currently env/`ALLOWED_EMAILS` with a built-in fallback).
 
 ---

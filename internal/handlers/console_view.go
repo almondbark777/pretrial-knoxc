@@ -114,12 +114,15 @@ type ConsoleSched struct {
 	Mine  bool
 }
 
-// ConsoleDashboard is the whole "My Caseload" view-model.
+// ConsoleDashboard is the whole "My Caseload" view-model. AlertTotal is the
+// pre-cap alert count — the feed shows the 40 most urgent, and the header must
+// say so honestly when there are more.
 type ConsoleDashboard struct {
-	AsOf     string
-	KPIs     ConsoleKPIs
-	Alerts   []ConsoleAlert
-	Schedule []ConsoleSched
+	AsOf       string
+	KPIs       ConsoleKPIs
+	Alerts     []ConsoleAlert
+	AlertTotal int
+	Schedule   []ConsoleSched
 }
 
 // consoleDashboard assembles the dashboard. It leans on the existing roster
@@ -239,6 +242,7 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 		}
 		return strings.ToUpper(d.Alerts[i].Name) < strings.ToUpper(d.Alerts[j].Name)
 	})
+	d.AlertTotal = len(d.Alerts)
 	if len(d.Alerts) > 40 {
 		d.Alerts = d.Alerts[:40]
 	}

@@ -101,6 +101,7 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	data["RowsJSON"] = rosterRowsJSON(rows) // client-side windowing: only the visible page hits the DOM
 	data["RowCount"] = len(rows)
 	data["Stats"] = computeStats(clients, track)
+	data["Officers"] = distinctOfficers(clients) // officer filter: pick any officer's caseload
 	// Initial filter state from URL params (shareable/bookmarkable — Build-Spec
 	// §5.2). The client-side filter applies these on load; KPI/alert cards and
 	// the compliance page deep-link here with these set.

@@ -11,7 +11,7 @@
   <input type="text" id="f-name" placeholder="Filter by name, IDN, case #…">
   <select id="f-status"><option value="">All statuses</option><option value="active">Active</option><option value="closed">Closed</option></select>
   <select id="f-level"><option value="">All levels</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="0">Unknown</option></select>
-  <select id="f-officer"><option value="">All officers</option><option value="mine">My caseload</option></select>
+  <select id="f-officer"><option value="">All officers</option><option value="mine">My caseload</option>{{range .Officers}}<option>{{.}}</option>{{end}}</select>
   <select id="f-comp"><option value="">Compliance: any</option><option value="behind">Behind on GPS</option><option value="missed">Missed check-in</option><option value="ok">Compliant</option></select>
   <select id="f-gps"><option value="">GPS: any</option><option value="1">GPS active</option><option value="0">No GPS</option></select>
   <select id="f-due"><option value="">Check-in due: any</option><option value="today">Due today</option><option value="overdue">Overdue</option></select>
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded',function(){
   /* ── filter + sort (operate on the data, not the DOM) ────────────────────── */
   function reflow(){
     var q=fName.value.trim().toLowerCase(), st=fStatus.value, lv=fLevel.value,
-        cmp=fComp.value, gps=fGps.value, mine=fOff.value==='mine', due=fDue.value;
+        cmp=fComp.value, gps=fGps.value, off=fOff.value, mine=off==='mine', due=fDue.value;
     view=ROWS.filter(function(r){
       if(q && r.s.indexOf(q)<0)return false;
       if(st && statusKey(r.st)!==st)return false;
@@ -208,6 +208,7 @@ document.addEventListener('DOMContentLoaded',function(){
       if(cmp && compKey(r.cm)!==cmp)return false;
       if(gps!=='' && (r.g?'1':'0')!==gps)return false;
       if(mine && (r.o||'').toLowerCase()!==USERNAME)return false;
+      if(off && !mine && r.o!==off)return false; // a specific officer's caseload
       if(due==='today' && r.cis!==ASOF)return false; // next check-in deadline is the as-of day
       if(due==='overdue' && !r.ov)return false;
       return true;

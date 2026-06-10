@@ -8,6 +8,11 @@
     <button class="btn ghost sm" onclick="window.print()">Print</button></div>
 </div>
 
+<div class="filters" style="margin-bottom:14px">
+  <input type="text" id="cfilter" placeholder="Filter all three rosters by name, officer, or detail…" aria-label="Filter compliance rosters">
+  <span class="count" id="cfilter-count" style="display:none"></span>
+</div>
+
 <div class="panel" style="margin-bottom:18px">
   <div class="h"><h2>Behind on GPS</h2><span class="grow"></span><span class="count">{{len .Behind}}</span>
     <a class="btn ghost sm" href="/export/behind.csv" style="margin-left:10px">Export CSV ⤓</a></div>
@@ -50,4 +55,32 @@
   </div>
 </div>
 <p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">These rosters are the current standing as of the selected date (system go-live · {{.Epoch}}). L1 clients are excluded from the monthly Missed roster and the 3-day grace is honored, matching the tracker (Brief 2.8).</p>
+
+<script>
+/* One quick filter across all three rosters: hides non-matching rows and turns
+   each panel's count badge into "shown of total". Debounced for low-end PCs —
+   the Missed roster runs to ~1,400 rows live. CSV exports are unaffected (they
+   are server-side downloads of the full roster). */
+document.addEventListener('DOMContentLoaded',function(){
+  var inp=document.getElementById('cfilter'),total=document.getElementById('cfilter-count');
+  if(!inp)return;
+  var panels=[].slice.call(document.querySelectorAll('.panel')).map(function(p){
+    var rows=[].slice.call(p.querySelectorAll('tbody tr')),badge=p.querySelector('.count');
+    return rows.length?{rows:rows.map(function(tr){return {tr:tr,txt:tr.textContent.toLowerCase()}}),badge:badge,base:rows.length}:null;
+  }).filter(Boolean);
+  var t=null;
+  function apply(){
+    var q=inp.value.trim().toLowerCase(),shown=0,all=0;
+    panels.forEach(function(p){
+      var n=0;
+      p.rows.forEach(function(r){var hit=!q||r.txt.indexOf(q)>=0;r.tr.style.display=hit?'':'none';if(hit)n++});
+      if(p.badge)p.badge.textContent=q?(n+' of '+p.base):p.base;
+      shown+=n;all+=p.base;
+    });
+    total.style.display=q?'':'none';
+    total.textContent=shown+' of '+all+' rows match';
+  }
+  inp.addEventListener('input',function(){clearTimeout(t);t=setTimeout(apply,150)});
+});
+</script>
 {{template "c_bot" .}}
