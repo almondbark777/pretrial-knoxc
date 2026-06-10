@@ -500,3 +500,35 @@ Noted for a future round: the record's Logged check-ins panel exposes no
 per-row delete even though `POST /admin/checkin/delete`
 (DeleteAddedCheckIn) exists — the delete UI was lost with the classic
 profile. Same for app-entered payments (endpoint exists, no console UI).
+
+## Entry — 2026-06-10 (round 3) — Remove controls restored for app-entered rows
+
+The 3-hourly improvement round, picking up the gap spotted while live-testing
+round 2: several app-entered row types render on the console record with **no
+way to remove a wrong entry**, even though the audited delete endpoints
+(`/admin/note/delete`, `/admin/checkin/delete`, `/admin/courtdate/delete`)
+are routed and live — that UI existed on the classic profile and was lost
+with it. Tags, payments, drug screens, and scheduled check-ins already had
+their × forms; **notes (Case Summary panel), app-logged check-ins (Check-ins
+tab panel), and court dates (Court tab table)** did not.
+
+All three now carry the same × confirm form pattern (CSRF + idn + id + next
+back to the record). `ConsoleLoggedCI` gained the `ID` field it was missing
+(without it a form would post id=0 and silently delete nothing — pinned by
+the new `TestConsoleRecordRowIDs`, which asserts every removable row type
+carries its DB id). The court table's action cell holds Log-outcome and ×
+side by side. Scope note: only app-entered rows are removable — raw imported
+check-ins/payments never render in these panels, so nothing here can touch
+imported data; deletes stay officer-level (supervisor tombstone delete is the
+documented backstop), all audited by the existing db layer.
+
+Live-verified in the preview: add note + court date (plus round 2's leftover
+test check-in) → all three × forms render with real ids → delete each through
+the real form → correct flash each time ("Note deleted." / "Check-in
+removed." / "Court date deleted."), rows gone, zero forms left, no JS errors.
+go build/vet/gofmt clean, full go test ./... green.
+
+Still open from the round-2 notes: violations and reminders have delete
+endpoints but render only in the Activity timeline (no row UI) — exposing
+them would need a new list section, a different-sized change. README
+"Security TODOs" remains stale Azure-era text (doc-fix candidate).

@@ -73,7 +73,11 @@
   <div class="panel" style="margin-top:18px">
     <div class="h"><h2>Notes</h2><span class="grow"></span>{{if $r.Notes}}<span class="count">{{len $r.Notes}}</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('noteModal')">+ Note</button></div>
     <div class="body">
-      {{range $r.Notes}}<div class="frow"><span class="rail info">·</span><div class="grow"><div class="t" style="font-weight:500;white-space:normal">{{.Body}}</div><div class="m">{{officer .Author}} · {{shortdate .CreatedAt}}</div></div></div>{{else}}<div class="emptybox" style="padding:22px"><div class="big">·</div>No notes yet. Use <b>+ Note</b> to add the first one.</div>{{end}}
+      {{range $r.Notes}}<div class="frow"><span class="rail info">·</span><div class="grow"><div class="t" style="font-weight:500;white-space:normal">{{.Body}}</div><div class="m">{{officer .Author}} · {{shortdate .CreatedAt}}</div></div>
+      <form method="post" action="/admin/note/delete" style="margin:0;align-self:center" onsubmit="return confirm('Delete this note?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Delete note">×</button>
+      </form></div>{{else}}<div class="emptybox" style="padding:22px"><div class="big">·</div>No notes yet. Use <b>+ Note</b> to add the first one.</div>{{end}}
     </div>
   </div>
 </div>
@@ -118,7 +122,11 @@
         <div class="t" style="font-weight:600">{{.Type}} · {{.Date}}</div>
         {{if .Note}}<div class="x" style="white-space:normal">{{.Note}}</div>{{end}}
         <div class="m">{{.Author}}</div>
-      </div></div>
+      </div>
+      <form method="post" action="/admin/checkin/delete" style="margin:0;align-self:center" onsubmit="return confirm('Remove this check-in entry?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Remove check-in entry">×</button>
+      </form></div>
       {{end}}
     </div>
   </div>
@@ -154,7 +162,11 @@
   {{if $r.Court}}
   <div class="tablewrap"><div class="tscroll"><table class="data">
     <thead><tr><th>Event</th><th>Date</th><th>Outcome</th><th>Next date</th><th>Reminder</th><th></th></tr></thead>
-    <tbody>{{range $r.Court}}<tr style="cursor:default"><td>{{.Event}}</td><td>{{.Date}}</td><td>{{template "chip" .Outcome}}</td><td>{{if .NextDate}}{{.NextDate}}{{else}}—{{end}}</td><td>{{template "chip" .Reminder}}</td><td class="qc">{{if not .HasOutcome}}<button type="button" class="btn ghost sm" onclick="cmOutcome({{.ID}})">Log outcome</button>{{end}}</td></tr>{{end}}</tbody>
+    <tbody>{{range $r.Court}}<tr style="cursor:default"><td>{{.Event}}</td><td>{{.Date}}</td><td>{{template "chip" .Outcome}}</td><td>{{if .NextDate}}{{.NextDate}}{{else}}—{{end}}</td><td>{{template "chip" .Reminder}}</td><td class="qc" style="white-space:nowrap">{{if not .HasOutcome}}<button type="button" class="btn ghost sm" onclick="cmOutcome({{.ID}})">Log outcome</button>{{end}}
+      <form method="post" action="/admin/courtdate/delete" style="margin:0;display:inline-block" onsubmit="return confirm('Delete this court date?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Delete court date">×</button>
+      </form></td></tr>{{end}}</tbody>
   </table></div></div>
   {{else}}<div class="panel"><div class="emptybox"><div class="big">▦</div>No court dates on record. Use <b>+ Add Court Date</b> to schedule one.</div></div>{{end}}
 </div>

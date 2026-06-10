@@ -84,3 +84,29 @@ func TestConsoleRecordScheduledStates(t *testing.T) {
 		t.Errorf("date formatting: %q, want \"Jun 1, 2026\"", rec.Scheduled[0].Date)
 	}
 }
+
+// Every removable app-entered row on the record must carry its DB id, or the
+// per-row remove form posts id=0 and silently deletes nothing. Regression for
+// the Logged-check-ins panel, which shipped without one.
+func TestConsoleRecordRowIDs(t *testing.T) {
+	track := compute.Noon(2026, 6, 10)
+	c := &compute.Client{IDN: "1", Name: "Client One", Status: "Open", Level: "2",
+		RefD: compute.Noon(2026, 1, 1), RefOK: true}
+	extras := models.DefendantExtras{
+		AddedCheckIns: []models.AddedCheckIn{{ID: 41, Date: "2026-06-01", Type: "Phone"}},
+		CourtDates:    []models.CourtDate{{ID: 42, IDN: "1", CourtDate: "2026-06-20", Court: "Division I"}},
+		Notes:         []models.Note{{ID: 43, IDN: "1", Body: "note"}},
+	}
+	rec := consoleRecord(c, []*compute.Client{c}, track,
+		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras)
+
+	if len(rec.LoggedCheckIns) != 1 || rec.LoggedCheckIns[0].ID != 41 {
+		t.Errorf("LoggedCheckIns ID = %+v, want 41", rec.LoggedCheckIns)
+	}
+	if len(rec.Court) != 1 || rec.Court[0].ID != 42 {
+		t.Errorf("Court ID = %+v, want 42", rec.Court)
+	}
+	if len(rec.Notes) != 1 || rec.Notes[0].ID != 43 {
+		t.Errorf("Notes ID = %+v, want 43", rec.Notes)
+	}
+}

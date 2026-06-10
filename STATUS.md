@@ -158,6 +158,14 @@ console dashboard's "My caseload" scope toggle)*
       (`saved_searches` from migration 001, finally in use). "★ Save view" on
       `/console/clients`, one-click chips, owner-scoped delete, sanitized
       query params, audited. Tests: `TestSavedViews`, `TestSanitizeViewQuery`.
+- [x] Remove controls for app-entered rows on the record — **done 2026-06-10**:
+      notes, app-logged check-ins, and court dates rendered on the console
+      record but lost their per-row delete UI when the classic profile was
+      removed (the audited endpoints stayed live). All three now carry a ×
+      confirm form like tags/payments/drug screens already had;
+      `ConsoleLoggedCI` gained the row ID it was missing. Only app-entered
+      rows are removable — raw imported data has no row in these panels.
+      Test: `TestConsoleRecordRowIDs` (every removable row carries its DB id).
 - [x] Scheduled check-ins (book appointments) — **done 2026-06-10**: the
       dormant migration-001 §12 `scheduled_check_ins` table is now live
       (mirrored into EnsureSchema). "Schedule Check-in" on the record books a

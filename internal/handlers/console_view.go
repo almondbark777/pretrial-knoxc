@@ -410,8 +410,11 @@ type ConsolePTRMonth struct {
 }
 
 // ConsoleLoggedCI is one app-entered check-in shown on the record with its
-// optional per-check-in note (e.g. GPS fitment details).
+// optional per-check-in note (e.g. GPS fitment details). ID drives the
+// per-row remove form (only app-entered rows are removable — raw imported
+// check-ins have no row here).
 type ConsoleLoggedCI struct {
+	ID     int64
 	Date   string
 	Type   string
 	Note   string
@@ -615,7 +618,7 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 	// Newest first (ListAddedCheckIns is add_id DESC).
 	for _, a := range extras.AddedCheckIns {
 		rec.LoggedCheckIns = append(rec.LoggedCheckIns, ConsoleLoggedCI{
-			Date: shortStamp(a.Date), Type: dash(a.Type), Note: a.Note,
+			ID: a.ID, Date: shortStamp(a.Date), Type: dash(a.Type), Note: a.Note,
 			Author: compute.FmtOfficer(a.Author),
 		})
 	}
