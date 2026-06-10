@@ -1,8 +1,10 @@
 # Project status — Knox County Pre-Trial (Go app)
 
 > Last updated 2026-06-10. Single-glance "what's done, what's left."
-> Deeper detail lives in `PTR_MASTER_OVERHAUL_BRIEF.md` (spec, parent folder), the
-> append-only `PHASE_*.md` paper trail, `README.md`, and `deploy/DEPLOY_GO.md`.
+> Deeper detail lives in `PTR_MASTER_OVERHAUL_BRIEF.md` (spec, parent folder),
+> `PROJECT_HISTORY.md` (the consolidated phase-by-phase paper trail),
+> `CONSOLE_DASHBOARD.md` (the console's own trail), `README.md`, and
+> `deploy/DEPLOY_GO.md`.
 
 ## TL;DR
 
@@ -50,7 +52,7 @@ backup drive. **Netdata monitoring** is running with phone push alerts via ntfy.
       read path** (BuildClients, the tracker feed, EM-fees) — importer-proof, so an
       app-entered record shows + computes everywhere and survives the Sunday reload.
       Tombstones suppress them; every write audited. (Officer-level; supervisor
-      delete is the backstop.) Paper trail: `PHASE_10_DATAENTRY.md`.
+      delete is the backstop.) Paper trail: `PROJECT_HISTORY.md` (Phase 10).
 
 **Admin & data-entry (Phase 7)**
 - [x] **Importer-proof delete**: `deleted_idns` tombstone filtered in `BuildClients`
@@ -117,8 +119,8 @@ console dashboard's "My caseload" scope toggle)*
    live `ptr1` data now that the full binary is deployed.
 2. **`kh222.db → pretrial_release.db` rename** (cosmetic). Update
    `Environment=DB=` in `ptr-backup.service` and `Environment=SQLITE_DB_PATH=` in
-   the webapp unit at the same time. See `PHASE_5_BACKUP.md` §5.
-3. **Two-server HA** *(production scale-up)*. Design locked in `PHASE_8_HA.md`:
+   the webapp unit at the same time. See `PROJECT_HISTORY.md` (Phase 5).
+3. **Two-server HA** *(production scale-up)*. Design locked in `deploy/HA_PLAN.md`:
    rqlite 3-node + Cloudflare LB failover. Do at the end of the testing phase.
 
 ### Nice-to-have / optional (not blocking)
@@ -216,6 +218,22 @@ console dashboard's "My caseload" scope toggle)*
       use case); the compliance page gained a quick filter across all three
       rosters (live Missed roster is ~1,400 rows); the Documents tab's fake
       upload button is visibly disabled instead of toasting "coming soon".
+- [x] Case-number search — **done 2026-06-10**: the global search matches
+      case numbers (any of a person's cases, with or without "@") plus name
+      and IDN; results show the case number.
+- [x] In-app Help page — **done 2026-06-10**: `/console/help` (sidebar "?")
+      covers the daily routine, the check-in rules (incl. the both-types
+      rule), the chip legend, fees, roles, and shortcuts.
+- [x] Data-freshness indicator — **done 2026-06-10**: the importer stamps
+      `import_meta` on every committed run; the console sidebar foot shows
+      "Data refreshed <time> ET" with an amber ⚠ past 26 h. Appears on ptr1
+      after the next deploy + import run (note: the deploy bundle does not
+      yet ship `sharepoint_import.py` — copy it per `deploy/INCREMENTAL.md`).
+- [x] Arrears letter toggles + history — **done 2026-06-10**: the EM-fees
+      report's checkboxes drive the memo batch (CSRF-guarded POST, zip is
+      exactly the ticked set), every generated memo (single or batch) is
+      recorded in `letter_log` (migration 007), and a printable "Last
+      letter" column shows each client's most recent memo + officer.
 - DB-backed allow-list (currently env/`ALLOWED_EMAILS` with a built-in fallback).
 
 ---

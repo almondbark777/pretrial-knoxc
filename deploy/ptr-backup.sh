@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ptr-backup.sh — WAL-safe online backup of the PTR SQLite DB to the backup drive.
-# Phase 5 (see WORKFLOW.md / PHASE_5_BACKUP.md). Runs as ptrapp via
+# Phase 5 (see WORKFLOW.md / PROJECT_HISTORY.md Phase 5). Runs as ptrapp via
 # ptr-backup.service + ptr-backup.timer.
 #
 # Why an ONLINE backup and not `cp`: the DB runs in WAL mode with the webapp and

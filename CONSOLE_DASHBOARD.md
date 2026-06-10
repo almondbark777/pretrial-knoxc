@@ -1,10 +1,12 @@
-# Case Console (`/console`) — second dashboard (Direction B)
+# Case Console (`/console`) — the app UI
 
-> Append-only paper trail, matching the `PHASE_N_*.md` convention. Built 2026-05-31 →
-> 2026-06-01 (Opus 4.8 1M). Brief: `PROMPT_new_dashboard_for_claude_code.md` (parent
-> folder). Functional spec: `PTR_Dashboard_BUILD_SPEC.md`. Layout ref:
-> `Pretrial-UI-Mockup.html`. Demo walkthrough + real-vs-demo-safe map: `CONSOLE_DEMO_RUNBOOK.md`.
-> **Branch `feature/console-dashboard`; uncommitted by design.**
+> Append-only paper trail for the console (the phase-era trails were
+> consolidated into `PROJECT_HISTORY.md` 2026-06-10; this doc continues live).
+> Built 2026-05-31 → 2026-06-01 as "Direction B", chosen as THE app 2026-06-02;
+> the classic interface was removed 2026-06-09. Brief:
+> `PROMPT_new_dashboard_for_claude_code.md` (parent folder). Functional spec:
+> `PTR_Dashboard_BUILD_SPEC.md`. Layout ref: `Pretrial-UI-Mockup.html`. Demo
+> walkthrough: `CONSOLE_DEMO_RUNBOOK.md`. Long since merged to `main`.
 
 ## What it is
 

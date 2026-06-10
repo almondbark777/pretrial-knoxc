@@ -55,11 +55,13 @@ deleted person stays gone across the Sunday full reload — flips to a physical 
 delete via `IMPORTER_RETIRED` at SharePoint cutover); delete / restore / override
 are supervisor-gated; every write is audited (viewable at `/admin/audit`).
 
-**Docs** — the spec is `PTR_MASTER_OVERHAUL_BRIEF.md` (parent folder); the
-`PHASE_*.md` files are the append-only paper trail (`PHASE_7` admin/data-entry,
-`PHASE_8` two-server HA plan); `STATUS.md` is the single-glance state of the
-project; `CONSOLE_DASHBOARD.md` documents the console; `deploy/DEPLOY_GO.md` +
-`deploy/smoke.sh` cover the cutover and post-deploy verification.
+**Docs** — the spec is `PTR_MASTER_OVERHAUL_BRIEF.md` (parent folder);
+`PROJECT_HISTORY.md` is the consolidated phase-by-phase paper trail (the old
+`PHASE_*.md` files were merged into it 2026-06-10); `STATUS.md` is the
+single-glance state of the project; `CONSOLE_DASHBOARD.md` documents the
+console; `deploy/HA_PLAN.md` is the future two-server design;
+`deploy/DEPLOY_GO.md` + `deploy/smoke.sh` cover the cutover and post-deploy
+verification.
 
 **Repo layout (current)**
 
@@ -88,7 +90,7 @@ The installer backs up the binary, unit, and DB before swapping, restarts
 `ptr-webapp`, and health-checks. Rollback = restore the saved unit + restart.
 Daily DB backups (`ptr-backup.timer` → `/mnt/backup/ptr`, 30-day retention,
 integrity-checked) and Netdata monitoring with ntfy phone alerts are already
-installed on the box — see `deploy/MONITORING.md` and `PHASE_5_BACKUP.md`.
+installed on the box — see `deploy/MONITORING.md` and `PROJECT_HISTORY.md` (Phase 5).
 
 **Security posture (current)**
 

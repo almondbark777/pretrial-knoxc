@@ -1,8 +1,10 @@
-# Phase 8 — Production HA (two-server failover)
+# Production HA plan (two-server failover)
 
-> Tracking doc (Brief Part 0.1 paper trail). **Design + runbook only — do NOT
-> implement until the testing phase ends** (the single-file SQLite setup is correct
-> and ideal for testing). Decision locked with Alex 2026-05-30; see Brief Part 4.9.
+> Formerly `PHASE_8_HA.md` (moved here 2026-06-10 when the phase paper trails
+> were consolidated into `PROJECT_HISTORY.md` — this one is a future plan, not
+> history). **Design + runbook only — do NOT implement until the testing phase
+> ends** (the single-file SQLite setup is correct and ideal for testing).
+> Decision locked with Alex 2026-05-30; see Brief Part 4.9.
 
 ---
 

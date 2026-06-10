@@ -20,7 +20,7 @@ import (
 //
 // Regenerate after any intentional methodology change with:
 //   .parity-venv\Scripts\python - < (export DB -> CSV, run generate_memos, dump JSON)
-// (see the session notes / PHASE_9_EMFEES.md).
+// (see the session notes / PROJECT_HISTORY.md Phase 9).
 
 type goldenRec struct {
 	Kind     string  `json:"kind"`

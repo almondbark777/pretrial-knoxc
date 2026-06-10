@@ -30,7 +30,7 @@ env/
 # --- Source data with defendant PII (NEVER commit) ---
 db/csv_clean/
 # EM-fee parity golden (derived from the offline DB; carries IDNs). Regenerate
-# locally per PHASE_9_EMFEES.md; the parity test skips when it's absent.
+# locally per PROJECT_HISTORY.md (Phase 9); the parity test skips when it's absent.
 internal/db/testdata/emfees_golden.json
 
 # --- EM-fee skill working scratch (regenerable; never commit) ---

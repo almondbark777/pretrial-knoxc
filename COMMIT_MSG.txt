@@ -1,0 +1,23 @@
+Consolidate the phase paper trails into PROJECT_HISTORY.md
+
+Enough has shipped that the ten PHASE_*.md append-only trails earned a
+single document. PROJECT_HISTORY.md now carries each phase's summary plus
+the load-bearing facts worth keeping at hand (the Phase 2 golden values,
+backup/monitoring parameters, the tombstone and override designs, EM-fee
+parity numbers, importer gotchas); the full original text remains in git
+history before this commit.
+
+- Phases 0-5, 7, 9, 10 -> PROJECT_HISTORY.md (originals removed).
+- PHASE_8_HA.md -> deploy/HA_PLAN.md unchanged apart from the header: it
+  is an executable future plan (rqlite 3-node + Cloudflare LB), not
+  history, so it lives with the other ops docs.
+- Phase 6 (validate on real ptr1 data) is recorded as the one open phase.
+- All cross-references updated: README, STATUS.md (also brought current
+  with the case-search/Help/freshness and arrears-letters rounds, and a
+  duplicate UX-pass bullet removed), .gitignore, deploy/ptr-backup.sh,
+  internal/db/emfees_test.go, and CONSOLE_DASHBOARD.md (header also
+  de-staled: the console is THE app on main, not an uncommitted branch).
+
+go build/test green; ptr-backup.sh confirmed still LF.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
