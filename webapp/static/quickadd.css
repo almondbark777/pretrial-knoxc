@@ -1,0 +1,350 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Quick-Entry Modal — shared add-a-check-in / add-a-payment dialog.
+ * Opened from anywhere via window.PTRQuick.open({idn, name, mode}).
+ * Sits ABOVE the detail drawer (so it can be opened from inside it).
+ * Theme-aware (uses theme.css custom properties).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.pq-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 18, 30, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 11000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.pq-scrim.open { opacity: 1; pointer-events: auto; }
+
+.pq-modal {
+  position: fixed;
+  z-index: 11001;
+  top: 50%;
+  left: 50%;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  transform: translate(-50%, -48%) scale(.98);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised, #fff);
+  border: 1px solid var(--rule, #d8d2c6);
+  border-radius: 6px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.32);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  overflow: hidden;
+}
+.pq-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* Header */
+.pq-head {
+  background: var(--navy, #0f3a66);
+  color: #fff;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.pq-head .pq-who { min-width: 0; }
+.pq-head .pq-kicker {
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--gold-pale, #e8d6a8);
+  opacity: .9;
+  margin-bottom: 2px;
+}
+.pq-head .pq-name {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 19px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pq-head .pq-meta {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--gold-pale, #e8d6a8);
+  opacity: .85;
+}
+.pq-x {
+  flex: none;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.3);
+  width: 30px; height: 30px;
+  border-radius: 4px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pq-x:hover { background: rgba(255,255,255,.28); }
+
+/* Tabs */
+.pq-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--rule, #d8d2c6);
+  background: var(--bg-soft, #f5f1e8);
+}
+.pq-tab {
+  flex: 1;
+  padding: 12px 10px;
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted, #7a7263);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.pq-tab:hover { color: var(--ink, #221d16); }
+.pq-tab.active {
+  color: var(--navy, #0f3a66);
+  border-bottom-color: var(--navy, #0f3a66);
+  background: var(--surface-raised, #fff);
+}
+
+/* Body (scrolls) */
+.pq-body { padding: 20px; overflow-y: auto; }
+
+.pq-pane { display: none; }
+.pq-pane.active { display: block; }
+
+/* Search step */
+.pq-search-label {
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted, #7a7263);
+  margin-bottom: 8px;
+}
+.pq-search-input {
+  width: 100%;
+  padding: 13px 15px;
+  font-size: 15px;
+  font-family: var(--sans, system-ui);
+  border: 1px solid var(--rule, #d8d2c6);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  color: var(--ink, #221d16);
+  box-sizing: border-box;
+}
+.pq-search-input:focus {
+  outline: none;
+  border-color: var(--navy, #0f3a66);
+  box-shadow: 0 0 0 2px var(--navy-pale, #d6e3f0);
+}
+.pq-results { margin-top: 12px; max-height: 320px; overflow-y: auto; }
+.pq-empty {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  color: var(--muted, #7a7263);
+  padding: 10px 2px;
+}
+.pq-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule-soft, #e7e1d5);
+  border-radius: 3px;
+  margin-bottom: 6px;
+  background: var(--bg-soft, #f5f1e8);
+  cursor: pointer;
+}
+.pq-row:hover { border-color: var(--navy, #0f3a66); background: var(--navy-pale, #d6e3f0); }
+.pq-row .pq-row-name { font-weight: 600; color: var(--ink, #221d16); font-size: 14px; }
+.pq-row .pq-row-meta {
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted, #7a7263);
+}
+.pq-pill {
+  font-family: var(--mono, monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 2px;
+  color: #fff;
+  flex: none;
+}
+.pq-pill.open { background: var(--good, #3a7d44); }
+.pq-pill.closed { background: var(--muted-2, #9a9384); }
+
+/* Form fields */
+.pq-field { margin-bottom: 14px; }
+.pq-field label {
+  display: block;
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted, #7a7263);
+  margin-bottom: 5px;
+}
+.pq-field input, .pq-field select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--sans, system-ui);
+  border: 1px solid var(--rule, #d8d2c6);
+  border-radius: 3px;
+  background: var(--surface, #fff);
+  color: var(--ink, #221d16);
+  box-sizing: border-box;
+}
+.pq-field input:focus, .pq-field select:focus {
+  outline: none;
+  border-color: var(--navy, #0f3a66);
+  box-shadow: 0 0 0 2px var(--navy-pale, #d6e3f0);
+}
+.pq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .pq-grid { grid-template-columns: 1fr; } }
+
+/* Footer */
+.pq-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--rule, #d8d2c6);
+  background: var(--bg-soft, #f5f1e8);
+}
+.pq-edit-link {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--navy, #0f3a66);
+  text-decoration: none;
+}
+.pq-edit-link:hover { text-decoration: underline; }
+.pq-keepopen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted, #7a7263);
+  cursor: pointer;
+}
+.pq-keepopen input { margin: 0; }
+.pq-btn {
+  background: var(--navy, #0f3a66);
+  color: #fff;
+  border: none;
+  padding: 11px 22px;
+  border-radius: 4px;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pq-btn:hover { background: var(--navy-deep, #0a2c4f); }
+.pq-btn:disabled { opacity: .5; cursor: default; }
+
+/* Session log */
+.pq-session {
+  margin: 0 20px 16px;
+  border: 1px solid var(--rule-soft, #e7e1d5);
+  border-radius: 4px;
+  padding: 10px 14px;
+  background: var(--bg-soft, #f5f1e8);
+}
+.pq-session h4 {
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--gold, #9a7b2e);
+  margin: 0 0 8px;
+}
+.pq-session-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  padding: 4px 0;
+  color: var(--ink, #221d16);
+}
+.pq-session-row .tag {
+  font-family: var(--mono, monospace);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+.pq-session-row .tag.checkin { background: var(--teal-pale, #cfe7e3); color: var(--teal, #2a6b63); }
+.pq-session-row .tag.payment { background: var(--gold-pale, #e8d6a8); color: var(--gold, #9a7b2e); }
+.pq-session-row .t { margin-left: auto; font-family: var(--mono, monospace); font-size: 10px; color: var(--muted, #7a7263); }
+
+/* Quick-entry dashboard card trigger buttons */
+.pq-quickcard-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.pq-quickcard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--rule, #d8d2c6);
+  background: var(--surface, #fff);
+  color: var(--ink, #221d16);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pq-quickcard-btn:hover { border-color: var(--navy, #0f3a66); background: var(--navy-pale, #d6e3f0); }
+.pq-quickcard-btn .ic { font-size: 14px; }
+
+/* "+ Add" masthead button */
+.kh-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 4px;
+  border: 1px solid var(--gold, #9a7b2e);
+  background: var(--gold, #9a7b2e);
+  color: #fff;
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.kh-add-btn:hover { filter: brightness(1.08); }
+
+/* Per-defendant action bar (drawer) */
+.kh-d-actionbar {
+  display: flex;
+  gap: 8px;
+  margin-right: auto;
+}
+.kh-d-actionbar .btn { font-size: 12px; }

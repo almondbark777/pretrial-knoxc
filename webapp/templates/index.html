@@ -158,6 +158,39 @@
             margin-top: 0.5rem;
         }
 
+        /* ===== QUICK ENTRY BAR ===== */
+        .quick-entry-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            background: white;
+            padding: 1.5rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid #b8902a;
+            margin-bottom: 2.5rem;
+        }
+        .quick-entry-bar .qe-copy h2 {
+            font-size: 1.15rem;
+            color: #1a3a6b;
+            margin: 0 0 0.25rem;
+        }
+        .quick-entry-bar .qe-copy p {
+            font-size: 0.85rem;
+            color: #666;
+            margin: 0;
+        }
+        .quick-entry-bar kbd {
+            font-family: monospace;
+            font-size: 0.78rem;
+            background: #f0ede6;
+            border: 1px solid #d8d2c6;
+            border-radius: 3px;
+            padding: 1px 6px;
+        }
+
         /* ===== APP GRID ===== */
         .app-grid {
             display: grid;
@@ -510,6 +543,26 @@
                 <h3>Fees Collected</h3>
                 <div class="number">${{ '{:,.0f}'.format(stats.fees_collected_month) }}</div>
                 <div class="subtext">{{ stats.month_label }} so far</div>
+            </div>
+        </div>
+
+        <!-- QUICK ENTRY -->
+        <div class="quick-entry-bar">
+            <div class="qe-copy">
+                <h2>Quick Entry</h2>
+                <p>Log a check-in or payment without leaving this page — or press
+                   <kbd>c</kbd>, <kbd>p</kbd>, <kbd>e</kbd> anywhere.</p>
+            </div>
+            <div class="pq-quickcard-btns">
+                <button type="button" class="pq-quickcard-btn"
+                        onclick="window.PTRQuick && PTRQuick.open({mode:'checkin'})">
+                    <span class="ic">＋</span> Check-In</button>
+                <button type="button" class="pq-quickcard-btn"
+                        onclick="window.PTRQuick && PTRQuick.open({mode:'payment'})">
+                    <span class="ic">＋</span> Payment</button>
+                <button type="button" class="pq-quickcard-btn"
+                        onclick="window.PTRQuick && PTRQuick.open({mode:'edit'})">
+                    <span class="ic">✏</span> Edit Info</button>
             </div>
         </div>
 

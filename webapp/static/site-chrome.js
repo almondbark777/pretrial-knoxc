@@ -22,6 +22,10 @@
 
   const SHORTCUTS = [
     ["Ctrl+K  /  ⌘K  /  /",  "Open Quick Search"],
+    ["a",                    "Add — open quick entry (search first)"],
+    ["c",                    "Add a check-in"],
+    ["p",                    "Add a payment"],
+    ["e",                    "Edit a defendant's info"],
     ["Esc",                  "Close drawer / palette"],
     ["?",                    "Show this help"],
     ["g d",                  "Go to Dashboard"],
@@ -74,7 +78,7 @@
       head.appendChild(fav);
     }
 
-    ["/static/drawer.css", "/static/palette.css", "/static/chrome-extras.css", "/static/mobile.css"]
+    ["/static/drawer.css", "/static/palette.css", "/static/chrome-extras.css", "/static/mobile.css", "/static/quickadd.css"]
       .forEach(href => {
         if (!document.querySelector(`link[href="${href}"]`)) {
           const l = document.createElement("link");
@@ -83,7 +87,7 @@
           head.appendChild(l);
         }
       });
-    ["/static/drawer.js", "/static/palette.js"].forEach(src => {
+    ["/static/drawer.js", "/static/palette.js", "/static/quickadd.js"].forEach(src => {
       if (!document.querySelector(`script[src="${src}"]`)) {
         const s = document.createElement("script");
         s.defer = true;
@@ -117,6 +121,9 @@
       </div>
       <nav class="topnav">${navHTML}</nav>
       <div class="mast-tools">
+        <button type="button" class="kh-add-btn" id="kh-add-btn" title="Add check-in / payment / edit (a)">
+          <span class="ic">＋</span> Add
+        </button>
         <button type="button" class="kh-search-trigger" id="kh-search-trigger" title="Quick search (${kbd} or /)">
           <span>⌕ Search</span>
           <span class="kh-palette-kbd">${kbd}</span>
@@ -137,6 +144,8 @@
     document.body.insertBefore(mast, document.body.firstChild);
 
     document.getElementById("kh-hamburger").addEventListener("click", toggleMobileMenu);
+    document.getElementById("kh-add-btn").addEventListener("click",
+      () => window.PTRQuick && window.PTRQuick.open({}));
     document.getElementById("kh-search-trigger").addEventListener("click",
       () => window.khPalette && window.khPalette.open());
     document.getElementById("kh-alerts-btn").addEventListener("click", toggleAlerts);
@@ -364,6 +373,14 @@
 
     if (e.key === "?") { e.preventDefault(); showHelp(); return; }
     if (e.key === "t") { e.preventDefault(); toggleTheme(); return; }
+    // Quick-entry single-key hotkeys (skip while mid "g _" chord so g c / g e
+    // still resolve to Court / Edit-page navigation).
+    if (chordBuffer !== "g" && window.PTRQuick) {
+      if (e.key === "a") { e.preventDefault(); window.PTRQuick.open({}); return; }
+      if (e.key === "c") { e.preventDefault(); window.PTRQuick.open({ mode: "checkin" }); return; }
+      if (e.key === "p") { e.preventDefault(); window.PTRQuick.open({ mode: "payment" }); return; }
+      if (e.key === "e") { e.preventDefault(); window.PTRQuick.open({ mode: "edit" }); return; }
+    }
     // chords like g d, g m, g r, etc.
     if (e.key === "g") {
       chordBuffer = "g";

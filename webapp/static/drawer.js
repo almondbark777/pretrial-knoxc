@@ -71,7 +71,11 @@
       <div class="kh-drawer-loading">Loading defendant…</div>
     </div>
     <div class="kh-drawer-foot">
-      <a class="btn btn-ghost" href="#" id="kh-d-fulledit">Open full edit page</a>
+      <div class="kh-d-actionbar">
+        <button class="btn btn-ghost" id="kh-d-add-ci" title="Log a check-in for this defendant (c)">＋ Check-In</button>
+        <button class="btn btn-ghost" id="kh-d-add-pm" title="Log a payment for this defendant (p)">＋ Payment</button>
+      </div>
+      <a class="btn btn-ghost" href="#" id="kh-d-fulledit">Edit ↗</a>
       <button class="btn btn-primary" id="kh-d-close-btn">Done</button>
     </div>
   `;
@@ -82,6 +86,8 @@
     drawer.querySelector('.kh-drawer-close').addEventListener('click', closeDrawer);
     drawer.querySelector('#kh-d-close-btn').addEventListener('click', closeDrawer);
     drawer.querySelector('#kh-d-pin').addEventListener('click', togglePin);
+    drawer.querySelector('#kh-d-add-ci').addEventListener('click', () => quickAdd('checkin'));
+    drawer.querySelector('#kh-d-add-pm').addEventListener('click', () => quickAdd('payment'));
     scrim.addEventListener('click', closeDrawer);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
@@ -175,6 +181,31 @@
     drawer.querySelectorAll('.kh-drawer-tab').forEach(t =>
       t.classList.toggle('active', t.dataset.tab === activeTab));
     renderActiveTab();
+  }
+
+  // ───── Quick add (check-in / payment) for the open defendant ─────────
+  function quickAdd(mode) {
+    if (!currentIdn || !window.PTRQuick) return;
+    const name = currentData?.defendant_name || '';
+    let caseNum = currentData?.case_numbers || '';
+    if (caseNum.includes(',')) caseNum = '';  // multi-case → don't stamp one wrongly
+    window.PTRQuick.open({
+      idn: currentIdn, name, caseNum, mode,
+      onSaved: refreshAfterEntry,
+    });
+  }
+
+  // Re-pull details after a quick add so the new row + totals show through.
+  function refreshAfterEntry() {
+    if (!currentIdn) return;
+    cache.timeline = null;
+    fetch('/api/defendants/' + encodeURIComponent(currentIdn) + '/details')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        currentData = d;
+        if (activeTab === 'overview' || activeTab === 'timeline') renderActiveTab();
+      }).catch(() => {});
   }
 
   // ───── Pin ──────────────────────────────────────────────────────────
