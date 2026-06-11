@@ -1,0 +1,105 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Data Import</h1>
+    <div class="sub">Upload the four SharePoint &ldquo;Export to CSV&rdquo; files — adds anything missing, updates changed fields, <b>never deletes</b> · stop-gap while the site is in testing</div>
+  </div>
+  <div class="right"><a class="btn ghost sm" href="/console/admin">← Admin</a></div>
+</div>
+
+{{if .Err}}
+<div class="panel" style="margin-bottom:18px">
+  <div class="pad" style="color:var(--risk-ink);font-weight:600">⚠ {{.Err}}</div>
+  {{if .Output}}<div class="pad" style="padding-top:0"><details><summary class="muted" style="cursor:pointer;font-size:12px">Tool output</summary><pre style="font-size:11px;white-space:pre-wrap;overflow:auto;max-height:300px">{{.Output}}</pre></details></div>{{end}}
+</div>
+{{end}}
+
+{{if eq .Mode "form"}}
+<div class="panel">
+  <div class="h"><h2>Upload SharePoint exports</h2></div>
+  <div class="pad">
+    <p class="muted" style="margin:0 0 14px;padding:0;font-size:13px">On each SharePoint list use <b>Export → Export to CSV</b>, then pick the four downloaded files here. Nothing is written in this step — you&rsquo;ll get a preview of exactly what would change before anything is applied.</p>
+    <form method="post" action="/admin/import/preview" enctype="multipart/form-data" id="impform">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">
+        <label class="condrow" style="display:block;border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;cursor:pointer">
+          <div class="t" style="margin-bottom:6px">New Blue Book</div>
+          <input type="file" name="bluebook" accept=".csv,text/csv" required style="font-size:12px;max-width:100%">
+        </label>
+        <label class="condrow" style="display:block;border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;cursor:pointer">
+          <div class="t" style="margin-bottom:6px">Check Ins</div>
+          <input type="file" name="checkins" accept=".csv,text/csv" required style="font-size:12px;max-width:100%">
+        </label>
+        <label class="condrow" style="display:block;border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;cursor:pointer">
+          <div class="t" style="margin-bottom:6px">Payments</div>
+          <input type="file" name="payments" accept=".csv,text/csv" required style="font-size:12px;max-width:100%">
+        </label>
+        <label class="condrow" style="display:block;border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;cursor:pointer">
+          <div class="t" style="margin-bottom:6px">GPS 48 Hours</div>
+          <input type="file" name="gps" accept=".csv,text/csv" required style="font-size:12px;max-width:100%">
+        </label>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" name="addsonly" value="1">
+        <span><b>Adds only</b> — insert rows missing from the database and leave every existing row completely untouched (skips field updates such as a case flipping Open → Closed)</span>
+      </label>
+      <div class="note-hint">Safety: rows in the database that aren&rsquo;t in the CSVs are <b>always kept</b>, an empty CSV cell <b>never blanks</b> a stored value, and re-uploading the same files is harmless (a second run changes nothing). Every applied run is written to the import change log and the audit trail.</div>
+      <button class="btn" type="submit" onclick="setTimeout(()=>{this.disabled=true;this.textContent='Checking against the database…'},0)">Upload &amp; preview changes</button>
+      <span class="muted" style="font-size:12px;margin-left:10px">runs a dry-run first — can take up to a minute on full exports</span>
+    </form>
+  </div>
+</div>
+{{end}}
+
+{{if eq .Mode "preview"}}
+<div class="panel">
+  <div class="h"><h2>Preview — nothing written yet</h2><span class="grow"></span>{{if .AddsOnly}}<span class="chip info">adds only</span>{{end}}<span class="chip neutral">run {{.Sum.RunID}}</span></div>
+  <div class="tscroll">
+    <table class="data">
+      <thead><tr><th>Dataset</th><th>New rows</th><th>Field updates</th><th>Unchanged</th><th>Blanks kept</th><th>CSV dups</th><th>In SQL only (kept)</th></tr></thead>
+      <tbody>
+        {{range .Rows}}<tr style="cursor:default"><td>{{.Label}}</td><td>{{if .Added}}<b>+{{.Added}}</b>{{else}}0{{end}}</td><td>{{if .Changed}}<b>~{{.Changed}}</b>{{else}}0{{end}}</td><td class="muted">{{.Unchanged}}</td><td class="muted">{{.Blanked}}</td><td class="muted">{{.CSVDups}}</td><td class="muted">{{.SQLOnly}}</td></tr>{{end}}
+        <tr style="cursor:default;font-weight:700"><td>Total</td><td>+{{.Sum.Totals.Added}}</td><td>~{{.Sum.Totals.Changed}}</td><td>{{.Sum.Totals.Unchanged}}</td><td>{{.Sum.Totals.Blanked}}</td><td>{{.Sum.Totals.CSVDups}}</td><td>{{.Sum.Totals.SQLOnly}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pad">
+    <div class="note-hint"><b>New rows</b> are inserted; <b>field updates</b> change only the listed fields on matched rows{{if .AddsOnly}} (disabled — adds only){{end}}; <b>blanks kept</b> are values the CSV left empty that the database keeps; <b>in SQL only</b> rows are kept, never deleted. The full per-row detail is in the import log{{if .Sum.LogPath}} (<code style="font-size:11px">{{.Sum.LogPath}}</code>){{end}}.</div>
+    <form method="post" action="/admin/import/apply" style="display:inline" onsubmit="var b=this.querySelector('button');setTimeout(()=>{b.disabled=true;b.textContent='Applying…'},0)">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="token" value="{{.Token}}">
+      {{if .AddsOnly}}<input type="hidden" name="addsonly" value="1">{{end}}
+      <button class="btn" type="submit">Apply to database</button>
+    </form>
+    <form method="post" action="/admin/import/discard" style="display:inline;margin-left:8px">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="token" value="{{.Token}}">
+      <button class="btn ghost" type="submit">Discard</button>
+    </form>
+    {{if .Output}}<details style="margin-top:14px"><summary class="muted" style="cursor:pointer;font-size:12px">Tool output (tail)</summary><pre style="font-size:11px;white-space:pre-wrap;overflow:auto;max-height:300px">{{.Output}}</pre></details>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{if eq .Mode "done"}}
+<div class="panel">
+  <div class="h"><h2>✓ Import committed</h2><span class="grow"></span>{{if .AddsOnly}}<span class="chip info">adds only</span>{{end}}<span class="chip ok">run {{.Sum.RunID}}</span></div>
+  <div class="tscroll">
+    <table class="data">
+      <thead><tr><th>Dataset</th><th>New rows</th><th>Field updates</th><th>Unchanged</th><th>Blanks kept</th><th>CSV dups</th><th>In SQL only (kept)</th></tr></thead>
+      <tbody>
+        {{range .Rows}}<tr style="cursor:default"><td>{{.Label}}</td><td>{{if .Added}}<b>+{{.Added}}</b>{{else}}0{{end}}</td><td>{{if .Changed}}<b>~{{.Changed}}</b>{{else}}0{{end}}</td><td class="muted">{{.Unchanged}}</td><td class="muted">{{.Blanked}}</td><td class="muted">{{.CSVDups}}</td><td class="muted">{{.SQLOnly}}</td></tr>{{end}}
+        <tr style="cursor:default;font-weight:700"><td>Total</td><td>+{{.Sum.Totals.Added}}</td><td>~{{.Sum.Totals.Changed}}</td><td>{{.Sum.Totals.Unchanged}}</td><td>{{.Sum.Totals.Blanked}}</td><td>{{.Sum.Totals.CSVDups}}</td><td>{{.Sum.Totals.SQLOnly}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pad">
+    <div class="note-hint">The site is showing the new data now (cache cleared, &ldquo;Data refreshed&rdquo; stamp updated). Per-row detail: import change log (run <code style="font-size:11px">{{.Sum.RunID}}</code>){{if .Sum.LogPath}} and <code style="font-size:11px">{{.Sum.LogPath}}</code>{{end}}.</div>
+    <a class="btn" href="/console/import">Import more files</a>
+    <a class="btn ghost" style="margin-left:8px" href="/console/clients">View clients</a>
+    {{if .IsSupervisor}}<a class="btn ghost" style="margin-left:8px" href="/admin/audit">Audit log</a>{{end}}
+    {{if .Output}}<details style="margin-top:14px"><summary class="muted" style="cursor:pointer;font-size:12px">Tool output (tail)</summary><pre style="font-size:11px;white-space:pre-wrap;overflow:auto;max-height:300px">{{.Output}}</pre></details>{{end}}
+  </div>
+</div>
+{{end}}
+{{template "c_bot" .}}

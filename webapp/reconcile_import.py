@@ -273,7 +273,8 @@ def _ensure_log_table(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS ix_icl_idn ON import_change_log(idn)")
 
 
-def reconcile_dataset(conn, dataset, path, run_id, ts, logf, dry, allow_blanking=False):
+def reconcile_dataset(conn, dataset, path, run_id, ts, logf, dry, allow_blanking=False,
+                      adds_only=False):
     table = DATASETS[dataset][0]
     aliases = DATASETS[dataset][1]
     keycols = KEYS[dataset]
@@ -330,6 +331,11 @@ def reconcile_dataset(conn, dataset, path, run_id, ts, logf, dry, allow_blanking
         if occ < len(queue):
             rowid, existing = queue[occ]
             matched_sql.add(rowid)
+            if adds_only:
+                # --adds-only: an existing row is left entirely untouched — no
+                # field updates, no blank-keep churn. Only brand-new rows insert.
+                unchanged += 1
+                continue
             # Each diff: (col, old_display, write_value). Comparison is done on the
             # MATCH-NORMALIZED forms (so format noise isn't a change), but the value
             # WRITTEN is the plain field_canon value -- never the normalized form,
@@ -459,6 +465,18 @@ def main():
     ap.add_argument("--allow-blanking", action="store_true",
                     help="let an empty CSV value overwrite a populated SQL field "
                          "(default OFF: empty CSV never blanks existing data)")
+    ap.add_argument("--adds-only", action="store_true",
+                    help="only INSERT rows missing from SQL; existing rows are left "
+                         "entirely untouched (no field updates)")
+    ap.add_argument("--summary-json", default=None,
+                    help="also write a machine-readable run summary (counts, run_id, "
+                         "log path) to this JSON file — used by the web upload page")
+    ap.add_argument("--no-email", action="store_true",
+                    help="never send the emailed report, even if REPORT_TO is configured")
+    ap.add_argument("--stamp-meta", default=None, metavar="MODE",
+                    help="on a committed (non-dry) run, stamp import_meta last_import/"
+                         "last_import_mode=MODE like the daily importer, so the console's "
+                         "'Data refreshed' footer reflects this sync")
     ap.add_argument("--email", action="store_true",
                     help="email the run summary (recipients from --email-to or REPORT_TO)")
     ap.add_argument("--email-to", default=None, help="comma-separated recipients (implies --email)")
@@ -502,18 +520,30 @@ def main():
     conn = sqlite3.connect(str(db), timeout=30)
     conn.execute("PRAGMA journal_mode=WAL"); conn.execute("PRAGMA busy_timeout=30000")
     totals = defaultdict(int)
+    per_dataset = {}
     try:
         conn.execute("BEGIN")
         if not args.dry_run:
             _ensure_log_table(conn)
         for ds in ORDER:
             s = reconcile_dataset(conn, ds, csvs[ds], run_id, ts, logf,
-                                  args.dry_run, args.allow_blanking)
+                                  args.dry_run, args.allow_blanking, args.adds_only)
+            per_dataset[ds] = s
             for k, v in s.items():
                 totals[k] += v
         logf(f"TOTAL: +{totals['added']} added, ~{totals['changed']} changed, "
              f"={totals['unchanged']} unchanged, {totals['blanked']} blanks-kept, "
              f"{totals['csv_dups']} csv-dups, {totals['sql_only']} kept-not-in-csv")
+        if args.stamp_meta and not args.dry_run:
+            # Freshness stamp, committed atomically with the data — same rows the
+            # daily importer writes, so the console footer counts this as a refresh.
+            conn.execute("CREATE TABLE IF NOT EXISTS import_meta (key TEXT PRIMARY KEY, value TEXT)")
+            now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            for k, v in (("last_import", now_utc), ("last_import_mode", args.stamp_meta)):
+                conn.execute(
+                    "INSERT INTO import_meta(key, value) VALUES(?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (k, v))
+            logf(f"stamped import_meta (mode={args.stamp_meta})")
         if args.dry_run:
             conn.execute("ROLLBACK"); logf("dry-run: rolled back, no changes written")
         else:
@@ -528,10 +558,22 @@ def main():
     logpath.write_text(body, encoding="utf-8")
     log(f"wrote text log: {logpath}")
 
+    # Machine-readable summary for the web upload page (written even on dry runs;
+    # its absence after a run signals failure to the caller).
+    if args.summary_json:
+        Path(args.summary_json).write_text(json.dumps({
+            "run_id": run_id, "dry_run": args.dry_run, "adds_only": args.adds_only,
+            "datasets": per_dataset, "totals": dict(totals),
+            "log_path": str(logpath), "ok": True,
+        }, indent=1), encoding="utf-8")
+        log(f"wrote summary json: {args.summary_json}")
+
     # Optional emailed report: PII-free summary in the body; full log attached
     # only with --attach-log. Sent AFTER the DB work, so a mail failure never
     # affects the committed reconcile.
     recipients = [a.strip() for a in (args.email_to or os.environ.get("REPORT_TO") or DEFAULT_REPORT_TO).split(",") if a.strip()]
+    if args.no_email:
+        recipients = []
     if args.email or args.email_to or recipients:
         if not recipients:
             log("WARNING: email requested but no recipients (set --email-to or REPORT_TO); skipped")

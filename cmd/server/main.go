@@ -105,6 +105,7 @@ func main() {
 	}
 	const cacheTTL = 60 * time.Second
 	srv := handlers.New(database, a, tmpl, cacheTTL, importerRetired)
+	srv.DBPath = dbPath // CSV upload page (importcsv.go): reconcile target + staging location
 
 	mtr := metrics.New(time.Now())
 
@@ -150,6 +151,7 @@ func main() {
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
 	r.Get("/console/help", srv.ConsoleHelp)
+	r.Get("/console/import", srv.ImportPage) // stop-gap SharePoint CSV upload (supervisor)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
 
 	// The classic "Direction A" interface was removed (2026-06-09) — old bookmarks
@@ -203,6 +205,9 @@ func main() {
 		ar.Post("/override/clear", srv.ClearOverride)    // clear override (supervisor)
 		ar.Post("/waiver", srv.SetFeeWaiver)             // grant GPS fee waiver (supervisor)
 		ar.Post("/waiver/clear", srv.ClearFeeWaiver)     // remove app fee waiver (supervisor)
+		ar.Post("/import/preview", srv.ImportPreview)    // stage uploaded CSVs + dry-run (supervisor)
+		ar.Post("/import/apply", srv.ImportApply)        // commit a previewed upload (supervisor)
+		ar.Post("/import/discard", srv.ImportDiscard)    // drop a previewed upload (supervisor)
 
 		// Data entry (any allowed officer): add a client, payments, check-ins.
 		// The classic add-client form is gone — the console intake wizard is the

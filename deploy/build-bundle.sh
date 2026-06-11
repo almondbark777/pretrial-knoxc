@@ -32,8 +32,10 @@ echo "== 2. stage templates/ + static/ + the importer =="
 cp -r templates static "$STAGE/"
 # The daily importer ships with the app so the import_meta freshness stamp
 # (the console's "Data refreshed" footer) deploys in the same run — no
-# separate scp per deploy/INCREMENTAL.md needed anymore.
-cp webapp/sharepoint_import.py "$STAGE/"
+# separate scp per deploy/INCREMENTAL.md needed anymore. reconcile_import.py
+# rides along: the console's /console/import upload page shells out to it, and
+# it imports the column mapping FROM sharepoint_import.py — always deploy both.
+cp webapp/sharepoint_import.py webapp/reconcile_import.py "$STAGE/"
 
 echo "== 3. stage installers + units + docs (flat, beside the binary) =="
 for f in \

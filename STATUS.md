@@ -227,13 +227,22 @@ console dashboard's "My caseload" scope toggle)*
 - [x] Data-freshness indicator — **done 2026-06-10**: the importer stamps
       `import_meta` on every committed run; the console sidebar foot shows
       "Data refreshed <time> ET" with an amber ⚠ past 26 h. Appears on ptr1
-      after the next deploy + import run (note: the deploy bundle does not
-      yet ship `sharepoint_import.py` — copy it per `deploy/INCREMENTAL.md`).
+      after the next deploy + import run (the deploy bundle ships
+      `sharepoint_import.py` since d267ead, and `reconcile_import.py` too).
 - [x] Arrears letter toggles + history — **done 2026-06-10**: the EM-fees
       report's checkboxes drive the memo batch (CSRF-guarded POST, zip is
       exactly the ticked set), every generated memo (single or batch) is
       recorded in `letter_log` (migration 007), and a printable "Last
       letter" column shows each client's most recent memo + officer.
+- [x] Stop-gap SharePoint CSV upload — **done 2026-06-10**: supervisor-only
+      `/console/import` (entry panel on the console Admin page) takes the four
+      SharePoint "Export to CSV" files, shows a dry-run preview of exactly
+      what would change, then applies via the proven
+      `webapp/reconcile_import.py` (adds + safe field updates, never deletes;
+      optional adds-only mode). Audited (`csv_reconcile`), change-logged, and
+      it refreshes the "Data refreshed" footer. The deploy bundle now ships
+      BOTH importer scripts. Remove the page (or just its Admin panel link) at
+      SharePoint cutover.
 - DB-backed allow-list (currently env/`ALLOWED_EMAILS` with a built-in fallback).
 
 ---

@@ -29,6 +29,10 @@ env/
 
 # --- Source data with defendant PII (NEVER commit) ---
 db/csv_clean/
+# Reconcile/upload artifacts written next to the DB by reconcile_import.py and
+# the /console/import upload page (per-row logs + staged CSVs carry names/IDNs).
+db/import_logs/
+db/import_uploads/
 # EM-fee parity golden (derived from the offline DB; carries IDNs). Regenerate
 # locally per PROJECT_HISTORY.md (Phase 9); the parity test skips when it's absent.
 internal/db/testdata/emfees_golden.json

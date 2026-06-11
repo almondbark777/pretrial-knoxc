@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"html/template"
@@ -29,10 +30,21 @@ type Server struct {
 	// physical raw_* row delete at SharePoint cutover (Brief: IMPORTER_RETIRED).
 	ImporterRetired bool
 
+	// DBPath is the SQLite file path. The CSV upload page passes it to the
+	// reconcile tool (which opens its own connection) and stages uploads next
+	// to it (importcsv.go). Empty in most tests — only the import flow uses it.
+	DBPath string
+
+	// ReconcileExec, when non-nil, replaces the real python reconcile_import.py
+	// invocation (importcsv.go) — used by tests to stub the subprocess.
+	ReconcileExec func(ctx context.Context, dir string, apply, addsOnly bool) (*ReconcileSummary, string, error)
+
 	cacheTTL time.Duration
 	mu       sync.Mutex
 	cached   map[string][]*compute.Client
 	cachedAt time.Time
+
+	importMu sync.Mutex // one CSV upload/reconcile at a time
 }
 
 // New builds a Server.

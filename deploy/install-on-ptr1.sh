@@ -66,6 +66,14 @@ if [ -f "$SRC/sharepoint_import.py" ]; then
   sudo chown "$OWN" "$APP/webapp/sharepoint_import.py" 2>/dev/null || true
   echo "  installed sharepoint_import.py (next import stamps import_meta -> the 'Data refreshed' footer)"
 fi
+# The CSV reconcile tool behind the web upload page (/console/import). It
+# imports the column mapping from sharepoint_import.py — ships together.
+if [ -f "$SRC/reconcile_import.py" ]; then
+  [ -f "$APP/webapp/reconcile_import.py" ] && sudo cp -a "$APP/webapp/reconcile_import.py" "$BK/reconcile_import.py.$STAMP" && echo "  saved reconcile_import.py.$STAMP"
+  sudo install -m0755 "$SRC/reconcile_import.py" "$APP/webapp/reconcile_import.py"
+  sudo chown "$OWN" "$APP/webapp/reconcile_import.py" 2>/dev/null || true
+  echo "  installed reconcile_import.py (backs the /console/import upload page)"
+fi
 echo "  installed (owner $OWN)"
 
 say "5. update .env (idempotent; existing keys left as-is)"

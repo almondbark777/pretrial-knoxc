@@ -49,6 +49,13 @@
 </div>
 
 <div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Data Import — SharePoint CSV upload</h2><span class="grow"></span><span class="chip warn">stop-gap</span>{{if .IsSupervisor}}<a class="btn sm" style="margin-left:10px" href="/console/import">Open import →</a>{{end}}</div>
+  <div class="pad">
+    <p class="muted" style="padding:0;margin:0;font-size:13px">Upload the four SharePoint <b>Export to CSV</b> files (Blue Book, Check Ins, Payments, GPS 48 Hours) to bring this database up to date between daily imports — for the testing period while SharePoint is still the system of record. Adds missing rows and updates changed fields; <b>never deletes</b>. Every change is previewed before it&rsquo;s applied and recorded in the import change log + audit trail.{{if not .IsSupervisor}} Supervisor sign-in required.{{end}}</p>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:18px">
   <div class="h"><h2>Recent Audit Trail</h2><span class="grow"></span><span class="count">{{len .Audit}}</span>{{if .IsSupervisor}}<a class="btn ghost sm" style="margin-left:10px" href="/admin/audit">Full audit log →</a>{{end}}</div>
   <div class="tscroll">
     {{if .Audit}}<table class="data">

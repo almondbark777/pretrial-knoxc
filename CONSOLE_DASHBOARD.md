@@ -671,3 +671,41 @@ Two loose ends closed before the ptr1 push:
    Guarded `if [ -f ]` so older bundles still install. `bash -n` clean.
 
 Full `go test ./...` green; fresh bundle built ready for the ptr1 push.
+
+## Stop-gap SharePoint CSV upload — `/console/import` (2026-06-10)
+
+While the site is in testing, SharePoint stays the system of record and the
+daily email import can lag it. Supervisors can now bring the DB current from
+the browser: upload the four SharePoint **Export to CSV** files → dry-run
+preview (per-dataset counts: new rows / field updates / unchanged / blanks
+kept / CSV dups / SQL-only-kept) → Apply.
+
+- **No new import logic.** The Go app deliberately does not write `raw_*`
+  (CLAUDE.md rule); `internal/handlers/importcsv.go` shells out to the proven
+  `webapp/reconcile_import.py` (natural-key match, UTC→Eastern/money/case
+  normalization, NEVER deletes, empty CSV cells never blank stored values,
+  idempotent). The tool gained four flags for the web path: `--adds-only`
+  (insert-only mode — the page's checkbox), `--summary-json` (machine-readable
+  counts the page renders), `--no-email`, and `--stamp-meta MODE` (writes the
+  same `import_meta` freshness rows as the daily importer, so the sidebar
+  "Data refreshed" footer reflects a web sync; mode `web-upload`).
+- Flow: files staged under `<db_dir>/import_uploads/<token>/` (canonical
+  names) → dry-run → Apply re-runs the same staged set for real → cache
+  cleared → staging removed; abandoned previews pruned after 24 h. One import
+  at a time (`importMu`); 10-min subprocess timeout.
+- Routes: `GET /console/import` (supervisor), POSTs under the CSRF-guarded
+  `/admin/import/{preview,apply,discard}`. Applied runs audit as
+  `csv_reconcile` (run_id + headline counts) and land in the tool's
+  `import_change_log` + text log as usual. Entry panel on `/console/admin`.
+- Env (optional): `PYTHON_BIN`, `RECONCILE_SCRIPT` — defaults fit ptr1
+  (`python3` on PATH, script relative to `WorkingDirectory=/opt/ptr-knoxc`).
+  Both importer scripts now ship in the deploy bundle (they must move
+  together: reconcile imports the column mapping from sharepoint_import).
+- Tests: `importcsv_test.go` — supervisor gate, argv contract, preview→apply
+  flow (staging, audit, cleanup), missing-file + bad-token rejection, and a
+  REAL-python integration test (insert + idempotency + meta stamp; skips
+  without python). `db/import_logs/` + `db/import_uploads/` gitignored (PII).
+- Live-verified in the preview with the real four exports against the scratch
+  DB: web preview counts == CLI dry-run exactly (+6,867 / ~1,086 / 388
+  blanks-kept on the stale snapshot), apply committed, stats/footer/audit all
+  updated, no console errors. Scratch DB deleted after (regenerates clean).
