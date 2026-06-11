@@ -10,6 +10,7 @@
   <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
   {{template "sitenav" .}}
   <span class="grow"></span>
+  {{template "freshstamp"}}
   <span class="muted">{{.User}}</span>
   <button type="button" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login')">Sign out</button>
 </header>
@@ -18,7 +19,7 @@
   <div class="report-head">
     <div class="agency">Knox County Sheriff's Office · Pre-Trial Services</div>
     <h1 style="padding:0">Past-Due Electronic Monitoring Fees</h1>
-    <p class="muted" style="padding:0">Clients 5+ days behind on GPS monitoring fees · As of {{.AsOf}}</p>
+    <p class="muted" style="padding:0">Clients 5+ days behind on GPS monitoring fees · As of {{.AsOf}}{{with dataFreshness}}{{if .OK}} · Data updated {{.Label}}{{end}}{{end}}</p>
   </div>
 
 <form method="post" action="/reports/em-fees/memos.zip" id="memoForm">

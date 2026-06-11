@@ -9,6 +9,7 @@
 <header class="topbar no-print">
   <a href="/reports" class="pilllink">&larr; Reports</a>
   <span class="grow"></span>
+  {{template "freshstamp"}}
   <span class="muted">{{.User}}</span>
   {{if .R.AltURL}}<a class="export" href="{{.R.AltURL}}">{{.R.AltLabel}}</a>{{end}}
   {{if .R.CSVPath}}<a class="export" href="{{.R.CSVPath}}">CSV ⤓</a>{{end}}
@@ -19,7 +20,7 @@
   <div class="report-head">
     <div class="agency">Knox County Sheriff's Office · Pre-Trial Services</div>
     <h1 style="padding:0">{{.R.Title}}</h1>
-    <p class="muted" style="padding:0">{{.R.Subtitle}} · As of {{.R.AsOf}} · {{len .R.Rows}} record(s)</p>
+    <p class="muted" style="padding:0">{{.R.Subtitle}} · As of {{.R.AsOf}} · {{len .R.Rows}} record(s){{with dataFreshness}}{{if .OK}} · Data updated {{.Label}}{{end}}{{end}}</p>
   </div>
 
   {{if .R.Groups}}

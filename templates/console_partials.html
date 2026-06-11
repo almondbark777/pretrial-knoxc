@@ -49,6 +49,7 @@
       </div>
       <a class="btn newref" href="/console/clients/new" title="Start a new referral">+ New Referral</a>
       <div class="ctools">
+        {{with dataFreshness}}{{if .OK}}<div class="cfresh{{if .Stale}} stale{{end}}" title="Last time data entered this database ({{.Mode}}) — the daily SharePoint import or a web CSV upload (Admin → Data Import)">{{if .Stale}}⚠ {{end}}<span class="lbl">Data updated</span> {{.Label}}<span class="ago"> · {{.Ago}}</span></div>{{end}}{{end}}
         <div class="casof{{if not .IsToday}} active{{end}}" title="As-of date — re-runs all compliance math for the whole console (defaults to today EST)">
           <span class="lbl">As of</span>
           <input type="date" id="asof-input" value="{{.AsOfInput}}" aria-label="As-of date">

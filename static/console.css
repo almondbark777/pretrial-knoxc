@@ -151,6 +151,13 @@ a:hover{text-decoration:underline}
 .csearch .res .empty{padding:11px;color:var(--muted);font-size:13px}
 
 .ctools{margin-left:auto;display:flex;align-items:center;gap:12px}
+/* "Data updated …" stamp — last time data entered the DB, on every page top bar */
+.cfresh{font-size:12px;color:var(--muted);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:7px 11px;background:var(--panel-2);white-space:nowrap}
+.cfresh .lbl{font-weight:600}
+.cfresh.stale{color:var(--warn-ink);background:var(--warn-bg);border-color:var(--warn-line);font-weight:600}
+@media(max-width:1180px){.cfresh .ago{display:none}}
+@media(max-width:1020px){.cfresh .lbl{display:none}}
+@media(max-width:860px){.cfresh{display:none}}
 .casof{display:flex;align-items:center;gap:7px;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:3px 5px 3px 10px;background:var(--panel-2);transition:border-color var(--t),box-shadow var(--t)}
 .casof .lbl{font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .casof input[type=date]{border:0;background:none;color:var(--ink);font:inherit;font-size:12.5px;padding:3px 2px;min-height:0}

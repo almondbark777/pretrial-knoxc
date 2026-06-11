@@ -709,3 +709,30 @@ kept / CSV dups / SQL-only-kept) → Apply.
   DB: web preview counts == CLI dry-run exactly (+6,867 / ~1,086 / 388
   blanks-kept on the stale snapshot), apply committed, stats/footer/audit all
   updated, no console errors. Scratch DB deleted after (regenerates clean).
+
+## "Data updated" stamp at the top of every page (2026-06-10)
+
+Alex: "for my own sanity, put at the top of every page the last time the
+website was updated." Every signed-in page now stamps when data last entered
+the database (the `import_meta` row written by both the daily importer and
+web CSV uploads): label + "Nh ago", amber ⚠ past 26 h, tooltip says which
+path wrote it (daily import vs web CSV upload).
+
+- **One source of truth, zero per-handler plumbing:** `Server.DataFreshness()`
+  (`internal/handlers/freshness.go`, with `db.LastImportMode` added to
+  meta.go) is exposed to ALL templates as the `dataFreshness` template func —
+  a parse-time placeholder in `tmplFuncs()` rebound to the real method via
+  `tmpl.Funcs(...)` after the Server exists (main.go). consoleBase's sidebar
+  foot now reuses it too.
+- Surfaces: console topbar chip (`.cfresh` in console.css; responsive — drops
+  "ago"/label as width shrinks, hidden <860px where the sidebar foot still
+  shows it; warn colors when stale, dark-mode aware) · tracker shell bar ·
+  reports hub · printable report pages (`report.html`, `report_emfees.html` —
+  ALSO in the printed `.report-head` line, so a printed roster shows its data
+  currency) · audit/deleted/message/delete-confirm topbars (shared
+  `freshstamp` partial in partials.html + `.freshstamp` in app.css).
+- Pre-rollout DBs (no import_meta) render nothing — same tolerance as before.
+- Tests: `freshness_test.go` (no-meta → fresh daily → stale web-upload; agoStr
+  buckets). Live-verified: fresh chip + tooltip on console/tracker/reports/
+  report-head/audit, stale 30h stamp goes amber+⚠ everywhere, dark-mode warn
+  palette, mobile hides the chip with no overflow, no console errors.

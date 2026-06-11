@@ -109,6 +109,9 @@ p{padding-left:24px;padding-right:24px}
 /* ── shell: thin bar framing the client-tracker iframe (landing page) ──────── */
 body.shell{height:100vh;overflow:hidden;display:flex;flex-direction:column;background:var(--bg-2)}
 .shell-bar{display:flex;align-items:center;gap:13px;padding:9px 20px;background:var(--bg-2);border-bottom:1px solid var(--line);flex:0 0 auto}
+/* "Data updated …" stamp (freshstamp partial) — top of every page */
+.freshstamp{font-size:12px;white-space:nowrap}
+@media(max-width:760px){.freshstamp{display:none}}
 .shell-sub{font-size:13px;padding:2px 9px;border:1px solid var(--line-2);border-radius:var(--r-pill)}
 .shell-frame{flex:1 1 auto;width:100%;border:0;background:#f5f1e6;display:block}
 .shell-bar a.btn{text-decoration:none}

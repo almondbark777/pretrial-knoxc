@@ -10,6 +10,7 @@
   <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
   {{template "sitenav" .}}
   <span class="grow"></span>
+  {{template "freshstamp"}}
   <span class="muted">{{.User}}</span>
   <button type="button" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login')">Sign out</button>
 </header>

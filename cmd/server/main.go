@@ -106,6 +106,10 @@ func main() {
 	const cacheTTL = 60 * time.Second
 	srv := handlers.New(database, a, tmpl, cacheTTL, importerRetired)
 	srv.DBPath = dbPath // CSV upload page (importcsv.go): reconcile target + staging location
+	// Bind the real freshness lookup now that the Server exists (the parse-time
+	// placeholder in tmplFuncs returns an empty stamp). Funcs is safe to call
+	// after parsing; execution uses the latest map.
+	tmpl.Funcs(template.FuncMap{"dataFreshness": srv.DataFreshness})
 
 	mtr := metrics.New(time.Now())
 
@@ -361,6 +365,10 @@ func moneyFmt(f float64) string {
 
 func tmplFuncs() template.FuncMap {
 	return template.FuncMap{
+		// dataFreshness: parse-time placeholder — rebound to the real
+		// srv.DataFreshness after the Server exists (main), so EVERY page
+		// chrome can stamp "Data updated …" without per-handler plumbing.
+		"dataFreshness": func() handlers.Freshness { return handlers.Freshness{} },
 		"fmtDate": func(t time.Time) string {
 			if t.IsZero() {
 				return ""

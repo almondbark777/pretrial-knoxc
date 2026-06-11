@@ -10,6 +10,7 @@
   <strong class="brand"><span class="brand-mark"></span>Knox County Pre-Trial</strong>
   <span class="muted shell-sub">Client Tracker</span>
   <span class="grow"></span>
+  {{template "freshstamp"}}
   <span class="muted">{{.User}}</span>
   <a class="btn" href="/console" title="Open the case management console">Open Console &rarr;</a>
   <button type="button" class="pilllink" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login')">Sign out</button>

@@ -24,3 +24,14 @@ func LastImport(d *sql.DB) (time.Time, bool) {
 	}
 	return t, true
 }
+
+// LastImportMode returns the import_meta 'last_import_mode' row — how data last
+// got in ("full"/"incremental" from the daily importer, "web-upload" from the
+// console CSV page). Empty when absent (same tolerance as LastImport).
+func LastImportMode(d *sql.DB) string {
+	var v string
+	if err := d.QueryRow(`SELECT value FROM import_meta WHERE key = 'last_import_mode'`).Scan(&v); err != nil {
+		return ""
+	}
+	return v
+}
