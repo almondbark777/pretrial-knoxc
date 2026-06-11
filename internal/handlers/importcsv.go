@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -40,6 +41,10 @@ type ReconcileCounts struct {
 	CSVDups   int `json:"csv_dups"`
 	SQLOnly   int `json:"sql_only"`
 	Blanked   int `json:"blanked"`
+	// Skipped is set on a per-dataset row when the tool couldn't process that
+	// file (empty, or its headers don't match the expected key columns — usually
+	// the wrong export in that slot). Never set on the Totals row.
+	Skipped bool `json:"skipped"`
 }
 
 // ReconcileSummary mirrors the tool's --summary-json output.
@@ -116,6 +121,10 @@ func (s *Server) runReconcile(ctx context.Context, dir string, apply, addsOnly b
 		script = filepath.Join("webapp", "reconcile_import.py") // CWD=/opt/ptr-knoxc on ptr1; repo root in dev
 	}
 	summaryPath := filepath.Join(dir, "summary.json")
+	// Drop any summary left by an earlier run (the preview's dry-run summary lives
+	// in the same dir): its presence afterward must mean THIS run wrote it, so a
+	// crashed apply can't be read as a success via a stale file.
+	_ = os.Remove(summaryPath)
 	cmd := exec.CommandContext(ctx, py, reconcileArgs(script, dir, s.DBPath, summaryPath, apply, addsOnly)...)
 	out, runErr := cmd.CombinedOutput()
 	b, readErr := os.ReadFile(summaryPath)
@@ -150,6 +159,18 @@ func importViewRows(sum *ReconcileSummary) []importViewRow {
 	return rows
 }
 
+// anySkipped reports whether the tool skipped any dataset (empty / wrong-columns
+// file). A skipped dataset means that export reconciled nothing — surfaced as a
+// loud warning so a mis-slotted upload isn't mistaken for "already up to date".
+func anySkipped(sum *ReconcileSummary) bool {
+	for _, c := range sum.Datasets {
+		if c.Skipped {
+			return true
+		}
+	}
+	return false
+}
+
 // tailStr keeps the last n characters (whole lines) of the tool output for display.
 func tailStr(s string, n int) string {
 	if len(s) <= n {
@@ -170,7 +191,13 @@ func (s *Server) importBase(w http.ResponseWriter, r *http.Request) map[string]a
 }
 
 // pruneStaleStaging drops abandoned upload dirs (preview never applied) after a day.
+// Holds importMu so it can't delete a dir that a concurrent apply is reading; if an
+// import is running it simply skips this pass (the next page visit prunes).
 func (s *Server) pruneStaleStaging() {
+	if !s.importMu.TryLock() {
+		return
+	}
+	defer s.importMu.Unlock()
 	root := s.importStagingRoot()
 	ents, err := os.ReadDir(root)
 	if err != nil {
@@ -265,6 +292,7 @@ func (s *Server) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	data["Rows"] = importViewRows(sum)
 	data["Token"] = token
 	data["AddsOnly"] = addsOnly
+	data["Skipped"] = anySkipped(sum)
 	data["Output"] = tailStr(out, 4000)
 	s.renderConsole(w, "console_import.html", data)
 }
@@ -299,22 +327,38 @@ func (s *Server) ImportApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer s.importMu.Unlock()
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	// Detach from the request context: a client disconnect or the Cloudflare
+	// proxy timeout (~100s) must NOT kill the reconcile mid-commit. importMu
+	// (single-flight) and the 10-minute cap bound it.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	sum, out, err := s.runReconcile(ctx, dir, true, addsOnly)
-	if err != nil {
-		s.importError(w, r, "Apply failed (nothing committed — the tool runs one transaction): "+err.Error(), out)
+	// "Committed" is decided by a fresh, non-dry-run summary — the tool writes it
+	// immediately after COMMIT — not by the exit code. A nonzero exit during the
+	// tool's post-commit bookkeeping must not be reported as "nothing committed"
+	// (which would also skip the audit row and cache clear on committed data).
+	committed := sum != nil && !sum.DryRun
+	if !committed {
+		msg := "Apply failed (nothing committed — the tool runs one transaction)"
+		if err != nil {
+			msg += ": " + err.Error()
+		}
+		s.importError(w, r, msg, out)
 		return
 	}
 	mode := ""
 	if addsOnly {
 		mode = " (adds only)"
 	}
-	_ = db.WriteAudit(s.DB, db.AuditEvent{
+	if aerr := db.WriteAudit(s.DB, db.AuditEvent{
 		User: user, Action: "csv_reconcile", Table: "raw_*", RowID: sum.RunID,
 		NewValue: fmt.Sprintf("web upload%s: +%d added, ~%d changed, %d blanks-kept, %d kept-not-in-csv",
 			mode, sum.Totals.Added, sum.Totals.Changed, sum.Totals.Blanked, sum.Totals.SQLOnly),
-	})
+	}); aerr != nil {
+		// The data is committed; an audit-write failure is logged, not hidden
+		// (the tool's own import_change_log is the backstop record).
+		log.Printf("csv_reconcile audit write failed (data committed, run %s): %v", sum.RunID, aerr)
+	}
 	s.clearCache()
 	_ = os.RemoveAll(dir)
 	data := s.importBase(w, r)
@@ -322,15 +366,22 @@ func (s *Server) ImportApply(w http.ResponseWriter, r *http.Request) {
 	data["Sum"] = sum
 	data["Rows"] = importViewRows(sum)
 	data["AddsOnly"] = addsOnly
+	data["Skipped"] = anySkipped(sum)
 	data["Output"] = tailStr(out, 4000)
 	s.renderConsole(w, "console_import.html", data)
 }
 
 // ImportDiscard throws away a previewed staging dir. POST /admin/import/discard.
+// Holds importMu so a discard can't delete the dir out from under a running apply.
 func (s *Server) ImportDiscard(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireSupervisor(w, r); !ok {
 		return
 	}
+	if !s.importMu.TryLock() {
+		redirectMsg(w, r, "/console/import", "An import is running — try discarding again once it finishes.")
+		return
+	}
+	defer s.importMu.Unlock()
 	if dir, err := s.importStagingFor(r.FormValue("token")); err == nil {
 		_ = os.RemoveAll(dir)
 	}

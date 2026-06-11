@@ -281,7 +281,7 @@ def reconcile_dataset(conn, dataset, path, run_id, ts, logf, dry, allow_blanking
     headers, rows = _read_csv(path)
     if not headers:
         logf(f"{dataset}: EMPTY file, skipped (table unchanged)")
-        return dict(added=0, changed=0, unchanged=0, csv_dups=0, sql_only=0, blanked=0)
+        return dict(added=0, changed=0, unchanged=0, csv_dups=0, sql_only=0, blanked=0, skipped=True)
 
     colmap = _match_headers(headers, aliases)        # db_col -> csv header
     # Drop sp_item_id: the Export-to-CSV files carry no SharePoint item ID, and
@@ -292,7 +292,7 @@ def reconcile_dataset(conn, dataset, path, run_id, ts, logf, dry, allow_blanking
     for kc in keycols:
         if kc not in colmap:
             logf(f"{dataset}: WARNING key column '{kc}' not in CSV; skipped. matched={db_cols}")
-            return dict(added=0, changed=0, unchanged=0, csv_dups=0, sql_only=0, blanked=0)
+            return dict(added=0, changed=0, unchanged=0, csv_dups=0, sql_only=0, blanked=0, skipped=True)
     _ensure_columns(conn, table, db_cols)
 
     # Index existing SQL rows by natural key -> queue of (rowid, {col: val}).
@@ -391,7 +391,7 @@ def reconcile_dataset(conn, dataset, path, run_id, ts, logf, dry, allow_blanking
     logf(f"{dataset}: +{added} added, ~{changed} changed, ={unchanged} unchanged, "
          f"{blanked} blanks-kept, {csv_dups} csv-dups-skipped, {sql_only} in-SQL-not-in-CSV (kept)")
     return dict(added=added, changed=changed, unchanged=unchanged,
-                csv_dups=csv_dups, sql_only=sql_only, blanked=blanked)
+                csv_dups=csv_dups, sql_only=sql_only, blanked=blanked, skipped=False)
 
 
 def find_csvs_from_dir(d):
@@ -530,11 +530,18 @@ def main():
                                   args.dry_run, args.allow_blanking, args.adds_only)
             per_dataset[ds] = s
             for k, v in s.items():
+                if k == "skipped":  # per-dataset flag, not a summable count
+                    continue
                 totals[k] += v
         logf(f"TOTAL: +{totals['added']} added, ~{totals['changed']} changed, "
              f"={totals['unchanged']} unchanged, {totals['blanked']} blanks-kept, "
              f"{totals['csv_dups']} csv-dups, {totals['sql_only']} kept-not-in-csv")
-        if args.stamp_meta and not args.dry_run:
+        # Only stamp the freshness clock if the run actually reconciled at least
+        # one dataset. A run where every file was skipped (wrong slots / empty
+        # exports) reconciled nothing, so it must NOT reset the "data updated"
+        # staleness indicator — that would mask a stale or broken pipeline.
+        reconciled_any = any(not per_dataset[d].get("skipped") for d in ORDER)
+        if args.stamp_meta and not args.dry_run and reconciled_any:
             # Freshness stamp, committed atomically with the data — same rows the
             # daily importer writes, so the console footer counts this as a refresh.
             conn.execute("CREATE TABLE IF NOT EXISTS import_meta (key TEXT PRIMARY KEY, value TEXT)")
@@ -544,6 +551,8 @@ def main():
                     "INSERT INTO import_meta(key, value) VALUES(?, ?) "
                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (k, v))
             logf(f"stamped import_meta (mode={args.stamp_meta})")
+        elif args.stamp_meta and not args.dry_run:
+            logf("NOT stamping import_meta: every dataset was skipped (no data reconciled)")
         if args.dry_run:
             conn.execute("ROLLBACK"); logf("dry-run: rolled back, no changes written")
         else:
@@ -553,20 +562,29 @@ def main():
     finally:
         conn.close()
 
-    # Write the human-readable file log (summary first, then detail).
-    body = "\n".join(summary_lines) + "\n\n--- detail ---\n" + "\n".join(detail_lines) + "\n"
-    logpath.write_text(body, encoding="utf-8")
-    log(f"wrote text log: {logpath}")
-
-    # Machine-readable summary for the web upload page (written even on dry runs;
-    # its absence after a run signals failure to the caller).
+    # Post-commit bookkeeping. The DB work is already committed (or rolled back on
+    # a dry run); a failure writing these files must NOT flip the exit code, or the
+    # web caller would report a committed import as failed. Write the machine-
+    # readable summary FIRST — that's the signal the upload page reads (its absence
+    # after a run means the run died before/at commit).
     if args.summary_json:
-        Path(args.summary_json).write_text(json.dumps({
-            "run_id": run_id, "dry_run": args.dry_run, "adds_only": args.adds_only,
-            "datasets": per_dataset, "totals": dict(totals),
-            "log_path": str(logpath), "ok": True,
-        }, indent=1), encoding="utf-8")
-        log(f"wrote summary json: {args.summary_json}")
+        try:
+            Path(args.summary_json).write_text(json.dumps({
+                "run_id": run_id, "dry_run": args.dry_run, "adds_only": args.adds_only,
+                "datasets": per_dataset, "totals": dict(totals),
+                "log_path": str(logpath), "ok": True,
+            }, indent=1), encoding="utf-8")
+            log(f"wrote summary json: {args.summary_json}")
+        except Exception as e:
+            log(f"WARNING: summary json write failed (data already committed): {e}")
+
+    # Human-readable file log (summary first, then detail).
+    body = "\n".join(summary_lines) + "\n\n--- detail ---\n" + "\n".join(detail_lines) + "\n"
+    try:
+        logpath.write_text(body, encoding="utf-8")
+        log(f"wrote text log: {logpath}")
+    except Exception as e:
+        log(f"WARNING: text log write failed (data already committed): {e}")
 
     # Optional emailed report: PII-free summary in the body; full log attached
     # only with --attach-log. Sent AFTER the DB work, so a mail failure never

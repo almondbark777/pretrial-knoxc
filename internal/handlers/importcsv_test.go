@@ -7,6 +7,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"html/template"
 	"mime/multipart"
 	"net/http"
@@ -39,7 +40,7 @@ func importTestServer(t *testing.T) (*Server, *auth.Authenticator) {
 	}
 	a := auth.New("pw", "secret", nil, []string{supEmail})
 	tmpl := template.Must(template.New("").Parse(
-		`{{define "console_import.html"}}MODE={{.Mode}}|TOK={{.Token}}|ERR={{.Err}}|ADDED={{if .Sum}}{{.Sum.Totals.Added}}{{end}}{{end}}` +
+		`{{define "console_import.html"}}MODE={{.Mode}}|TOK={{.Token}}|ERR={{.Err}}|SKIP={{.Skipped}}|ADDED={{if .Sum}}{{.Sum.Totals.Added}}{{end}}{{end}}` +
 			`{{define "message.html"}}{{.Title}}{{end}}`))
 	srv := New(d, a, tmpl, time.Minute, false)
 	srv.DBPath = dbPath
@@ -147,6 +148,50 @@ func TestImportPreviewApplyFlow(t *testing.T) {
 	}
 	if _, err := os.Stat(staged); !os.IsNotExist(err) {
 		t.Errorf("staging dir not removed after apply")
+	}
+}
+
+// TestImportApplyCommittedDespiteToolError: when the tool wrote a non-dry-run
+// summary (data committed) but exited nonzero during post-commit bookkeeping, the
+// apply must still report success, write the audit row, and clear the cache —
+// never the false "nothing committed".
+func TestImportApplyCommittedDespiteToolError(t *testing.T) {
+	srv, a := importTestServer(t)
+	stubReconcile(srv, "RUNC") // preview stages the files + mints a token
+	rec := do(a, srv.ImportPreview, multipartUpload(t, nil, "bluebook", "checkins", "payments", "gps"))
+	m := regexp.MustCompile(`TOK=([0-9a-f]{32})`).FindStringSubmatch(rec.Body.String())
+	if m == nil {
+		t.Fatalf("no staging token in %q", rec.Body.String())
+	}
+	// Apply: committed summary (DryRun=false) but a nonzero-exit error alongside.
+	srv.ReconcileExec = func(ctx context.Context, dir string, apply, addsOnly bool) (*ReconcileSummary, string, error) {
+		return &ReconcileSummary{RunID: "RUNC", DryRun: false, OK: true,
+			Totals: ReconcileCounts{Added: 3}}, "post-commit warning", errors.New("text log write failed")
+	}
+	form := url.Values{"token": {m[1]}}
+	req := httptest.NewRequest("POST", "/admin/import/apply", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = do(a, srv.ImportApply, req)
+	if !strings.Contains(rec.Body.String(), "MODE=done") {
+		t.Fatalf("committed-with-error apply should show the done page, got %q", rec.Body.String())
+	}
+	if n := auditCount(t, srv.DB, "csv_reconcile", "RUNC"); n != 1 {
+		t.Errorf("committed apply must still write the audit row: got %d", n)
+	}
+}
+
+// TestImportSkippedDatasetWarns: a dataset the tool skipped (wrong-columns file)
+// must raise the visible warning flag, not pass silently as "up to date".
+func TestImportSkippedDatasetWarns(t *testing.T) {
+	srv, a := importTestServer(t)
+	srv.ReconcileExec = func(ctx context.Context, dir string, apply, addsOnly bool) (*ReconcileSummary, string, error) {
+		return &ReconcileSummary{RunID: "RUNS", DryRun: !apply, OK: true,
+			Datasets: map[string]ReconcileCounts{"bluebook": {Added: 1}, "checkins": {Skipped: true}},
+			Totals:   ReconcileCounts{Added: 1}}, "checkins: WARNING key column not in CSV; skipped", nil
+	}
+	rec := do(a, srv.ImportPreview, multipartUpload(t, nil, "bluebook", "checkins", "payments", "gps"))
+	if !strings.Contains(rec.Body.String(), "SKIP=true") {
+		t.Errorf("preview must flag a skipped dataset, got %q", rec.Body.String())
 	}
 }
 

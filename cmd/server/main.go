@@ -116,6 +116,11 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	// Cap every request body before anything reads it (auth/CSRF parse the form
+	// first). Only the CSV upload page carries a large body; everything else is a
+	// tiny form. Without this, ParseMultipartForm's "maxMemory" arg is NOT a size
+	// limit — an oversized upload would spool to the DB volume and could fill it.
+	r.Use(maxBodyBytes(maxRequestBody))
 	// Gzip responses (html/css/js/json) when the client accepts it. The roster page
 	// ships a few hundred KB of JSON; compression cuts that ~85% on the wire, which
 	// matters most on slow office LANs / low-end machines. Applied before the metrics
@@ -296,6 +301,25 @@ func legacyProfileRedirect(w http.ResponseWriter, r *http.Request) {
 		to += "/" + url.PathEscape(idn)
 	}
 	http.Redirect(w, r, to, http.StatusFound)
+}
+
+// maxRequestBody bounds any single request body. The CSV upload page is the only
+// large-body endpoint (four SharePoint exports, well under this); every other POST
+// is a small form. Matches importMaxUpload in importcsv.go.
+const maxRequestBody = 64 << 20 // 64 MB
+
+// maxBodyBytes wraps the request body in http.MaxBytesReader so reads past the
+// limit fail (and the server answers 413) instead of buffering an unbounded
+// upload. Runs ahead of the auth/CSRF middleware, which parse the form body.
+func maxBodyBytes(n int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, n)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // securityHeaders sets conservative, low-risk response headers on every response.

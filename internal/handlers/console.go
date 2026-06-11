@@ -52,15 +52,9 @@ func (s *Server) consoleBase(r *http.Request, active string, track time.Time) ma
 		"Epoch":        compute.StatsEpochLabel,  // go-live date for epoch-scoped stat labels
 		"Msg":          r.URL.Query().Get("msg"), // flash toast after a write redirect
 	}
-	// Data freshness (sidebar foot; the topbar stamp renders via the
-	// dataFreshness template func — freshness.go is the one source of truth).
-	// Absent on pre-rollout DBs — the display simply stays off. Stale (>26h —
-	// the import is daily, with slack) gets a warning so a silently broken
-	// import pipeline is visible to the people relying on the numbers.
-	if f := s.DataFreshness(); f.OK {
-		data["DataRefreshed"] = f.Label
-		data["DataStale"] = f.Stale
-	}
+	// Data freshness renders from the `dataFreshness` template func at both the
+	// topbar and the sidebar foot (freshness.go is the one source of truth) — no
+	// per-handler plumbing, and both stamps agree on wording + source.
 	return data
 }
 

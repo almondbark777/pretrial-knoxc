@@ -736,3 +736,64 @@ path wrote it (daily import vs web CSV upload).
   buckets). Live-verified: fresh chip + tooltip on console/tracker/reports/
   report-head/audit, stale 30h stamp goes amber+⚠ everywhere, dark-mode warn
   palette, mobile hides the chip with no overflow, no console errors.
+
+## CSV-upload hardening — pre-push review fixes (2026-06-11)
+
+A multi-agent pre-push review (`/code-review high`) of the two unpushed commits
+(`8f8dc77` CSV upload page + `d932a41` freshness stamp) surfaced ~10 confirmed
+findings, almost all on the stop-gap `/console/import` page. The mechanical
+push-blockers are fixed here; a few by-design / low-priority items are noted at
+the end. Quality gate green (gofmt/vet/build/`go test ./...`); real-python and
+preview verification done.
+
+- **Real request-body cap (was a disk-fill DoS).** `ParseMultipartForm`'s arg is
+  a memory threshold, not a size limit, and the CSRF middleware parses the whole
+  body *before* the supervisor check — so any logged-in officer could stream an
+  unbounded body onto the DB volume. Added a global `maxBodyBytes` middleware
+  (`http.MaxBytesReader`, 64 MB) ahead of auth/CSRF in `cmd/server/main.go`. The
+  only large-body endpoint is the upload page; everything else is a tiny form.
+- **Apply detached from the request context.** `ImportApply` ran the reconcile
+  under `r.Context()`, so a client disconnect or the Cloudflare ~100 s proxy
+  timeout would SIGKILL python mid-commit. Now `context.Background()` + the 10-min
+  cap (single-flight `importMu` still bounds it).
+- **"Committed" decided by the summary, not the exit code.** A nonzero exit
+  during the tool's *post-commit* bookkeeping used to render the false "Apply
+  failed (nothing committed)" while skipping the audit row and cache clear on
+  already-committed data. `ImportApply` now treats a fresh non-dry-run summary as
+  committed and proceeds to audit + `clearCache` regardless of a late error;
+  `runReconcile` deletes any stale summary before running (the preview's dry-run
+  summary shared the dir); and python writes the summary FIRST post-commit with
+  the log/summary writes wrapped so they can't flip the exit code. The audit
+  write is no longer fire-and-forget — a failure is logged (data is committed).
+- **Skipped datasets surfaced (was a silent no-op import).** A misfiled / wrong-
+  columns CSV was "skipped" with all-zero counts, yet the page showed
+  "✓ Import committed" and the freshness clock was reset. The tool now returns a
+  per-dataset `skipped` flag (excluded from the totals sum so the Totals row
+  still unmarshals as counts), the preview + done pages show a ⚠ warning when any
+  dataset was skipped, and the freshness stamp is only written when at least one
+  dataset actually reconciled (an all-skipped run no longer masks stale data).
+  Verified against real python: a misfiled gps file → `gps.skipped=true`, others
+  still stamp; all-four misfiled → no `import_meta` stamp at all.
+- **Discard / prune no longer race a running apply.** `ImportDiscard` and
+  `pruneStaleStaging` now take `importMu` (TryLock) before deleting a staging
+  dir, so they can't pull files out from under a concurrent apply.
+- **Freshness-stamp honesty.** The console sidebar foot rendered a separate
+  "Data refreshed" stamp from `consoleBase` map keys whose tooltip claimed the
+  daily import was the only writer (wrong since web uploads also stamp). It now
+  renders via the same `dataFreshness` func as the topbar — unified "Data
+  updated" wording + a correct tooltip naming both sources — and the
+  `DataRefreshed`/`DataStale` plumbing is removed from `consoleBase`.
+
+New tests: `TestImportApplyCommittedDespiteToolError` (committed summary + late
+error → done page + audit row), `TestImportSkippedDatasetWarns` (skipped flag
+raises the warning). Preview live-checked: all console pages 200, both freshness
+stamps render with the corrected tooltip, no JS errors.
+
+**Deferred (by-design or low-priority, candidates for an attended pass):** a
+valid upload of genuinely-old exports still stamps "now" (a valid sync *is* a
+refresh — only the all-skipped no-op case is now guarded); the midday-apply
+SQLite write-lock window (inherent to moving the import into business hours —
+officers briefly see "database is locked" flashes); the per-render freshness
+double-query (review rated trivial — single-row PK lookups under WAL); the
+Windows `python3` Store-stub `LookPath` trap (dev-only; ptr1 is Linux); and the
+report-header inline stamp variants (correct, just not yet a shared partial).

@@ -37,7 +37,7 @@
       <span class="spacer"></span>
       <a href="/" class="back" title="Back to the Client Tracker"><span class="ico">←</span><span class="label">Client Tracker</span></a>
     </nav>
-    <div class="foot">Knox County Pre-Trial<br>Case Management Console{{if .DataRefreshed}}<br><span{{if .DataStale}} style="color:var(--warn-ink);font-weight:600"{{end}} title="When the daily SharePoint import last wrote this database">{{if .DataStale}}⚠ {{end}}Data refreshed {{.DataRefreshed}}</span>{{end}}</div>
+    <div class="foot">Knox County Pre-Trial<br>Case Management Console{{with dataFreshness}}{{if .OK}}<br><span{{if .Stale}} style="color:var(--warn-ink);font-weight:600"{{end}} title="Last time data entered this database ({{.Mode}}) — the daily SharePoint import or a web CSV upload">{{if .Stale}}⚠ {{end}}Data updated {{.Label}}</span>{{end}}{{end}}</div>
   </aside>
 
   <div class="cmain">

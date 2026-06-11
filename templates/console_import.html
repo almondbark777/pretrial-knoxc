@@ -54,6 +54,7 @@
 {{if eq .Mode "preview"}}
 <div class="panel">
   <div class="h"><h2>Preview — nothing written yet</h2><span class="grow"></span>{{if .AddsOnly}}<span class="chip info">adds only</span>{{end}}<span class="chip neutral">run {{.Sum.RunID}}</span></div>
+  {{if .Skipped}}<div class="pad" style="padding-bottom:0;color:var(--risk-ink);font-weight:600">⚠ One or more files didn&rsquo;t match the expected columns and were skipped (0 rows). Check you uploaded the right export in each slot before applying.</div>{{end}}
   <div class="tscroll">
     <table class="data">
       <thead><tr><th>Dataset</th><th>New rows</th><th>Field updates</th><th>Unchanged</th><th>Blanks kept</th><th>CSV dups</th><th>In SQL only (kept)</th></tr></thead>
@@ -84,6 +85,7 @@
 {{if eq .Mode "done"}}
 <div class="panel">
   <div class="h"><h2>✓ Import committed</h2><span class="grow"></span>{{if .AddsOnly}}<span class="chip info">adds only</span>{{end}}<span class="chip ok">run {{.Sum.RunID}}</span></div>
+  {{if .Skipped}}<div class="pad" style="padding-bottom:0;color:var(--risk-ink);font-weight:600">⚠ One or more files were skipped (0 rows) — they didn&rsquo;t match the expected columns. If that wasn&rsquo;t intended, re-upload the correct export for the skipped dataset(s).</div>{{end}}
   <div class="tscroll">
     <table class="data">
       <thead><tr><th>Dataset</th><th>New rows</th><th>Field updates</th><th>Unchanged</th><th>Blanks kept</th><th>CSV dups</th><th>In SQL only (kept)</th></tr></thead>
