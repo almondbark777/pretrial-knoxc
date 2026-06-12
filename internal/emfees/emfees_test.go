@@ -26,6 +26,9 @@ func TestParseDate(t *testing.T) {
 		{"5/8/2026", true, 2026, 5, 8},
 		{"5/8/2026 14:30", true, 2026, 5, 8}, // trailing time-of-day dropped
 		{"12/31/2025", true, 2025, 12, 31},
+		{"2026-05-08", true, 2026, 5, 8},           // canonical ISO (reconcile tool)
+		{"2026-5-8", true, 2026, 5, 8},             // ISO without leading zeros
+		{"2026-05-08T00:00:00Z", true, 2026, 5, 8}, // ISO with time-of-day dropped
 		{"", false, 0, 0, 0},
 		{"   ", false, 0, 0, 0},
 		{"not-a-date", false, 0, 0, 0},
@@ -184,6 +187,75 @@ func TestJunkAndNoTypeSkipped(t *testing.T) {
 	}
 	if res.SkippedNoType != 1 {
 		t.Fatalf("SkippedNoType=%d want 1", res.SkippedNoType)
+	}
+}
+
+// reliefRow is a 48-hour row that also records a "Switched To"/"Switched GPS Date".
+func reliefRow(idn, name, caseNo, status, gtype, install, switchedTo, switchDate string) map[string]string {
+	r := gpsRow(idn, name, caseNo, status, gtype, install)
+	r["switched_to"] = switchedTo
+	r["switched_gps_date"] = switchDate
+	return r
+}
+
+func TestComputeReliefSwitchFreezesBilling(t *testing.T) {
+	// Off GPS / relieved on Apr 15 — billing must FREEZE there, not run to as-of
+	// (May 1). Apr 1 -> Apr 15 inclusive = 15 days at $8 = $120, not 31 days/$248.
+	gps := []map[string]string{
+		reliefRow("1", "ABSHER, KELLY", "@100", "OPEN", "ALLIED", "4/1/2026", "No GPS", "4/15/2026"),
+	}
+	res := Compute(gps, nil, nil, asOf("5/1/2026"))
+	if len(res.Open) != 1 {
+		t.Fatalf("open=%d want 1", len(res.Open))
+	}
+	r := res.Open[0]
+	if r.Days != 15 || r.Owed != 120 || r.Behind != 120 {
+		t.Fatalf("relief freeze: days=%d owed=%v behind=%v want 15/120/120", r.Days, r.Owed, r.Behind)
+	}
+	if !r.End.Equal(d("4/15/2026")) {
+		t.Fatalf("relief freeze end=%v want 4/15/2026", r.End)
+	}
+}
+
+func TestComputeReliefSwitchPaidUpDropsOffList(t *testing.T) {
+	// The reported scenario: relieved Apr 15, paid through the frozen window. With
+	// the freeze she is within threshold and drops off; without it she'd still owe
+	// days she was never on a device and stay on the past-due list (the PTR1 bug).
+	gps := []map[string]string{
+		reliefRow("1", "ABSHER, KELLY", "@100", "OPEN", "SCRAM", "4/1/2026", "No GPS", "4/15/2026"),
+	}
+	pays := []map[string]string{payRow("1", "@100", "SCRAM", "225", "4/16/2026")} // 15d*15 = 225 (paid up)
+	res := Compute(gps, pays, nil, asOf("6/1/2026"))
+	if len(res.Open) != 0 {
+		t.Fatalf("paid-up relieved client should drop off, got %+v", res.Open)
+	}
+}
+
+func TestComputeRealDeviceSwitchNotFrozen(t *testing.T) {
+	// A genuine ALLIED->SCRAM switch is NOT a relief — billing runs to as-of and
+	// dual-bills across the switch date. Apr 1 install ALLIED, switch SCRAM Apr 25,
+	// as-of May 15: pre 10*8=80, switch day 8+15=23, post 20*15=300 => 403 / 31 days.
+	gps := []map[string]string{
+		reliefRow("1", "ROE, RICH", "@100", "OPEN", "ALLIED", "4/15/2026", "SCRAM", "4/25/2026"),
+	}
+	res := Compute(gps, nil, nil, asOf("5/15/2026"))
+	if len(res.Open) != 1 {
+		t.Fatalf("open=%d want 1", len(res.Open))
+	}
+	if r := res.Open[0]; r.Days != 31 || r.Owed != 403 || !r.HasSwitch {
+		t.Fatalf("device switch should dual-bill to as-of: %+v", r)
+	}
+}
+
+func TestComputeReliefSwitchOutsideWindowIgnored(t *testing.T) {
+	// Relief date after the period end (a stale/future entry) must not shorten the
+	// window — billing runs to as-of as normal. Apr 1 -> May 1 = 31 days * 8 = 248.
+	gps := []map[string]string{
+		reliefRow("1", "LATE, LARRY", "@100", "OPEN", "ALLIED", "4/1/2026", "off GPS", "6/1/2026"),
+	}
+	res := Compute(gps, nil, nil, asOf("5/1/2026"))
+	if len(res.Open) != 1 || res.Open[0].Days != 31 || res.Open[0].Owed != 248 {
+		t.Fatalf("out-of-window relief should be ignored: %+v", res.Open)
 	}
 }
 

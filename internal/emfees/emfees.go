@@ -45,6 +45,16 @@ func rate(gpsType string) (int, bool) {
 	return 0, false
 }
 
+// reliefSwitchRe matches a "Switched To" value that means the client is no longer
+// on a device — "No GPS", "off GPS", "GPS relieved", "removed". Identical to the
+// canonical tracker's _isReliefSwitch (and compute.reRelief), so the EM-fee report
+// freezes billing on relief the same way the client tracker does.
+var reliefSwitchRe = regexp.MustCompile(`\bno\s*gps\b|\bgps\s*reliev|\boff\s*gps\b|\bgps\s*off\b|\bremov`)
+
+func isReliefSwitch(switchedTo string) bool {
+	return reliefSwitchRe.MatchString(strings.ToLower(strings.TrimSpace(switchedTo)))
+}
+
 // daysBehindThreshold: 5+ days behind triggers a memo.
 const daysBehindThreshold = 5
 
@@ -106,12 +116,20 @@ func parseDate(value string) (time.Time, bool) {
 	if s == "" {
 		return time.Time{}, false
 	}
-	s = strings.SplitN(s, " ", 2)[0] // drop any trailing time-of-day
-	t, err := time.ParseInLocation("1/2/2006", s, time.UTC)
-	if err != nil {
-		return time.Time{}, false
+	// Drop any trailing time-of-day, whether space- or 'T'-separated
+	// ("5/11/2026 1:00", "2026-05-11T00:00:00Z").
+	if i := strings.IndexAny(s, " T"); i > 0 {
+		s = s[:i]
 	}
-	return t, true
+	// Accept both the US export format and canonical ISO. The daily importer keeps
+	// US ("5/11/2026"); the reconcile tool canonicalizes to ISO ("2026-05-11"), so
+	// the report must read both or it would silently skip ISO-stored rows.
+	for _, layout := range []string{"1/2/2006", "2006-1-2"} {
+		if t, err := time.ParseInLocation(layout, s, time.UTC); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // parseAmount parses "$1,234.00" → 1234.0; blank/invalid → 0.0.
@@ -319,6 +337,19 @@ func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Resu
 			}
 		} else {
 			end = asOf
+		}
+		// GPS relieved: when the row records the client is off the device
+		// ("Switched To" = "No GPS" / "off GPS" / "removed") with a valid switch
+		// date inside the billing window, billing FREEZES at that date — days stop
+		// counting after it. Mirrors the canonical computeGPS relief-switch rule so
+		// the report agrees with the client tracker (e.g. a client moved to plea
+		// SCRAM stops accruing EM fees). A relief row carries no billable rate, so
+		// it only shortens the window; real ALLIED/SCRAM device switches below still
+		// dual-bill across their switch date as before.
+		if reliefDate, rok := parseDate(r["switched_gps_date"]); rok &&
+			isReliefSwitch(get(r, "switched_to")) &&
+			!reliefDate.Before(install) && reliefDate.Before(end) {
+			end = reliefDate
 		}
 		if daysBetween(install, end) < 0 {
 			continue
