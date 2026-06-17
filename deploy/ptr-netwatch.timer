@@ -1,0 +1,14 @@
+# Fires the network watchdog every minute. Install at
+# /etc/systemd/system/ptr-netwatch.timer then:
+#   systemctl enable --now ptr-netwatch.timer
+# Not Persistent — this is a live connectivity check, no point catching up.
+[Unit]
+Description=Run the PTR network watchdog every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

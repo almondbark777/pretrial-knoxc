@@ -1,0 +1,9 @@
+# Network watchdog for ptr1's building-WiFi uplink. Install at
+# /etc/systemd/system/ptr-netwatch.service. Runs as root (needs `ip link`,
+# `networkctl`, and `systemctl restart`). Paired with the .timer (every minute).
+[Unit]
+Description=PTR network watchdog (alert + self-heal flaky WiFi uplink)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ptr-netwatch.sh
