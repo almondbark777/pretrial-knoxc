@@ -797,3 +797,28 @@ officers briefly see "database is locked" flashes); the per-render freshness
 double-query (review rated trivial — single-row PK lookups under WAL); the
 Windows `python3` Store-stub `LookPath` trap (dev-only; ptr1 is Linux); and the
 report-header inline stamp variants (correct, just not yet a shared partial).
+
+## 2026-06-17 · Dashboard feed → "New Referrals (past 24h)" + roster default sort
+
+Two requested tweaks, both live-verified, full suite green.
+
+1. **Dashboard feed repurposed.** The left panel was "Alerts Needing Attention"
+   (behind-on-GPS + missed-check-in + violation rosters). It's now **"New
+   Referrals · Past 24 Hours"** — clients whose referral date falls in the
+   rolling 24h window (in day terms: yesterday or today, `track-1 ≤ RefD ≤
+   track`; future-dated referrals are excluded), newest first, capped at 40 with
+   the same honest "showing N of M" note (now linking to Clients, not
+   Compliance). The behind/missed/violation rosters still drive the KPIs and the
+   Compliance page — only the *feed* changed. VM fields renamed `Alerts`/
+   `AlertTotal` → `Referrals`/`ReferralTotal`, `ConsoleAlert` → `ConsoleReferral`
+   (carries a `ref time.Time` sort key). Tests `TestConsoleDashboardReferralMine`
+   (officer attribution + stale-referral exclusion), `TestConsoleDashboardReferralCap`
+   (40-cap + pre-cap total).
+2. **Clients roster defaults to referral date, latest on top.** New **Referred**
+   column (data-col 5, between Status and Next Court), populated from `RefD` with
+   an ISO sort key (`rds`; `""` when undated so it sinks to the bottom under the
+   default descending sort). Client-side windowing now initializes `sortCol=5,
+   sortDir=-1`; header ships pre-marked `aria-sort="descending"`. Server-side
+   `consoleClientRows` sorts the same way so the no-JS path matches. CSV export
+   gained the column. Tests updated: `TestRosterRowsJSON` (rd/rds keys),
+   `TestConsoleClientRowsDateSortKeys` (referral key ISO-or-empty).

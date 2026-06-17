@@ -93,15 +93,16 @@ type ConsoleKPIs struct {
 	OverdueCheckIns int // missed a required check-in this month (Stats.MissedMonth)
 }
 
-// ConsoleAlert is one row in the alert feed.
-type ConsoleAlert struct {
+// ConsoleReferral is one row in the "new referrals" feed: a client referred
+// within the past 24 hours. Newest first.
+type ConsoleReferral struct {
 	IDN     string
 	Name    string
 	Context string
 	Chip    Chip
-	Icon    string // severity glyph on the rail
-	Mine    bool   // belongs to the signed-in officer's caseload
-	sev     int    // sort key (higher = more urgent)
+	Icon    string    // glyph on the rail
+	Mine    bool      // belongs to the signed-in officer's caseload
+	ref     time.Time // referral date — sort key (newer = higher)
 }
 
 // ConsoleSched is one row in today's schedule.
@@ -114,15 +115,15 @@ type ConsoleSched struct {
 	Mine  bool
 }
 
-// ConsoleDashboard is the whole "My Caseload" view-model. AlertTotal is the
-// pre-cap alert count — the feed shows the 40 most urgent, and the header must
-// say so honestly when there are more.
+// ConsoleDashboard is the whole "My Caseload" view-model. ReferralTotal is the
+// pre-cap count — the feed shows the 40 most recent referrals, and the header
+// must say so honestly when there are more.
 type ConsoleDashboard struct {
-	AsOf       string
-	KPIs       ConsoleKPIs
-	Alerts     []ConsoleAlert
-	AlertTotal int
-	Schedule   []ConsoleSched
+	AsOf          string
+	KPIs          ConsoleKPIs
+	Referrals     []ConsoleReferral
+	ReferralTotal int
+	Schedule      []ConsoleSched
 }
 
 // consoleDashboard assembles the dashboard. It leans on the existing roster
@@ -139,11 +140,10 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 		return officerLC != "" && strings.ToLower(strings.TrimSpace(o)) == officerLC
 	}
 
-	// Compute the two heavy rosters ONCE and reuse them for both the KPI counts
-	// and the alert feed (they were previously computed twice per dashboard load:
-	// once inside computeStats, once for the alerts). rosterStateCounts covers the
-	// cheap state tallies without another roster pass.
-	behind := behindRoster(clients, track)
+	// Compute the missed-check-in roster ONCE for the KPI count. (The behind-on-GPS
+	// and violation rosters still power the Compliance page; the dashboard feed now
+	// shows new referrals instead of compliance alerts.) rosterStateCounts covers
+	// the cheap state tallies without another roster pass.
 	missed := missedCheckInsRoster(clients, track)
 	d.KPIs.ActiveClients = rosterStateCounts(clients).Open
 	d.KPIs.OverdueCheckIns = len(missed)
@@ -207,44 +207,38 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 
 	d.KPIs.OpenViolations = len(violations)
 
-	// ── Alert feed ── behind-on-GPS + missed-check-in rosters drive it (real data),
-	// plus any recorded violations. Sorted by severity, then name.
-	for _, r := range behind {
-		d.Alerts = append(d.Alerts, ConsoleAlert{
-			IDN: r.IDN, Name: r.Name, Context: titleCase(r.Detail) + " · " + r.Officer,
-			Chip: Chip{Tone: "risk", Icon: "⚠", Label: "Behind on GPS"}, Icon: "⚠",
-			Mine: mine(r.Officer), sev: 30,
-		})
-	}
-	for _, r := range missed {
-		d.Alerts = append(d.Alerts, ConsoleAlert{
-			IDN: r.IDN, Name: r.Name, Context: titleCase(r.Detail) + " · " + r.Officer,
-			Chip: Chip{Tone: "risk", Icon: "⚠", Label: "Missed check-in"}, Icon: "⚠",
-			Mine: mine(r.Officer), sev: 20,
-		})
-	}
-	for _, v := range violations {
-		nm := nameFor(clients, v.IDN)
-		ctx := strings.TrimSpace(v.Category + " " + v.Description)
-		if ctx == "" {
-			ctx = "Violation recorded"
+	// ── New-referrals feed ── clients referred within the past 24 hours (in
+	// day terms: yesterday or today), newest first. This replaces the old
+	// compliance-alert feed — officers want the freshest intakes front-and-center
+	// to assign + set the first check-in. The behind/missed/violation rosters
+	// still feed the KPIs and the Compliance page.
+	cutoff := track.AddDate(0, 0, -1) // 24h window (referral dates are day-granular)
+	for _, cases := range clients {
+		c := openRep(cases)
+		if c == nil || !c.RefOK || c.RefD.Before(cutoff) || c.RefD.After(track) {
+			continue
 		}
-		d.Alerts = append(d.Alerts, ConsoleAlert{
-			IDN: v.IDN, Name: nm, Context: clipText(ctx, 90),
-			Chip: Chip{Tone: "risk", Icon: "⚠", Label: "Violation"}, Icon: "⚠",
-			Mine: mine(officerForIDN(clients, v.IDN)), // attribute to the caseload (survives "My caseload")
-			sev:  40,
+		lvl, _ := compute.ParseLevel(c.Level)
+		officer := strings.TrimSpace(c.Officer)
+		if officer == "" {
+			officer = "Unassigned"
+		}
+		d.Referrals = append(d.Referrals, ConsoleReferral{
+			IDN: c.IDN, Name: c.Name,
+			Context: "Referred " + c.RefD.Format("Jan 2") + " · " + officer,
+			Chip:    levelChip(lvl), Icon: "＋",
+			Mine: mine(c.Officer), ref: c.RefD,
 		})
 	}
-	sort.SliceStable(d.Alerts, func(i, j int) bool {
-		if d.Alerts[i].sev != d.Alerts[j].sev {
-			return d.Alerts[i].sev > d.Alerts[j].sev
+	sort.SliceStable(d.Referrals, func(i, j int) bool {
+		if !d.Referrals[i].ref.Equal(d.Referrals[j].ref) {
+			return d.Referrals[i].ref.After(d.Referrals[j].ref) // newest first
 		}
-		return strings.ToUpper(d.Alerts[i].Name) < strings.ToUpper(d.Alerts[j].Name)
+		return strings.ToUpper(d.Referrals[i].Name) < strings.ToUpper(d.Referrals[j].Name)
 	})
-	d.AlertTotal = len(d.Alerts)
-	if len(d.Alerts) > 40 {
-		d.Alerts = d.Alerts[:40]
+	d.ReferralTotal = len(d.Referrals)
+	if len(d.Referrals) > 40 {
+		d.Referrals = d.Referrals[:40]
 	}
 	sort.SliceStable(d.Schedule, func(i, j int) bool {
 		return strings.ToUpper(d.Schedule[i].Title) < strings.ToUpper(d.Schedule[j].Title)
@@ -269,6 +263,8 @@ type ConsoleClientRow struct {
 	NextCheckIn     string
 	NextCheckInSort string // ISO key so the column sorts chronologically
 	CheckInOverdue  bool
+	Referred        string // referral date (display)
+	ReferredSort    string // ISO key; "" when none, so the default newest-first sort drops it to the bottom
 	Compliance      Chip
 	GpsActive       bool
 	// lowercase blobs for client-side filtering
@@ -308,19 +304,33 @@ func consoleClientRows(clients map[string][]*compute.Client, track time.Time, co
 		if nextCourt == "" {
 			nextCourt, nextCourtSort = "—", blankDateSort
 		}
+		// Referral date. Missing → "—" display with an empty ISO key so the
+		// roster's default newest-first sort lands undated referrals at the bottom.
+		referred, referredSort := "—", ""
+		if c.RefOK {
+			referred = c.RefD.Format("Jan 2, 2006")
+			referredSort = c.RefD.Format("2006-01-02")
+		}
 		row := ConsoleClientRow{
 			IDN: idn, Name: c.Name, Initials: Initials(c.Name), CaseNo: dash(c.CaseNo),
 			Level: lvl, LevelChip: levelChip(lvl), StatusChip: statusChip(c.Status),
 			Officer: dash(c.Officer), NextCourt: nextCourt, NextCourtSort: nextCourtSort,
 			NextCheckIn: nextCI, NextCheckInSort: nextCISort,
 			CheckInOverdue: overdue,
-			Compliance:     complianceChip(behind[idn], missed[idn], len(reportedMissed(c, ci)), true),
-			GpsActive:      c.GpsActive,
+			Referred:       referred, ReferredSort: referredSort,
+			Compliance: complianceChip(behind[idn], missed[idn], len(reportedMissed(c, ci)), true),
+			GpsActive:  c.GpsActive,
 		}
 		row.Search = strings.ToLower(c.Name + " " + idn + " " + c.CaseNo + " " + c.Officer)
 		rows = append(rows, row)
 	}
+	// Default order: newest referral first (the client-side roster re-applies the
+	// same default, so this also covers the no-JS path). Undated referrals carry an
+	// empty key and fall to the bottom; ties break alphabetically.
 	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].ReferredSort != rows[j].ReferredSort {
+			return rows[i].ReferredSort > rows[j].ReferredSort
+		}
 		return strings.ToUpper(rows[i].Name) < strings.ToUpper(rows[j].Name)
 	})
 	return rows
@@ -341,6 +351,8 @@ type rosterJSONRow struct {
 	Ci  string `json:"ci"`  // next check-in (display)
 	Cis string `json:"cis"` // next check-in (ISO sort key)
 	Ov  bool   `json:"ov"`  // check-in overdue
+	Rd  string `json:"rd"`  // referred (display)
+	Rds string `json:"rds"` // referred (ISO sort key; "" when none)
 	Cm  string `json:"cm"`  // compliance chip label
 	G   bool   `json:"g"`   // gps active
 	O   string `json:"o"`   // officer (display)
@@ -358,6 +370,7 @@ func rosterRowsJSON(rows []ConsoleClientRow) template.JS {
 			I: r.IDN, N: r.Name, A: r.Initials, C: r.CaseNo, L: r.Level,
 			St: r.StatusChip.Label, Nc: r.NextCourt, Ncs: r.NextCourtSort,
 			Ci: r.NextCheckIn, Cis: r.NextCheckInSort, Ov: r.CheckInOverdue,
+			Rd: r.Referred, Rds: r.ReferredSort,
 			Cm: r.Compliance.Label, G: r.GpsActive, O: r.Officer, S: r.Search,
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -36,20 +37,19 @@ func TestConsoleDashboardParity(t *testing.T) {
 	if dash.KPIs.OpenViolations != 0 {
 		t.Errorf("OpenViolations = %d, want 0 (no violations passed)", dash.KPIs.OpenViolations)
 	}
-	// Alerts are capped at 40 and sorted by severity (descending).
-	if len(dash.Alerts) > 40 {
-		t.Errorf("alerts not capped: %d", len(dash.Alerts))
+	// The new-referrals feed is capped at 40, ReferralTotal carries the true
+	// pre-cap count, and rows are sorted newest-first.
+	if len(dash.Referrals) > 40 {
+		t.Errorf("referrals not capped: %d", len(dash.Referrals))
 	}
-	for i := 1; i < len(dash.Alerts); i++ {
-		if dash.Alerts[i-1].sev < dash.Alerts[i].sev {
-			t.Errorf("alerts not sorted by severity at %d", i)
+	if dash.ReferralTotal < len(dash.Referrals) {
+		t.Errorf("ReferralTotal %d < shown %d", dash.ReferralTotal, len(dash.Referrals))
+	}
+	for i := 1; i < len(dash.Referrals); i++ {
+		if dash.Referrals[i-1].ref.Before(dash.Referrals[i].ref) {
+			t.Errorf("referrals not sorted newest-first at %d", i)
 			break
 		}
-	}
-	// Every behind-roster client appears as a risk alert (until the 40 cap).
-	behind := behindRoster(clients, adminTrack)
-	if len(behind) > 0 && len(dash.Alerts) == 0 {
-		t.Errorf("behind roster has %d but no alerts surfaced", len(behind))
 	}
 }
 
@@ -91,28 +91,35 @@ func TestConsoleDashboardCourtMine(t *testing.T) {
 	}
 }
 
-// Same attribution rule for violation alerts: a violation on an officer's own
-// client must be Mine so it survives the "My caseload" filter.
-func TestConsoleDashboardViolationMine(t *testing.T) {
+// A new-referral feed row must be attributed to the client's supervising officer
+// so it survives the "My caseload" filter (which hides rows with Mine=false).
+func TestConsoleDashboardReferralMine(t *testing.T) {
 	track := compute.Noon(2026, 6, 1)
 	clients := map[string][]*compute.Client{
 		"1": {{IDN: "1", Name: "Client One", Status: "Open", Officer: "Alice Smith",
-			Level: "2", RefD: compute.Noon(2026, 1, 1), RefOK: true}},
+			Level: "2", RefD: track, RefOK: true}}, // referred today → in the 24h window
 	}
-	viols := []models.Violation{{IDN: "1", Category: "Curfew", Description: "late"}}
-	violAlert := func(d ConsoleDashboard) *ConsoleAlert {
-		for i := range d.Alerts {
-			if d.Alerts[i].Chip.Label == "Violation" {
-				return &d.Alerts[i]
+	refRow := func(d ConsoleDashboard) *ConsoleReferral {
+		for i := range d.Referrals {
+			if d.Referrals[i].IDN == "1" {
+				return &d.Referrals[i]
 			}
 		}
 		return nil
 	}
-	if a := violAlert(consoleDashboard(clients, track, nil, viols, nil, "Alice Smith")); a == nil || !a.Mine {
-		t.Errorf("violation alert should be Mine for the supervising officer, got %+v", a)
+	if a := refRow(consoleDashboard(clients, track, nil, nil, nil, "Alice Smith")); a == nil || !a.Mine {
+		t.Errorf("referral should be Mine for the supervising officer, got %+v", a)
 	}
-	if a := violAlert(consoleDashboard(clients, track, nil, viols, nil, "Bob Jones")); a == nil || a.Mine {
-		t.Errorf("violation alert should not be Mine for a different officer, got %+v", a)
+	if a := refRow(consoleDashboard(clients, track, nil, nil, nil, "Bob Jones")); a == nil || a.Mine {
+		t.Errorf("referral should not be Mine for a different officer, got %+v", a)
+	}
+	// A referral older than 24 hours (in day terms) must NOT appear in the feed.
+	stale := map[string][]*compute.Client{
+		"2": {{IDN: "2", Name: "Old Referral", Status: "Open", Officer: "Alice Smith",
+			Level: "2", RefD: compute.Noon(2026, 5, 1), RefOK: true}},
+	}
+	if d := consoleDashboard(stale, track, nil, nil, nil, ""); len(d.Referrals) != 0 {
+		t.Errorf("stale referral leaked into the 24h feed: %d rows", len(d.Referrals))
 	}
 }
 
@@ -206,6 +213,15 @@ func TestConsoleClientRowsDateSortKeys(t *testing.T) {
 		if (r.NextCheckIn == "—") != (r.NextCheckInSort == blankDateSort) {
 			t.Errorf("IDN %s check-in display/sort disagree: %q / %q", r.IDN, r.NextCheckIn, r.NextCheckInSort)
 		}
+		// Referred carries an ISO key, or "" when there is no referral date (so the
+		// roster's default newest-first sort drops it to the bottom).
+		if r.Referred == "—" {
+			if r.ReferredSort != "" {
+				t.Errorf("IDN %s: no referral but ReferredSort=%q", r.IDN, r.ReferredSort)
+			}
+		} else if !iso.MatchString(r.ReferredSort) {
+			t.Errorf("IDN %s ReferredSort=%q not ISO-sortable", r.IDN, r.ReferredSort)
+		}
 		// No court map was supplied, so every Next Court is blank → sentinel.
 		if r.NextCourt != "—" || r.NextCourtSort != blankDateSort {
 			t.Errorf("IDN %s expected blank court cell, got %q / %q", r.IDN, r.NextCourt, r.NextCourtSort)
@@ -286,6 +302,7 @@ func TestRosterRowsJSON(t *testing.T) {
 		{IDN: "1", Name: "ABBOTT <b>", Initials: "AB", CaseNo: "@1", Level: 3,
 			StatusChip: Chip{Label: "Active"}, NextCourt: "Jan 2", NextCourtSort: "2026-01-02",
 			NextCheckIn: "Jun 5", NextCheckInSort: "2026-06-05", CheckInOverdue: true,
+			Referred: "Jan 1, 2026", ReferredSort: "2026-01-01",
 			Compliance: Chip{Label: "Behind on GPS"}, GpsActive: true, Officer: "Alice Smith",
 			Search: "abbott 1 @1 alice smith"},
 	}
@@ -307,6 +324,7 @@ func TestRosterRowsJSON(t *testing.T) {
 	for k, want := range map[string]string{
 		"i": "1", "n": "ABBOTT <b>", "a": "AB", "c": "@1", "st": "Active",
 		"nc": "Jan 2", "ncs": "2026-01-02", "ci": "Jun 5", "cis": "2026-06-05",
+		"rd": "Jan 1, 2026", "rds": "2026-01-01",
 		"cm": "Behind on GPS", "o": "Alice Smith", "s": "abbott 1 @1 alice smith",
 	} {
 		if r[k] != want {
@@ -321,21 +339,22 @@ func TestRosterRowsJSON(t *testing.T) {
 	}
 }
 
-// The alert feed shows at most the 40 most urgent rows, but AlertTotal must
+// The referral feed shows at most the 40 most recent rows, but ReferralTotal must
 // carry the real pre-cap count so the dashboard can say "40 of N" honestly.
-func TestConsoleDashboardAlertCap(t *testing.T) {
+func TestConsoleDashboardReferralCap(t *testing.T) {
 	track := compute.Noon(2026, 6, 10)
 	clients := map[string][]*compute.Client{}
-	var viols []models.Violation
 	for i := 0; i < 55; i++ {
-		viols = append(viols, models.Violation{IDN: "1", Category: "Other", Description: "x"})
+		idn := strconv.Itoa(i)
+		clients[idn] = []*compute.Client{{IDN: idn, Name: "Client " + idn, Status: "Open",
+			Level: "1", RefD: track, RefOK: true}} // all referred today
 	}
-	d := consoleDashboard(clients, track, nil, viols, nil, "")
-	if len(d.Alerts) != 40 {
-		t.Errorf("alerts shown = %d, want capped at 40", len(d.Alerts))
+	d := consoleDashboard(clients, track, nil, nil, nil, "")
+	if len(d.Referrals) != 40 {
+		t.Errorf("referrals shown = %d, want capped at 40", len(d.Referrals))
 	}
-	if d.AlertTotal != 55 {
-		t.Errorf("AlertTotal = %d, want 55 (the pre-cap count)", d.AlertTotal)
+	if d.ReferralTotal != 55 {
+		t.Errorf("ReferralTotal = %d, want 55 (the pre-cap count)", d.ReferralTotal)
 	}
 }
 

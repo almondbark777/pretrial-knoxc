@@ -39,17 +39,17 @@
 
 <div class="grid2">
   <div class="panel">
-    <div class="h"><h2>Alerts Needing Attention</h2><span class="grow"></span><span class="count">{{$d.AlertTotal}}</span></div>
-    {{if gt $d.AlertTotal (len $d.Alerts)}}<div class="muted" style="padding:8px 18px 0;font-size:12px">Showing the {{len $d.Alerts}} most urgent of {{$d.AlertTotal}} — full rosters in <a href="/console/compliance">Compliance</a>.</div>{{end}}
-    <div class="body" id="alertfeed">
-      {{range $d.Alerts}}
+    <div class="h"><h2>New Referrals · Past 24 Hours</h2><span class="grow"></span><span class="count">{{$d.ReferralTotal}}</span></div>
+    {{if gt $d.ReferralTotal (len $d.Referrals)}}<div class="muted" style="padding:8px 18px 0;font-size:12px">Showing the {{len $d.Referrals}} most recent of {{$d.ReferralTotal}} — full roster in <a href="/console/clients">Clients</a>.</div>{{end}}
+    <div class="body" id="referralfeed">
+      {{range $d.Referrals}}
       <div class="frow" data-mine="{{.Mine}}">
         <span class="rail {{.Chip.Tone}}">{{.Icon}}</span>
         <div class="grow"><div class="t"><a href="/console/clients/{{.IDN}}">{{.Name}}</a></div><div class="m">{{.Context}}</div></div>
         {{template "chip" .Chip}}
       </div>
       {{else}}
-      <div class="emptybox"><div class="big">✓</div>Nothing needs attention right now.</div>
+      <div class="emptybox"><div class="big">◯</div>No new referrals in the past 24 hours.</div>
       {{end}}
     </div>
   </div>
@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded',function(){
       var mine=b.dataset.scope==='mine';
       document.body.classList.toggle('scope-mine',mine);
       document.getElementById('ch1').textContent=mine?('My Caseload — '+(name||'me')):'Division Caseload';
-      if(mine){emptyNote('alertfeed');emptyNote('schedfeed');}
+      if(mine){emptyNote('referralfeed');emptyNote('schedfeed');}
       else{document.querySelectorAll('.scope-empty').forEach(function(n){n.style.display='none'});}
     });
   });

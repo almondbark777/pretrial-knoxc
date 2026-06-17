@@ -55,10 +55,11 @@
         <th data-col="2" data-type="text" scope="col" tabindex="0" aria-sort="none">Case # <span class="arr">↕</span></th>
         <th data-col="3" data-type="num" scope="col" tabindex="0" aria-sort="none">Level <span class="arr">↕</span></th>
         <th data-col="4" data-type="text" scope="col" tabindex="0" aria-sort="none">Status <span class="arr">↕</span></th>
-        <th data-col="5" data-type="text" scope="col" tabindex="0" aria-sort="none">Next Court <span class="arr">↕</span></th>
-        <th data-col="6" data-type="text" scope="col" tabindex="0" aria-sort="none">Next Check-in <span class="arr">↕</span></th>
-        <th data-col="7" data-type="text" scope="col" tabindex="0" aria-sort="none">Compliance <span class="arr">↕</span></th>
-        <th data-col="8" data-type="text" scope="col" tabindex="0" aria-sort="none">Officer <span class="arr">↕</span></th>
+        <th data-col="5" data-type="text" scope="col" tabindex="0" aria-sort="descending" class="sorted">Referred <span class="arr">▼</span></th>
+        <th data-col="6" data-type="text" scope="col" tabindex="0" aria-sort="none">Next Court <span class="arr">↕</span></th>
+        <th data-col="7" data-type="text" scope="col" tabindex="0" aria-sort="none">Next Check-in <span class="arr">↕</span></th>
+        <th data-col="8" data-type="text" scope="col" tabindex="0" aria-sort="none">Compliance <span class="arr">↕</span></th>
+        <th data-col="9" data-type="text" scope="col" tabindex="0" aria-sort="none">Officer <span class="arr">↕</span></th>
         <th scope="col" aria-label="Quick actions"></th>
       </tr></thead>
       {{/* Rows are windowed: only the visible page is rendered into the DOM by JS
@@ -150,7 +151,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')document.get
 
 document.addEventListener('DOMContentLoaded',function(){
   var PAGE=50, page=0, view=ROWS.slice(), sel=new Set(), pageRows=[];
-  var sortCol=null, sortDir=1;
+  var sortCol=5, sortDir=-1; // default: Referred, newest first
   var byId={}; ROWS.forEach(function(r){byId[r.i]=r});
 
   var tbody=document.getElementById('ctbody');
@@ -189,6 +190,7 @@ document.addEventListener('DOMContentLoaded',function(){
       +'<td>'+esc(r.c)+'</td>'
       +'<td>'+lvlChip(r.l)+'</td>'
       +'<td>'+statusChip(r.st)+'</td>'
+      +'<td>'+esc(r.rd)+'</td>'
       +'<td>'+esc(r.nc)+'</td>'
       +'<td'+(r.ov?' class="overdue"':'')+'>'+esc(r.ci)+(r.ov?' ⚠':'')+'</td>'
       +'<td>'+compChip(r.cm)+'</td>'
@@ -218,21 +220,19 @@ document.addEventListener('DOMContentLoaded',function(){
   function colGet(col){
     switch(col){case 1:return function(r){return r.n};case 2:return function(r){return r.c};
       case 3:return function(r){return r.l};case 4:return function(r){return r.st};
-      case 5:return function(r){return r.ncs};case 6:return function(r){return r.cis};
-      case 7:return function(r){return r.cm};case 8:return function(r){return r.o};
+      case 5:return function(r){return r.rds};case 6:return function(r){return r.ncs};
+      case 7:return function(r){return r.cis};case 8:return function(r){return r.cm};
+      case 9:return function(r){return r.o};
       default:return function(r){return r.n}}
   }
   function applySort(){
-    if(sortCol===null){ // default: overdue first, then name
-      view.sort(function(a,b){if(a.ov!==b.ov)return a.ov?-1:1;return a.s<b.s?-1:a.s>b.s?1:0});
-      return;
-    }
     var g=colGet(sortCol), num=(sortCol===3);
     view.sort(function(a,b){
       var x=g(a),y=g(b);
       if(num)return (parseFloat(x||0)-parseFloat(y||0))*sortDir;
       x=(''+x).toLowerCase(); y=(''+y).toLowerCase();
-      return (x<y?-1:x>y?1:0)*sortDir;
+      var c=(x<y?-1:x>y?1:0)*sortDir;
+      return c!==0?c:(a.s<b.s?-1:a.s>b.s?1:0); // stable tiebreak: name A→Z
     });
   }
 
@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded',function(){
     var start=page*PAGE, end=Math.min(start+PAGE,n);
     pageRows=view.slice(start,end);
     if(n===0){
-      tbody.innerHTML='<tr class="empty-row"><td colspan="10"><div class="empty-state"><div class="es-ic">🔍</div><div>No clients match your filters.</div><button type="button" class="btn ghost sm es-clear">Clear all filters</button></div></td></tr>';
+      tbody.innerHTML='<tr class="empty-row"><td colspan="11"><div class="empty-state"><div class="es-ic">🔍</div><div>No clients match your filters.</div><button type="button" class="btn ghost sm es-clear">Clear all filters</button></div></td></tr>';
     }else{
       var html=''; for(var i=start;i<end;i++)html+=rowHTML(view[i]);
       tbody.innerHTML=html;
@@ -344,8 +344,8 @@ document.addEventListener('DOMContentLoaded',function(){
   /* ── CSV export (from the data, no DOM scraping) ─────────────────────────── */
   function exportRows(list,tag){
     function q(s){s=(''+(s||'')).replace(/\s+/g,' ').trim();return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
-    var lines=[['Name','IDN','Case','Level','Status','Next Court','Next Check-in','Compliance','Officer'].join(',')];
-    list.forEach(function(r){lines.push([r.n,r.i,r.c,levelLabel(r.l),r.st,r.nc,r.ci,r.cm,r.o].map(q).join(','))});
+    var lines=[['Name','IDN','Case','Level','Status','Referred','Next Court','Next Check-in','Compliance','Officer'].join(',')];
+    list.forEach(function(r){lines.push([r.n,r.i,r.c,levelLabel(r.l),r.st,r.rd,r.nc,r.ci,r.cm,r.o].map(q).join(','))});
     var blob=new Blob([lines.join('\n')],{type:'text/csv'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);
     a.download='clients-'+(tag?tag+'-':'')+list.length+'.csv';document.body.appendChild(a);a.click();
