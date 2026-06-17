@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -102,6 +103,67 @@ func TestAddDefendantBondConditionsAndSupervision(t *testing.T) {
 	})
 	if got := addedField(t, d, none, "bond_conditions"); got != "" {
 		t.Errorf("bond_conditions with nothing checked = %q, want empty", got)
+	}
+}
+
+// The intake form's IDN autofill (/api/prefill) returns the identity + case
+// fields we already have for an existing person, with dates normalized to ISO for
+// the date inputs; an unknown IDN returns found:false.
+func TestAPIPrefill(t *testing.T) {
+	d := testDB(t)
+	srv := newServer(d)
+
+	idn := "999881234"
+	postAdd(t, srv, url.Values{
+		"defendant": {"PREFILL, PAT"}, "idn": {idn}, "warrant_case_num": {"@88123"},
+		"pretrial_level": {"2"}, "charge_type": {"Felony"}, "bond_amount": {"$25,000"},
+		"order_from": {"Magistrate"}, "birthdate": {"1990-05-15"}, "supervising_officer": {"Kathy Jones"},
+		"gps": {"true"}, "gps_type": {"ALLIED"}, "gps_install_date": {"2026-06-01"},
+	})
+
+	get := func(idn string) map[string]any {
+		req := httptest.NewRequest("GET", "/api/prefill?idn="+idn, nil)
+		rec := httptest.NewRecorder()
+		srv.APIPrefill(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("APIPrefill status = %d", rec.Code)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+			t.Fatalf("bad JSON: %v\n%s", err, rec.Body.String())
+		}
+		return m
+	}
+
+	g := get(idn)
+	if g["found"] != true {
+		t.Fatalf("found = %v, want true (body shape %v)", g["found"], g)
+	}
+	if g["name"] != "PREFILL, PAT" {
+		t.Errorf("name = %v", g["name"])
+	}
+	if g["bondAmount"] != "$25,000" || g["chargeType"] != "Felony" || g["orderFrom"] != "Magistrate" {
+		t.Errorf("case fields wrong: %+v", g)
+	}
+	if g["level"].(float64) != 2 {
+		t.Errorf("level = %v, want 2", g["level"])
+	}
+	if g["gps"] != true || g["gpsType"] != "ALLIED" {
+		t.Errorf("gps = %v / %v, want true/ALLIED", g["gps"], g["gpsType"])
+	}
+	// Dates come back as YYYY-MM-DD so the form's date inputs accept them.
+	isISO := func(v string) bool { return len(v) == 10 && v[4] == '-' && v[7] == '-' }
+	if bd, _ := g["birthdate"].(string); !isISO(bd) {
+		t.Errorf("birthdate = %q, want ISO YYYY-MM-DD", bd)
+	}
+	// gpsInstall is sourced from the GPS-events dataset (absent for an app-only
+	// client), so here it's empty — but when present it must be ISO.
+	if gi, _ := g["gpsInstall"].(string); gi != "" && !isISO(gi) {
+		t.Errorf("gpsInstall = %q, want empty or ISO", gi)
+	}
+
+	if u := get("000000099"); u["found"] != false {
+		t.Errorf("unknown IDN: found = %v, want false", u["found"])
 	}
 }
 

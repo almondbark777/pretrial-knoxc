@@ -231,6 +231,55 @@ func (s *Server) APIClient(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// APIPrefill powers the intake form's IDN autofill. Given ?idn=, it returns the
+// identity + case fields we already have for that person — from the same merged,
+// deduplicated client set every other view uses (blue book + app-added records) —
+// so an officer re-referring an existing defendant doesn't re-key what we already
+// know. Dates are normalized to YYYY-MM-DD for the form's date inputs; level is 0
+// when unknown. Returns {"found":false} for a brand-new IDN.
+// GET /api/prefill
+func (s *Server) APIPrefill(w http.ResponseWriter, r *http.Request) {
+	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
+	if idn == "" {
+		writeJSON(w, http.StatusOK, map[string]any{"found": false})
+		return
+	}
+	clients, err := s.clients()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	c := openRep(clients[idn])
+	if c == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"found": false})
+		return
+	}
+	iso := func(v string) string {
+		if t, ok := compute.ParseDay(strings.TrimSpace(v)); ok {
+			return t.Format("2006-01-02")
+		}
+		return ""
+	}
+	lvl, _ := compute.ParseLevel(c.Level)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"found":           true,
+		"name":            c.Name,
+		"birthdate":       iso(c.Birthdate),
+		"caseNo":          c.CaseNo,
+		"level":           lvl, // 0 = unknown
+		"chargeType":      c.ChargeType,
+		"bondAmount":      c.BondAmount,
+		"supervisionType": c.SupervisionType,
+		"orderFrom":       c.OrderFrom,
+		"dma":             c.DMA,
+		"officer":         c.Officer,
+		"status":          c.Status,
+		"gps":             c.GpsActive,
+		"gpsType":         strings.ToUpper(strings.TrimSpace(c.GpsType)),
+		"gpsInstall":      iso(c.GpInstall),
+	})
+}
+
 // ── Stats + case-grid bundles (JSON) ──────────────────────────────────────────
 
 func (s *Server) APIStats(w http.ResponseWriter, r *http.Request) {

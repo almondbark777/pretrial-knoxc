@@ -184,6 +184,7 @@ func main() {
 	r.Get("/calendar.html", legacyCalendarRedirect)
 	r.Get("/client_profile.html", legacyProfileRedirect)
 	r.Get("/api/lookup", srv.APILookup)
+	r.Get("/api/prefill", srv.APIPrefill) // intake IDN autofill (existing-person lookup)
 	r.Get("/api/clients", srv.APIClient)
 	r.Get("/api/stats", srv.APIStats)
 	r.Get("/api/defendants", srv.APIDefendants)

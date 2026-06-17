@@ -29,6 +29,8 @@
         <label>IDN <span class="req">*</span><input type="text" name="idn" data-req inputmode="numeric" placeholder="e.g. 1648023"></label>
         <label>Date of birth<input type="date" name="birthdate"></label>
       </div>
+      <div class="idnnote" id="idnNote" hidden></div>
+      <p class="muted" style="padding:0;margin:12px 0 0;font-size:12px">Enter the IDN first — if we already have this person, their details fill in automatically.</p>
     </section>
 
     <!-- ── Step 2 — Case & Level (warrant number + level on one screen) ───── -->
@@ -173,6 +175,8 @@ html[data-theme="dark"] .wchip.active{border-color:var(--accent);color:var(--acc
 .wpane input.invalid,.wpane select.invalid{border-color:var(--risk);box-shadow:0 0 0 3px var(--risk-bg)}
 .req{color:var(--risk)}
 .wcadence{margin-top:16px;padding:11px 14px;background:var(--info-bg);border:1px solid var(--info-line);border-radius:var(--r-sm);font-size:13px;color:var(--info-ink)}
+.idnnote{margin-top:14px;padding:11px 14px;border-radius:var(--r-sm);font-size:13px;border:1px solid var(--info-line);background:var(--info-bg);color:var(--info-ink)}
+.idnnote.miss{border-color:var(--line-2);background:var(--panel-2);color:var(--muted)}
 .wradio{display:flex;gap:10px;flex-wrap:wrap}
 .wopt{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;padding:12px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);cursor:pointer;font-size:13.5px;color:var(--ink);font-weight:600}
 .wopt input{width:auto;flex:0 0 auto}
@@ -261,6 +265,51 @@ document.addEventListener('DOMContentLoaded',function(){
   }catch(e){}
   // default referral date to today if blank (officer can change it)
   if(!form.referral_date.value){try{form.referral_date.value=new Date().toISOString().slice(0,10)}catch(e){}}
+
+  // ── IDN autofill: if we already have this person, pre-fill what we know ──────
+  var idnNote=document.getElementById('idnNote'), lastLookup='';
+  function fillEmpty(name,val){
+    var el=form[name]; if(!el||val==null||val==='')return;
+    if(typeof el.value==='string'&&!el.value.trim())el.value=val; // never clobber a typed value
+  }
+  function fillSelect(name,val){
+    var el=form[name]; if(!el||val==null||val===''||(el.value||'').trim()!=='')return; // respect a chosen option
+    var v=String(val);
+    [].forEach.call(el.options,function(o){if(o.value===v||o.text===v)el.value=o.value});
+  }
+  function lookupIDN(){
+    var idn=(form.idn.value||'').trim();
+    if(idn.length<3){if(idnNote){idnNote.hidden=true;}lastLookup='';return;}
+    if(idn===lastLookup)return; lastLookup=idn;
+    fetch('/api/prefill?idn='+encodeURIComponent(idn),{credentials:'same-origin'})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        if(!d||!d.found){if(idnNote){idnNote.hidden=false;idnNote.className='idnnote miss';idnNote.innerHTML='No existing record for IDN '+esc(idn)+' — entering a new person.';}return;}
+        fillEmpty('defendant',d.name);
+        fillEmpty('birthdate',d.birthdate);
+        fillEmpty('warrant_case_num',d.caseNo);
+        if(d.level)fillSelect('pretrial_level',String(d.level));
+        fillSelect('charge_type',d.chargeType);
+        fillSelect('supervision_type',d.supervisionType);
+        fillEmpty('bond_amount',d.bondAmount);
+        fillEmpty('order_from',d.orderFrom);
+        fillEmpty('dma',d.dma);
+        fillSelect('supervising_officer',d.officer);
+        if(d.gps){
+          var gy=form.querySelector('input[name="gps"][value="true"]');
+          if(gy){gy.checked=true;syncGps();}
+          fillSelect('gps_type',d.gpsType);
+          fillEmpty('gps_install_date',d.gpsInstall);
+        }
+        updateCadence();
+        var closed=(d.status&&/clos/i.test(d.status))?' <b>(previous case closed)</b>':'';
+        if(idnNote){idnNote.hidden=false;idnNote.className='idnnote';idnNote.innerHTML='✓ Existing record found — <b>'+esc(d.name)+'</b>'+closed+'. Details pre-filled below — review &amp; edit before creating.';}
+      })
+      .catch(function(){/* network hiccup: stay silent, officer can still type */});
+  }
+  form.idn.addEventListener('change',lookupIDN);
+  form.idn.addEventListener('blur',lookupIDN);
+
   syncGps();
   show(0);
 });
