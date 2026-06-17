@@ -147,6 +147,27 @@ CREATE TABLE IF NOT EXISTS added_defendants (
     birthdate           TEXT,
     closed_date         TEXT,
     day_adjustment      TEXT,
+    bond_conditions     TEXT,
+    court               TEXT,
+    victim              TEXT,
+    victim_idn          TEXT,
+    victim_2            TEXT,
+    victim_2_idn        TEXT,
+    victim_3            TEXT,
+    victim_3_idn        TEXT,
+    victim_time_48      TEXT,
+    victim_accept_deny_gps TEXT,
+    gps_install_date    TEXT,
+    da_emailed          TEXT,
+    switched_to         TEXT,
+    switched_gps_date   TEXT,
+    paid                TEXT,
+    court_order         TEXT,
+    comments            TEXT,
+    received_signed_copy_date TEXT,
+    contact_date        TEXT,
+    released_to_hilltop_date  TEXT,
+    ptr_successfully_completed TEXT,
     author              TEXT,
     created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -242,6 +263,13 @@ CREATE TABLE IF NOT EXISTS letter_log (
     created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_letter_idn ON letter_log(idn);
+
+CREATE TABLE IF NOT EXISTS caseload_letters (
+    letter     TEXT PRIMARY KEY,
+    officer    TEXT NOT NULL,
+    author     TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to
@@ -269,7 +297,26 @@ func EnsureSchema(d *sql.DB) error {
 	if err := addColumnIfMissing(d, "added_check_ins", "note", "TEXT"); err != nil {
 		return err
 	}
+	// Full-referral fields on added_defendants (migration 008) — the console intake
+	// wizard now mirrors the SharePoint exports. Names match the raw_blue_book /
+	// raw_gps_48_hours columns so they merge by name in every read path.
+	for _, col := range addedDefendantReferralCols {
+		if err := addColumnIfMissing(d, "added_defendants", col, "TEXT"); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// addedDefendantReferralCols are the columns added in migration 008 to capture the
+// full referral. Kept as a list so EnsureSchema can backfill an existing DB (the
+// inline CREATE above already has them for a fresh DB).
+var addedDefendantReferralCols = []string{
+	"bond_conditions", "court", "victim", "victim_idn", "victim_2", "victim_2_idn",
+	"victim_3", "victim_3_idn", "victim_time_48", "victim_accept_deny_gps",
+	"gps_install_date", "da_emailed", "switched_to", "switched_gps_date", "paid",
+	"court_order", "comments", "received_signed_copy_date", "contact_date",
+	"released_to_hilltop_date", "ptr_successfully_completed",
 }
 
 // addColumnIfMissing runs an idempotent ALTER TABLE … ADD COLUMN, skipping it

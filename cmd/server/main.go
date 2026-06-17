@@ -217,6 +217,7 @@ func main() {
 		ar.Post("/import/preview", srv.ImportPreview)    // stage uploaded CSVs + dry-run (supervisor)
 		ar.Post("/import/apply", srv.ImportApply)        // commit a previewed upload (supervisor)
 		ar.Post("/import/discard", srv.ImportDiscard)    // drop a previewed upload (supervisor)
+		ar.Post("/caseload", srv.SaveCaseload)           // set A–Z caseload assignments (supervisor)
 
 		// Data entry (any allowed officer): add a client, payments, check-ins.
 		// The classic add-client form is gone — the console intake wizard is the

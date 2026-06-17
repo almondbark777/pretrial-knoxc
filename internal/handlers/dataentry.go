@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"pretrial-knoxc/internal/auth"
+	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 )
 
@@ -36,6 +37,42 @@ func (s *Server) AddDefendant(w http.ResponseWriter, r *http.Request) {
 		OrderFrom:       r.FormValue("order_from"),
 		DMA:             r.FormValue("dma"),
 		Birthdate:       r.FormValue("birthdate"),
+		// Blue Book case detail
+		BondConditions:           r.FormValue("bond_conditions"),
+		Court:                    r.FormValue("court"),
+		Comments:                 r.FormValue("comments"),
+		ReceivedSignedCopyDate:   r.FormValue("received_signed_copy_date"),
+		ContactDate:              r.FormValue("contact_date"),
+		ReleasedToHilltopDate:    r.FormValue("released_to_hilltop_date"),
+		PTRSuccessfullyCompleted: r.FormValue("ptr_successfully_completed"),
+		// GPS / 48-hour victim notification (only meaningful when GPS = Yes)
+		GPSInstallDate:      r.FormValue("gps_install_date"),
+		DAEmailed:           r.FormValue("da_emailed"),
+		CourtOrder:          r.FormValue("court_order"),
+		Paid:                r.FormValue("paid"),
+		SwitchedTo:          r.FormValue("switched_to"),
+		SwitchedGPSDate:     r.FormValue("switched_gps_date"),
+		VictimTime48:        r.FormValue("victim_time_48"),
+		VictimAcceptDenyGPS: r.FormValue("victim_accept_deny_gps"),
+		Victim:              r.FormValue("victim"),
+		VictimIDN:           r.FormValue("victim_idn"),
+		Victim2:             r.FormValue("victim_2"),
+		Victim2IDN:          r.FormValue("victim_2_idn"),
+		Victim3:             r.FormValue("victim_3"),
+		Victim3IDN:          r.FormValue("victim_3_idn"),
+	}
+	// GPS = No: drop any GPS/victim-notification values the hidden section may have
+	// carried, so a non-GPS referral never stores stray GPS fields.
+	if !isTruthyForm(nd.GPS) {
+		nd.GPSType, nd.GPSInstallDate, nd.DAEmailed, nd.CourtOrder, nd.Paid = "", "", "", "", ""
+		nd.SwitchedTo, nd.SwitchedGPSDate, nd.VictimTime48, nd.VictimAcceptDenyGPS = "", "", "", ""
+		nd.Victim, nd.VictimIDN, nd.Victim2, nd.Victim2IDN, nd.Victim3, nd.Victim3IDN = "", "", "", "", "", ""
+	}
+	// Auto-assign by the first letter of the last name when the officer was left on
+	// "Auto — by last name" (blank). A manual selection is honored as-is. Unmapped
+	// initials stay blank (no guess).
+	if strings.TrimSpace(nd.Officer) == "" {
+		nd.Officer = db.OfficerForLastName(s.DB, nd.Name)
 	}
 	if err := db.AddDefendant(s.DB, nd, auth.User(r)); err != nil {
 		redirectMsg(w, r, "/console/clients/new", "Could not add client: "+err.Error())
@@ -48,10 +85,30 @@ func (s *Server) AddDefendant(w http.ResponseWriter, r *http.Request) {
 	if summary := strings.TrimSpace(r.FormValue("intake_summary")); summary != "" {
 		_ = db.AddNote(s.DB, strings.TrimSpace(nd.IDN), summary, auth.User(r))
 	}
+	// First check-in is auto-scheduled 3 business days after the referral date
+	// (weekends + federal holidays excluded) — officers no longer enter it; court
+	// dates are added later from the record. Best-effort: the client already exists
+	// if this booking fails.
+	ref, ok := compute.ParseDay(nd.ReferralDate)
+	if !ok {
+		ref = compute.TodayET()
+	}
+	due := compute.FirstCheckInDue(ref).Format("2006-01-02")
+	_ = db.AddScheduledCheckIn(s.DB, strings.TrimSpace(nd.IDN), due, "In Person", nd.Officer, auth.User(r))
 	s.clearCache()
 	idn := strings.TrimSpace(nd.IDN)
 	redirectMsg(w, r, safeNext(r, "/console/clients/"+url.PathEscape(idn)),
 		"Client added: "+strings.TrimSpace(nd.Name)+" (IDN "+idn+").")
+}
+
+// isTruthyForm reports whether a form value means "yes" (the intake wizard posts
+// gps as "true"/"false"; tolerate the usual variants).
+func isTruthyForm(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "true", "1", "yes", "on", "y":
+		return true
+	}
+	return false
 }
 
 // AddPayment records a payment on an existing client's profile.

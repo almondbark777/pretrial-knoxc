@@ -93,6 +93,96 @@ func nextMonth(d time.Time) time.Time {
 	return time.Date(d.Year(), d.Month()+1, 1, 12, 0, 0, 0, time.UTC)
 }
 
+// ── Business days / U.S. federal holidays ───────────────────────────────────
+//
+// Used for the referral "first check-in due" deadline: 3 business days after the
+// referral date, with weekends and observed federal holidays excluded.
+
+// nthWeekdayOfMonth returns the n-th given weekday of a month (n is 1-based),
+// e.g. the 3rd Monday of January. Noon-UTC, like every date here.
+func nthWeekdayOfMonth(year int, m time.Month, wd time.Weekday, n int) time.Time {
+	first := Noon(year, m, 1)
+	off := (int(wd) - int(first.Weekday()) + 7) % 7
+	return addDays(first, off+(n-1)*7)
+}
+
+// lastWeekdayOfMonth returns the last given weekday of a month (e.g. last Monday
+// of May for Memorial Day).
+func lastWeekdayOfMonth(year int, m time.Month, wd time.Weekday) time.Time {
+	last := lastOfMonth(Noon(year, m, 1))
+	back := (int(last.Weekday()) - int(wd) + 7) % 7
+	return addDays(last, -back)
+}
+
+// usFederalHolidaysObserved returns the set of observed U.S. federal-holiday dates
+// (noon-UTC, date only) for a year. Fixed-date holidays falling on a Saturday are
+// observed the preceding Friday and on a Sunday the following Monday (OPM rule);
+// the Monday/Thursday holidays never land on a weekend. New Year's Day of the
+// following year, when observed on Dec 31 of this year, is included so a late-Dec
+// referral counts it.
+func usFederalHolidaysObserved(year int) map[time.Time]bool {
+	out := map[time.Time]bool{}
+	add := func(t time.Time) { out[Noon(t.Year(), t.Month(), t.Day())] = true }
+	observed := func(t time.Time) time.Time {
+		switch t.Weekday() {
+		case time.Saturday:
+			return addDays(t, -1)
+		case time.Sunday:
+			return addDays(t, 1)
+		}
+		return t
+	}
+	// Fixed-date holidays (observed-shifted).
+	add(observed(Noon(year, time.January, 1)))   // New Year's Day
+	add(observed(Noon(year, time.June, 19)))     // Juneteenth
+	add(observed(Noon(year, time.July, 4)))      // Independence Day
+	add(observed(Noon(year, time.November, 11))) // Veterans Day
+	add(observed(Noon(year, time.December, 25))) // Christmas Day
+	// Floating Monday/Thursday holidays (no observed shift).
+	add(nthWeekdayOfMonth(year, time.January, time.Monday, 3))    // MLK Jr. Day
+	add(nthWeekdayOfMonth(year, time.February, time.Monday, 3))   // Washington's Birthday
+	add(lastWeekdayOfMonth(year, time.May, time.Monday))          // Memorial Day
+	add(nthWeekdayOfMonth(year, time.September, time.Monday, 1))  // Labor Day
+	add(nthWeekdayOfMonth(year, time.October, time.Monday, 2))    // Columbus Day
+	add(nthWeekdayOfMonth(year, time.November, time.Thursday, 4)) // Thanksgiving Day
+	// Next year's New Year's Day can be observed on Dec 31 of this year (Jan 1 = Sat).
+	if ny := observed(Noon(year+1, time.January, 1)); ny.Year() == year {
+		add(ny)
+	}
+	return out
+}
+
+// IsBusinessDay reports whether d is a weekday that is not an observed federal
+// holiday.
+func IsBusinessDay(d time.Time) bool {
+	if wd := d.Weekday(); wd == time.Saturday || wd == time.Sunday {
+		return false
+	}
+	return !usFederalHolidaysObserved(d.Year())[Noon(d.Year(), d.Month(), d.Day())]
+}
+
+// AddBusinessDays returns the date n business days after start, skipping weekends
+// and observed federal holidays. start itself is day 0 (never counted), so the
+// result is always strictly after start for n >= 1.
+func AddBusinessDays(start time.Time, n int) time.Time {
+	cur := Noon(start.Year(), start.Month(), start.Day())
+	for added := 0; added < n; {
+		cur = addDays(cur, 1)
+		if IsBusinessDay(cur) {
+			added++
+		}
+	}
+	return cur
+}
+
+// FirstCheckInDue returns the first-check-in deadline for a referral: 3 business
+// days after the referral date (weekends + federal holidays excluded). Per Alex's
+// rule, a Thu 18-Jun-2026 referral is due end of business Wed 24-Jun-2026
+// (Juneteenth + the weekend don't count).
+func FirstCheckInDue(referral time.Time) time.Time {
+	return AddBusinessDays(referral, 3)
+}
+
 // daysBetween mirrors JS Math.round((b-a)/86400000). Noon-UTC => exact.
 func daysBetween(a, b time.Time) int {
 	return int(math.Round(b.Sub(a).Hours() / 24.0))

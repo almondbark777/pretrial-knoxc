@@ -65,11 +65,25 @@ func parsePosAmount(s string) bool {
 }
 
 // NewDefendant is the field set for adding a client. IDN + Name are required;
-// everything else is optional. Status defaults to "Open".
+// everything else is optional. Status defaults to "Open". The fields mirror the
+// SharePoint New Blue Book + GPS 48 Hours columns (the console intake wizard
+// collects them); they land in added_defendants under the canonical snake_case
+// column names so they merge into every read path by name.
 type NewDefendant struct {
 	IDN, Name, CaseNumber, Level, Status, Officer, ReferralDate string
 	GPS, GPSType, ChargeType, BondAmount, SupervisionType       string
 	OrderFrom, DMA, Birthdate                                   string
+	// Case detail (Blue Book)
+	BondConditions, Court string
+	// GPS / 48-hour victim notification (GPS 48 Hours) — only set when GPS = Yes
+	GPSInstallDate, DAEmailed, CourtOrder, Paid string
+	SwitchedTo, SwitchedGPSDate                 string
+	VictimTime48, VictimAcceptDenyGPS           string
+	Victim, VictimIDN, Victim2, Victim2IDN      string
+	Victim3, Victim3IDN                         string
+	// Misc Blue Book
+	Comments, ReceivedSignedCopyDate, ContactDate   string
+	ReleasedToHilltopDate, PTRSuccessfullyCompleted string
 }
 
 // IDNExistsInRoster reports whether an IDN is already present in the imported
@@ -119,12 +133,30 @@ func AddDefendant(d *sql.DB, nd NewDefendant, by string) error {
 		`INSERT INTO added_defendants
 		   (idn, defendant, warrant_case_num, pretrial_level, case_status, supervising_officer,
 		    referral_date, gps, gps_type, charge_type, bond_amount, supervision_type,
-		    order_from, dma, birthdate, author)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		    order_from, dma, birthdate,
+		    bond_conditions, court, gps_install_date, da_emailed, court_order, paid,
+		    switched_to, switched_gps_date, victim_time_48, victim_accept_deny_gps,
+		    victim, victim_idn, victim_2, victim_2_idn, victim_3, victim_3_idn,
+		    comments, received_signed_copy_date, contact_date, released_to_hilltop_date,
+		    ptr_successfully_completed, author)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+		         ?,?,?,?,?,?,
+		         ?,?,?,?,
+		         ?,?,?,?,?,?,
+		         ?,?,?,?,
+		         ?,?)`,
 		nd.IDN, nd.Name, strings.TrimSpace(nd.CaseNumber), strings.TrimSpace(nd.Level), status,
 		strings.TrimSpace(nd.Officer), normInputDate(nd.ReferralDate), gps, strings.TrimSpace(nd.GPSType),
 		strings.TrimSpace(nd.ChargeType), strings.TrimSpace(nd.BondAmount), strings.TrimSpace(nd.SupervisionType),
-		strings.TrimSpace(nd.OrderFrom), strings.TrimSpace(nd.DMA), normInputDate(nd.Birthdate), nz(by))
+		strings.TrimSpace(nd.OrderFrom), strings.TrimSpace(nd.DMA), normInputDate(nd.Birthdate),
+		strings.TrimSpace(nd.BondConditions), strings.TrimSpace(nd.Court), normInputDate(nd.GPSInstallDate),
+		strings.TrimSpace(nd.DAEmailed), strings.TrimSpace(nd.CourtOrder), strings.TrimSpace(nd.Paid),
+		strings.TrimSpace(nd.SwitchedTo), normInputDate(nd.SwitchedGPSDate), strings.TrimSpace(nd.VictimTime48),
+		strings.TrimSpace(nd.VictimAcceptDenyGPS),
+		strings.TrimSpace(nd.Victim), strings.TrimSpace(nd.VictimIDN), strings.TrimSpace(nd.Victim2),
+		strings.TrimSpace(nd.Victim2IDN), strings.TrimSpace(nd.Victim3), strings.TrimSpace(nd.Victim3IDN),
+		strings.TrimSpace(nd.Comments), normInputDate(nd.ReceivedSignedCopyDate), normInputDate(nd.ContactDate),
+		normInputDate(nd.ReleasedToHilltopDate), strings.TrimSpace(nd.PTRSuccessfullyCompleted), nz(by))
 }
 
 // AddPayment records a payment against an existing IDN.

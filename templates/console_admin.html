@@ -27,6 +27,74 @@
   </div>
 </div>
 
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Caseload by last name (A&ndash;Z)</h2><span class="grow"></span>
+    {{if not .IsSupervisor}}<span class="asof">read-only &middot; supervisor sign-in required to change</span>{{end}}
+  </div>
+  <div class="pad">
+    <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Assign each letter to an officer. A new referral left on <b>&ldquo;Auto &mdash; by last name&rdquo;</b> is automatically assigned to whoever owns the first letter of the defendant&rsquo;s last name &mdash; no need to type the officer in each time. <b>One officer per letter.</b></p>
+    {{if .Officers}}
+    <form method="post" action="/admin/caseload" id="caseloadForm">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="next" value="/console/admin">
+      <div class="clscroll">
+        <table class="cltable">
+          <thead><tr><th class="offcol">Officer</th>{{range .Letters}}<th>{{.}}</th>{{end}}</tr></thead>
+          <tbody>
+          {{range $off := .Officers}}
+            <tr><td class="offcol">{{$off}}</td>
+            {{range $l := $.Letters}}
+              <td><input type="checkbox" name="cell" value="{{$l}}|{{$off}}" data-letter="{{$l}}"{{if eq (index $.Caseload $l) $off}} checked{{end}}{{if not $.IsSupervisor}} disabled{{end}}></td>
+            {{end}}
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+      <div class="cllegend" id="clUnassigned"></div>
+      {{if .IsSupervisor}}<div style="margin-top:14px"><button type="submit" class="btn">Save caseload</button></div>{{end}}
+    </form>
+    {{else}}
+    <div class="emptybox"><div class="big">&#9711;</div>No officers in the roster yet &mdash; add a client first, then assign letters here.</div>
+    {{end}}
+  </div>
+</div>
+<style>
+.clscroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+.cltable{border-collapse:collapse;font-size:12px;width:100%}
+.cltable th,.cltable td{border:1px solid var(--line);padding:4px 2px;text-align:center;white-space:nowrap}
+.cltable thead th{background:var(--panel-3);color:var(--muted);font-weight:700;position:sticky;top:0}
+.cltable .offcol{text-align:left;padding:6px 12px;position:sticky;left:0;background:var(--panel-2);font-weight:600;color:var(--ink);z-index:1}
+.cltable thead .offcol{z-index:2}
+.cltable tbody tr:hover td{background:var(--panel-3)}
+.cltable input{width:15px;height:15px;cursor:pointer}
+.cllegend{margin-top:10px;font-size:12.5px;color:var(--muted)}
+.cllegend b{color:var(--warn-ink,var(--ink))}
+</style>
+<script>
+(function(){
+  var form=document.getElementById('caseloadForm');
+  if(!form)return;
+  var boxes=[].slice.call(form.querySelectorAll('input[type="checkbox"][name="cell"]'));
+  var legend=document.getElementById('clUnassigned');
+  function refresh(){
+    var owned={};
+    boxes.forEach(function(b){if(b.checked)owned[b.dataset.letter]=true;});
+    var miss=[];
+    ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+      .forEach(function(l){if(!owned[l])miss.push(l);});
+    legend.innerHTML = miss.length ? ('Unassigned: <b>'+miss.join(' ')+'</b> (these fall through to no auto-assignment)') : 'Every letter A&ndash;Z is assigned.';
+  }
+  boxes.forEach(function(b){b.addEventListener('change',function(){
+    if(b.checked){ // one owner per letter — clear the same column for other officers
+      boxes.forEach(function(o){if(o!==b&&o.dataset.letter===b.dataset.letter)o.checked=false;});
+    }
+    refresh();
+  });});
+  refresh();
+})();
+</script>
+
 <div class="grid2" style="margin-top:18px">
   <div class="panel">
     <div class="h"><h2>Conditions Library</h2><span class="grow"></span><button class="btn ghost sm" onclick="openAction('soon','the conditions library')">+ Condition</button></div>

@@ -335,7 +335,30 @@ func (s *Server) ConsoleAdmin(w http.ResponseWriter, r *http.Request) {
 	data["Tombstones"] = tomb
 	data["Audit"] = audit
 	data["Fields"] = db.OverridableFields()
-	data["CSRF"] = s.Auth.CSRF(w, r) // for the one-click "Undo last delete" form
+	// Caseload-by-last-name grid (officers × A–Z). The officer list is the same
+	// roster set the intake wizard offers, unioned with any officer that already
+	// owns a letter (so an existing assignment always renders a row and survives a
+	// save even if that officer currently has no open clients).
+	caseload, _ := db.LoadCaseloadLetters(s.DB)
+	var officers []string
+	if clients, err := s.clients(); err == nil {
+		officers = distinctOfficers(clients)
+	}
+	seen := map[string]bool{}
+	for _, o := range officers {
+		seen[o] = true
+	}
+	for _, o := range caseload {
+		if !seen[o] {
+			officers = append(officers, o)
+			seen[o] = true
+		}
+	}
+	sort.Strings(officers)
+	data["Officers"] = officers
+	data["Caseload"] = caseload
+	data["Letters"] = db.Letters
+	data["CSRF"] = s.Auth.CSRF(w, r) // for the one-click "Undo last delete" form + caseload save
 	s.renderConsole(w, "console_admin.html", data)
 }
 
