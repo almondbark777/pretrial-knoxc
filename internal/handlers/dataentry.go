@@ -37,8 +37,9 @@ func (s *Server) AddDefendant(w http.ResponseWriter, r *http.Request) {
 		OrderFrom:       r.FormValue("order_from"),
 		DMA:             r.FormValue("dma"),
 		Birthdate:       r.FormValue("birthdate"),
-		// Blue Book case detail
-		BondConditions:           r.FormValue("bond_conditions"),
+		// Blue Book case detail. Bond conditions is a multi-select (SCRAM #4 /
+		// Drug Screens #5 / Supervision #7) — join the checked boxes into one cell.
+		BondConditions:           strings.Join(r.Form["bond_conditions"], ", "),
 		Court:                    r.FormValue("court"),
 		Comments:                 r.FormValue("comments"),
 		ReceivedSignedCopyDate:   r.FormValue("received_signed_copy_date"),

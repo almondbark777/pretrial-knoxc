@@ -73,6 +73,38 @@ func TestAddDefendantAutoAssignsByLastName(t *testing.T) {
 	}
 }
 
+// Bond conditions is a multi-select (SCRAM #4 / Drug Screens #5 / Supervision
+// #7): the checked boxes are joined into one cell. Supervision type is one of the
+// fixed dropdown values. Both round-trip into added_defendants.
+func TestAddDefendantBondConditionsAndSupervision(t *testing.T) {
+	d := testDB(t)
+	srv := newServer(d)
+
+	// Two bond-condition boxes checked → joined "A, B" in submit order.
+	multi := "999779111"
+	postAdd(t, srv, url.Values{
+		"defendant": {"BONDER, BEV"}, "idn": {multi}, "warrant_case_num": {"@779111"},
+		"pretrial_level": {"2"}, "supervision_type": {"GPS"}, "gps": {"false"},
+		"bond_conditions": {"#4 SCRAM", "#7 Supervision"},
+	})
+	if got := addedField(t, d, multi, "bond_conditions"); got != "#4 SCRAM, #7 Supervision" {
+		t.Errorf("bond_conditions = %q, want %q", got, "#4 SCRAM, #7 Supervision")
+	}
+	if got := addedField(t, d, multi, "supervision_type"); got != "GPS" {
+		t.Errorf("supervision_type = %q, want GPS", got)
+	}
+
+	// No box checked → empty cell (not "[]" or a stray comma).
+	none := "999779222"
+	postAdd(t, srv, url.Values{
+		"defendant": {"NOCOND, NICK"}, "idn": {none}, "warrant_case_num": {"@779222"},
+		"pretrial_level": {"1"}, "gps": {"false"},
+	})
+	if got := addedField(t, d, none, "bond_conditions"); got != "" {
+		t.Errorf("bond_conditions with nothing checked = %q, want empty", got)
+	}
+}
+
 func TestAddDefendantGPSFields(t *testing.T) {
 	d := testDB(t)
 	srv := newServer(d)

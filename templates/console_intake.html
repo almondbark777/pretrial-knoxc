@@ -48,13 +48,27 @@
         </select></label>
         <label>Order from<input type="text" name="order_from" placeholder="Magistrate"></label>
         <label>Supervision type<select name="supervision_type">
-          <option>Pre-Trial</option><option>Diversion</option><option>Bond</option><option>Other</option>
+          <option value="">— choose —</option>
+          <option>Bond Supervision</option>
+          <option>Bond SCRAM</option>
+          <option>Drug Screen</option>
+          <option>GPS</option>
+          <option>Plea SCRAM</option>
+          <option>Remote breath / IDD</option>
+          <option>Vivatrol</option>
         </select></label>
         <label>Court<input type="text" name="court" placeholder="General Sessions"></label>
         <label>Bond amount<input type="text" name="bond_amount" placeholder="$25,000"></label>
-        <label>Bond conditions<input type="text" name="bond_conditions" placeholder="No-contact, no firearms…"></label>
         <label>Referral date<input type="date" name="referral_date" id="refDate"></label>
         <label>DMA<input type="text" name="dma" placeholder="optional"></label>
+        <div class="wfull wchecks">
+          <span class="wchecks-lbl">Bond conditions <span class="muted" style="font-weight:400">(check all that apply)</span></span>
+          <div class="wradio" role="group" aria-label="Bond conditions">
+            <label class="wopt"><input type="checkbox" name="bond_conditions" value="#4 SCRAM"> <span>SCRAM (#4)</span></label>
+            <label class="wopt"><input type="checkbox" name="bond_conditions" value="#5 Drug Screens"> <span>Drug Screens (#5)</span></label>
+            <label class="wopt"><input type="checkbox" name="bond_conditions" value="#7 Supervision"> <span>Supervision (#7)</span></label>
+          </div>
+        </div>
       </div>
       <div class="wcadence" id="cadenceHint">Pick a level to see the implied check-in cadence.</div>
     </section>
@@ -152,6 +166,8 @@ html[data-theme="dark"] .wchip.active{border-color:var(--accent);color:var(--acc
 @media(max-width:620px){.wgrid{grid-template-columns:1fr}}
 .wpane label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600}
 .wpane label.wfull{grid-column:1/-1;margin-top:14px}
+.wpane .wfull{grid-column:1/-1}
+.wchecks-lbl{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px}
 .wpane input,.wpane select,.wpane textarea{padding:9px 11px;border:1px solid var(--line-2);border-radius:var(--r-sm);font:inherit;font-size:13.5px;background:var(--panel-2);color:var(--ink)}
 .wpane input:focus,.wpane select:focus,.wpane textarea:focus{border-color:var(--accent);box-shadow:var(--ring);outline:none;background:var(--panel)}
 .wpane input.invalid,.wpane select.invalid{border-color:var(--risk);box-shadow:0 0 0 3px var(--risk-bg)}
