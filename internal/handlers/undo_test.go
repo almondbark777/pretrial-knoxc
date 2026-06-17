@@ -16,7 +16,7 @@ import (
 // verify the non-supervisor is blocked and the empty case is graceful.
 func TestUndoLastDelete(t *testing.T) {
 	d := testDB(t)
-	a := auth.New("pw", "secret", nil, []string{"alexander.bentley@knoxsheriff.org"})
+	a := auth.New("pw", "secret", nil, []string{"alexander.bentley@knoxsheriff.org"}, nil)
 	tmpl := template.Must(template.New("").Parse(`{{define "message.html"}}{{.Title}}{{end}}`))
 	srv := New(d, a, tmpl, time.Minute, false)
 

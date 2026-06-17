@@ -38,7 +38,7 @@ func importTestServer(t *testing.T) (*Server, *auth.Authenticator) {
 	if err := db.EnsureSchema(d); err != nil {
 		t.Fatalf("EnsureSchema: %v", err)
 	}
-	a := auth.New("pw", "secret", nil, []string{supEmail})
+	a := auth.New("pw", "secret", nil, []string{supEmail}, nil)
 	tmpl := template.Must(template.New("").Parse(
 		`{{define "console_import.html"}}MODE={{.Mode}}|TOK={{.Token}}|ERR={{.Err}}|SKIP={{.Skipped}}|ADDED={{if .Sum}}{{.Sum.Totals.Added}}{{end}}{{end}}` +
 			`{{define "message.html"}}{{.Title}}{{end}}`))

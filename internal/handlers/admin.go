@@ -33,6 +33,27 @@ func (s *Server) requireSupervisor(w http.ResponseWriter, r *http.Request) (stri
 	return user, false
 }
 
+// requireAdmin returns the caller's email and true when they are an admin.
+// Otherwise it writes a 403 (HTML or JSON) and returns false. Admin gates the
+// user/role-management actions — the one capability supervisors don't get.
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (string, bool) {
+	user := auth.User(r)
+	if s.Auth.IsAdmin(user) {
+		return user, true
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "admin role required"})
+	} else {
+		w.WriteHeader(http.StatusForbidden)
+		s.render(w, "message.html", map[string]any{
+			"User": user, "Title": "Not permitted",
+			"Message": "Managing users and roles is restricted to admins.",
+			"Back":    backOr(r, "/console/admin"),
+		})
+	}
+	return user, false
+}
+
 // redirectMsg performs a Post/Redirect/Get back to `to` with a flash message.
 func redirectMsg(w http.ResponseWriter, r *http.Request, to, msg string) {
 	if msg != "" {

@@ -99,13 +99,24 @@ func main() {
 	}
 
 	importerRetired := envBool("IMPORTER_RETIRED")
-	a := auth.New(password, secret, envList("ALLOWED_EMAILS"), envList("SUPERVISOR_EMAILS"))
+	adminEmails := auth.DefaultAdminEmails(envList("ADMIN_EMAILS"))
+	a := auth.New(password, secret, envList("ALLOWED_EMAILS"), envList("SUPERVISOR_EMAILS"), adminEmails)
 	if envBool("COOKIE_SECURE") {
 		a.SetCookieSecure(true) // browser↔Cloudflare hop is HTTPS; set Secure in prod
 	}
+	// Roles & permissions: seed app_users on first run (no-op once the table has rows)
+	// from the EFFECTIVE allow-list (a.AllowedEmails/SupervisorEmails apply the
+	// built-in fallback), so the seeded roster matches exactly who auth admits — then
+	// make the DB the source of truth via a short-TTL cache.
+	if err := db.SeedUsersIfEmpty(database, a.AllowedEmails(), a.SupervisorEmails(), adminEmails); err != nil {
+		log.Printf("seed app_users: %v", err) // non-fatal: auth falls back to the env lists
+	}
+	roleCache := db.NewRoleCache(database, 15*time.Second)
+	a.SetRoleSource(roleCache.RoleOf)
 	const cacheTTL = 60 * time.Second
 	srv := handlers.New(database, a, tmpl, cacheTTL, importerRetired)
-	srv.DBPath = dbPath // CSV upload page (importcsv.go): reconcile target + staging location
+	srv.DBPath = dbPath   // CSV upload page (importcsv.go): reconcile target + staging location
+	srv.Roles = roleCache // user-management handlers invalidate this after a role change
 	// Bind the real freshness lookup now that the Server exists (the parse-time
 	// placeholder in tmplFuncs returns an empty stamp). Funcs is safe to call
 	// after parsing; execution uses the latest map.
@@ -218,6 +229,8 @@ func main() {
 		ar.Post("/import/apply", srv.ImportApply)        // commit a previewed upload (supervisor)
 		ar.Post("/import/discard", srv.ImportDiscard)    // drop a previewed upload (supervisor)
 		ar.Post("/caseload", srv.SaveCaseload)           // set A–Z caseload assignments (supervisor)
+		ar.Post("/user/save", srv.SaveUser)              // add/re-role a user (admin)
+		ar.Post("/user/remove", srv.RemoveUser)          // revoke a user (admin)
 
 		// Data entry (any allowed officer): add a client, payments, check-ins.
 		// The classic add-client form is gone — the console intake wizard is the

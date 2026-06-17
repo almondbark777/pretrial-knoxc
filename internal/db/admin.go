@@ -270,6 +270,14 @@ CREATE TABLE IF NOT EXISTS caseload_letters (
     author     TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS app_users (
+    email      TEXT PRIMARY KEY,
+    role       TEXT NOT NULL DEFAULT 'officer',
+    added_by   TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to

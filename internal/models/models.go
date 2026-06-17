@@ -344,3 +344,13 @@ type LetterLogEntry struct {
 	GeneratedBy string `json:"generatedBy"`
 	CreatedAt   string `json:"createdAt"`
 }
+
+// AppUser is one row of the app_users table — the in-app roles & permissions
+// roster (migration 010). Role is one of officer | supervisor | admin.
+type AppUser struct {
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	AddedBy   string `json:"addedBy"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}

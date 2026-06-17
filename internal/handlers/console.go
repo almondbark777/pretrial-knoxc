@@ -45,6 +45,7 @@ func (s *Server) consoleBase(r *http.Request, active string, track time.Time) ma
 		"User":         user,
 		"UserName":     compute.FmtOfficer(user),
 		"IsSupervisor": s.Auth.IsSupervisor(user),
+		"IsAdmin":      s.Auth.IsAdmin(user),
 		"ActiveNav":    active,
 		"Today":        track.Format("January 2, 2006"),
 		"AsOfInput":    track.Format("2006-01-02"),
@@ -325,6 +326,14 @@ func (s *Server) ConsoleReports(w http.ResponseWriter, r *http.Request) {
 
 // ── /console/admin ────────────────────────────────────────────────────────────
 
+// adminUserRow is one row of the Users & Roles table: the app_users record plus UI
+// flags — Permanent (break-glass admin → controls disabled) and IsSelf (the current
+// admin → no self-remove).
+type adminUserRow struct {
+	Email, Role, AddedBy string
+	Permanent, IsSelf    bool
+}
+
 func (s *Server) ConsoleAdmin(w http.ResponseWriter, r *http.Request) {
 	track := s.trackFrom(r)
 	data := s.consoleBase(r, "admin", track)
@@ -335,6 +344,19 @@ func (s *Server) ConsoleAdmin(w http.ResponseWriter, r *http.Request) {
 	data["Tombstones"] = tomb
 	data["Audit"] = audit
 	data["Fields"] = db.OverridableFields()
+	// Users & roles roster (admins edit it here; supervisors see it read-only).
+	appUsers, _ := db.ListAppUsers(s.DB)
+	me := strings.ToLower(strings.TrimSpace(auth.User(r)))
+	userRows := make([]adminUserRow, 0, len(appUsers))
+	for _, u := range appUsers {
+		userRows = append(userRows, adminUserRow{
+			Email: u.Email, Role: u.Role, AddedBy: u.AddedBy,
+			Permanent: s.Auth.IsBreakGlassAdmin(u.Email),
+			IsSelf:    u.Email == me,
+		})
+	}
+	data["Users"] = userRows
+	data["Roles"] = []string{"officer", "supervisor", "admin"}
 	// Caseload-by-last-name grid (officers × A–Z). The officer list is the same
 	// roster set the intake wizard offers, unioned with any officer that already
 	// owns a letter (so an existing assignment always renders a row and survives a

@@ -16,7 +16,7 @@ import (
 // persists and redirects back to the record with a flash, clear undoes it.
 func TestFeeWaiverHandlers(t *testing.T) {
 	d := testDB(t)
-	a := auth.New("pw", "secret", nil, []string{"alexander.bentley@knoxsheriff.org"})
+	a := auth.New("pw", "secret", nil, []string{"alexander.bentley@knoxsheriff.org"}, nil)
 	tmpl := template.Must(template.New("").Parse(`{{define "message.html"}}{{.Title}}{{end}}`))
 	srv := New(d, a, tmpl, time.Minute, false)
 	const idn = "999000555"

@@ -37,10 +37,29 @@ var defaultUsers = []string{
 	"Johnie.Carter@knoxsheriff.org", "alexander.bentley@knoxsheriff.org",
 }
 
-// Authenticator gates HTTP requests.
+// defaultAdmin is the hardcoded break-glass admin: ALWAYS admin regardless of the
+// app_users table, so no in-app role change can lock the owner out. Overridable via
+// ADMIN_EMAILS.
+const defaultAdmin = "alexander.bentley@knoxsheriff.org"
+
+// DefaultAdminEmails returns the configured admin list, or the built-in break-glass
+// default when it's empty. Exported so main can seed the app_users table with the
+// same admin set the Authenticator treats as break-glass (one source of truth).
+func DefaultAdminEmails(adminEmails []string) []string {
+	if len(adminEmails) == 0 {
+		return []string{defaultAdmin}
+	}
+	return adminEmails
+}
+
+// Authenticator gates HTTP requests. allowed/supervisors/admins are the env-derived
+// bootstrap + fallback sets; roleFn (set via SetRoleSource) is the DB-backed role
+// lookup that, once wired, is the source of truth (see roleOf).
 type Authenticator struct {
 	allowed     map[string]bool
 	supervisors map[string]bool
+	admins      map[string]bool // break-glass admins (always admin); from ADMIN_EMAILS
+	roleFn      func(email string) (string, bool)
 	password    string
 	store       *sessions.CookieStore
 }
@@ -53,7 +72,7 @@ const sessionName = "kh_sess"
 // prior 22-user behavior. supervisorEmails is the SUPERVISOR_EMAILS subset that
 // may delete / restore / override (Phase 7 roles); entries not on the allow-list
 // are ignored — a supervisor must still be an allowed user.
-func New(password, sessionSecret string, allowedEmails, supervisorEmails []string) *Authenticator {
+func New(password, sessionSecret string, allowedEmails, supervisorEmails, adminEmails []string) *Authenticator {
 	if len(allowedEmails) == 0 {
 		allowedEmails = defaultUsers
 	}
@@ -70,6 +89,15 @@ func New(password, sessionSecret string, allowedEmails, supervisorEmails []strin
 			supervisors[e] = true
 		}
 	}
+	// Break-glass admins. Default to the built-in owner when unset so the deployment
+	// always has at least one admin that the in-app roster can't remove. Not filtered
+	// by the allow-list — an admin is implicitly allowed (see roleOf/IsAllowed).
+	admins := map[string]bool{}
+	for _, e := range DefaultAdminEmails(adminEmails) {
+		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+			admins[e] = true
+		}
+	}
 	store := sessions.NewCookieStore([]byte(sessionSecret))
 	store.Options = &sessions.Options{
 		Path:     "/",
@@ -78,23 +106,93 @@ func New(password, sessionSecret string, allowedEmails, supervisorEmails []strin
 		SameSite: http.SameSiteLaxMode,
 		// TLS terminated upstream by Cloudflare, so Secure is left false here.
 	}
-	return &Authenticator{allowed: allowed, supervisors: supervisors, password: password, store: store}
+	return &Authenticator{allowed: allowed, supervisors: supervisors, admins: admins, password: password, store: store}
+}
+
+// SetRoleSource wires the DB-backed role lookup (a db.RoleCache.RoleOf). It returns
+// (role, dbOK): when dbOK is true the answer is authoritative (role may be "" =
+// no access); when false the DB was unreachable and roleOf falls back to the env
+// sets. Set after the DB exists (late-binding, like the dataFreshness template func).
+func (a *Authenticator) SetRoleSource(fn func(email string) (string, bool)) { a.roleFn = fn }
+
+// roleOf resolves a caller's effective role: "admin" | "supervisor" | "officer" |
+// "" (no access). Precedence: break-glass admins always win; then the DB role
+// source (authoritative once wired); then the env allow/supervisor lists as a
+// fail-safe fallback if the DB lookup is unavailable.
+func (a *Authenticator) roleOf(email string) string {
+	e := strings.ToLower(strings.TrimSpace(email))
+	if e == "" {
+		return ""
+	}
+	if a.admins[e] {
+		return "admin"
+	}
+	if a.roleFn != nil {
+		if role, dbOK := a.roleFn(e); dbOK {
+			return role
+		}
+	}
+	if a.supervisors[e] {
+		return "supervisor"
+	}
+	if a.allowed[e] {
+		return "officer"
+	}
+	return ""
 }
 
 func (a *Authenticator) IsAllowed(email string) bool {
-	return a.allowed[strings.ToLower(strings.TrimSpace(email))]
+	return a.roleOf(email) != ""
 }
 
-// IsSupervisor reports whether the email is in the supervisor tier (a subset of
-// the allow-list). Supervisor-only actions: delete / restore / field overrides.
+// IsSupervisor reports whether the email is supervisor-or-above. Supervisor actions:
+// delete / restore / overrides / fee waivers / caseload / CSV import.
 func (a *Authenticator) IsSupervisor(email string) bool {
-	return a.supervisors[strings.ToLower(strings.TrimSpace(email))]
+	switch a.roleOf(email) {
+	case "supervisor", "admin":
+		return true
+	}
+	return false
+}
+
+// IsAdmin reports whether the email is in the admin tier. Admin-only actions:
+// manage users & roles.
+func (a *Authenticator) IsAdmin(email string) bool {
+	return a.roleOf(email) == "admin"
+}
+
+// IsBreakGlassAdmin reports whether the email is a hardcoded break-glass admin
+// (ADMIN_EMAILS / the built-in default). Those accounts are always admin and can't
+// be demoted or removed from the in-app roster — the lockout backstop.
+func (a *Authenticator) IsBreakGlassAdmin(email string) bool {
+	return a.admins[strings.ToLower(strings.TrimSpace(email))]
+}
+
+// AllowedEmails / SupervisorEmails return the EFFECTIVE env-derived sets (after the
+// built-in fallback for an unset ALLOWED_EMAILS). main seeds the app_users roster
+// from these so the seeded roster matches exactly who auth admits today — seeding
+// from the raw env vars would miss the fallback users and, since the DB is
+// authoritative once seeded, lock them out.
+func (a *Authenticator) AllowedEmails() []string {
+	out := make([]string, 0, len(a.allowed))
+	for e := range a.allowed {
+		out = append(out, e)
+	}
+	return out
+}
+
+func (a *Authenticator) SupervisorEmails() []string {
+	out := make([]string, 0, len(a.supervisors))
+	for e := range a.supervisors {
+		out = append(out, e)
+	}
+	return out
 }
 
 // Login validates credentials and writes the session cookie.
 func (a *Authenticator) Login(w http.ResponseWriter, r *http.Request, email, password string) bool {
 	email = strings.ToLower(strings.TrimSpace(email))
-	if !a.allowed[email] || !a.checkPassword(password) {
+	if !a.IsAllowed(email) || !a.checkPassword(password) {
 		return false
 	}
 	sess, _ := a.store.Get(r, sessionName)
@@ -221,7 +319,7 @@ func (a *Authenticator) resolve(r *http.Request) string {
 	}
 	// 2) Session cookie.
 	if sess, err := a.store.Get(r, sessionName); err == nil {
-		if u, ok := sess.Values["user"].(string); ok && a.allowed[u] {
+		if u, ok := sess.Values["user"].(string); ok && a.IsAllowed(u) {
 			return u
 		}
 	}
@@ -246,7 +344,7 @@ func (a *Authenticator) basicAuth(r *http.Request) string {
 		return ""
 	}
 	user = strings.ToLower(strings.TrimSpace(user))
-	if a.allowed[user] && a.checkPassword(pass) {
+	if a.IsAllowed(user) && a.checkPassword(pass) {
 		return user
 	}
 	return ""

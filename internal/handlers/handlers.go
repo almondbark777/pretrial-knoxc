@@ -39,6 +39,11 @@ type Server struct {
 	// invocation (importcsv.go) — used by tests to stub the subprocess.
 	ReconcileExec func(ctx context.Context, dir string, apply, addsOnly bool) (*ReconcileSummary, string, error)
 
+	// Roles is the DB-backed role cache (app_users). The user-management handlers
+	// call Invalidate() after a change so it takes effect immediately. May be nil
+	// in tests that don't exercise role management.
+	Roles *db.RoleCache
+
 	cacheTTL time.Duration
 	mu       sync.Mutex
 	cached   map[string][]*compute.Client

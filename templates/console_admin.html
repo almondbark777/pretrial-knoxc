@@ -7,23 +7,76 @@
   {{if not .IsSupervisor}}<div class="right"><span class="asof">read-only · supervisor sign-in required to change</span></div>{{end}}
 </div>
 
-<div class="grid2">
-  <div class="panel">
-    <div class="h"><h2>Users &amp; Roles</h2><span class="grow"></span><button class="btn ghost sm" onclick="openAction('soon','user management')">+ Add user</button></div>
-    <div class="pad">
-      <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Three roles gate capability (not pages), built as a config map so re-tuning who-can-do-what is a config change, not a refactor:</p>
-      <div class="condrow" style="border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;padding:11px 14px"><div class="grow"><div class="t">Officer</div><div class="m">Read everything; create notes, check-ins, court dates, violations, reminders.</div></div><span class="chip info">officer</span></div>
-      <div class="condrow" style="border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;padding:11px 14px"><div class="grow"><div class="t">Supervisor</div><div class="m">+ apply overrides/corrections, waive fees/conditions, reassign clients.</div></div><span class="chip warn">supervisor</span></div>
-      <div class="condrow" style="border:1px solid var(--line);border-radius:var(--r);padding:11px 14px"><div class="grow"><div class="t">Admin</div><div class="m">+ manage users, conditions library, reminder templates.</div></div><span class="chip risk">admin</span></div>
-    </div>
+<div class="panel">
+  <div class="h"><h2>Users &amp; Roles</h2><span class="grow"></span>
+    {{if not .IsAdmin}}<span class="asof">read-only &middot; admin sign-in required to change</span>{{end}}
   </div>
-
-  <div class="panel">
-    <div class="h"><h2>Overridable Fields</h2></div>
-    <div class="pad">
-      <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Roster facts are corrected as <b>overrides</b> applied on read (never edits to <code>raw_*</code>), so a fix shows in both apps. Supervisor-only.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:7px">{{range .Fields}}<span class="chip neutral">{{.Label}}</span>{{end}}</div>
+  <div class="pad">
+    <p class="muted" style="padding:0;margin:0 0 10px;font-size:13px">Three tiers gate what a person can do. Changes here take effect immediately &mdash; no redeploy.</p>
+    <div class="rolelegend">
+      <span><span class="chip info">officer</span> read everything + log notes/check-ins/payments/court/violations</span>
+      <span><span class="chip warn">supervisor</span> + deletes, overrides, fee waivers, caseload, CSV import</span>
+      <span><span class="chip risk">admin</span> + manage users &amp; roles (this panel)</span>
     </div>
+    <div class="note-hint" style="margin:12px 0">&#9888; A brand-new person also needs their email on the <b>Cloudflare Access</b> allow-list (a separate outer gate, managed in the Cloudflare dashboard) to reach the site at all. Changing an existing person&rsquo;s role is fully handled here.</div>
+
+    {{if .IsAdmin}}
+    <form method="post" action="/admin/user/save" class="useradd">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="next" value="/console/admin">
+      <input type="email" name="email" placeholder="name@knoxsheriff.org" required>
+      <select name="role">{{range .Roles}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+      <button type="submit" class="btn">Add / update</button>
+    </form>
+    {{end}}
+
+    {{if .Users}}
+    <div class="tscroll" style="margin-top:12px"><table class="data">
+      <thead><tr><th>Email</th><th>Role</th><th>Added by</th>{{if .IsAdmin}}<th>Change</th>{{end}}</tr></thead>
+      <tbody>
+      {{range .Users}}
+      <tr style="cursor:default">
+        <td>{{.Email}}</td>
+        <td><span class="chip {{if eq .Role "admin"}}risk{{else if eq .Role "supervisor"}}warn{{else}}info{{end}}">{{.Role}}</span></td>
+        <td class="muted">{{.AddedBy}}</td>
+        {{if $.IsAdmin}}
+        <td>
+          {{if .Permanent}}<span class="muted" title="break-glass admin — can't be changed or removed">permanent admin</span>
+          {{else}}
+          <form method="post" action="/admin/user/save" style="display:inline-flex;gap:6px;align-items:center;margin:0">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="next" value="/console/admin"><input type="hidden" name="email" value="{{.Email}}">
+            <select name="role" onchange="this.form.submit()">{{$cur := .Role}}{{range $.Roles}}<option value="{{.}}"{{if eq . $cur}} selected{{end}}>{{.}}</option>{{end}}</select>
+          </form>
+          {{if not .IsSelf}}
+          <form method="post" action="/admin/user/remove" style="display:inline;margin:0 0 0 6px" onsubmit="return confirm('Remove {{.Email}} — they lose access immediately. Continue?');">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="next" value="/console/admin"><input type="hidden" name="email" value="{{.Email}}">
+            <button type="submit" class="btn ghost sm">Remove</button>
+          </form>
+          {{end}}
+          {{end}}
+        </td>
+        {{end}}
+      </tr>
+      {{end}}
+      </tbody>
+    </table></div>
+    {{else}}
+    <div class="emptybox" style="margin-top:12px"><div class="big">&#9711;</div>No users yet — the roster seeds from the configured allow-list on first run.</div>
+    {{end}}
+  </div>
+</div>
+<style>
+.rolelegend{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)}
+.rolelegend .chip{margin-right:4px}
+.useradd{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2)}
+.useradd input[type=email]{flex:1 1 220px;padding:8px 10px;border:1px solid var(--line-2);border-radius:var(--r-sm);font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}
+.useradd select{padding:8px 10px;border:1px solid var(--line-2);border-radius:var(--r-sm);font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}
+</style>
+
+<div class="panel" style="margin-top:18px">
+  <div class="h"><h2>Overridable Fields</h2></div>
+  <div class="pad">
+    <p class="muted" style="padding:0;margin:0 0 12px;font-size:13px">Roster facts are corrected as <b>overrides</b> applied on read (never edits to <code>raw_*</code>), so a fix shows in both apps. Supervisor-only.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:7px">{{range .Fields}}<span class="chip neutral">{{.Label}}</span>{{end}}</div>
   </div>
 </div>
 
