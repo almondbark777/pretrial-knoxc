@@ -357,18 +357,22 @@ func (s *Server) ConsoleAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Users"] = userRows
 	data["Roles"] = []string{"officer", "supervisor", "admin"}
-	// Caseload-by-last-name grid (officers × A–Z). The officer list is the same
-	// roster set the intake wizard offers, unioned with any officer that already
-	// owns a letter (so an existing assignment always renders a row and survives a
-	// save even if that officer currently has no open clients).
+	// Caseload-by-last-name grid (officers × A–Z). Officer rows = everyone on the
+	// email allow-list, shown by name (FmtOfficer), so every authorized user can be
+	// assigned a letter regardless of whether they currently supervise any open
+	// client. Unioned with any officer that already owns a letter (so an existing
+	// assignment always renders a row and survives a save even if that email is no
+	// longer on the list).
 	caseload, _ := db.LoadCaseloadLetters(s.DB)
 	var officers []string
-	if clients, err := s.clients(); err == nil {
-		officers = distinctOfficers(clients)
-	}
 	seen := map[string]bool{}
-	for _, o := range officers {
-		seen[o] = true
+	for _, email := range s.Auth.AllowedEmails() {
+		name := compute.FmtOfficer(email)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		officers = append(officers, name)
 	}
 	for _, o := range caseload {
 		if !seen[o] {
