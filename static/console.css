@@ -11,6 +11,7 @@
    =========================================================================== */
 
 :root{
+  color-scheme: light;
   /* surfaces (light, default) */
   --bg:#eaeef4;
   --panel:#ffffff;
@@ -50,6 +51,7 @@
 }
 
 html[data-theme="dark"]{
+  color-scheme: dark;
   --bg:#0b0e13;
   --panel:#141a22;
   --panel-2:#1a212c;

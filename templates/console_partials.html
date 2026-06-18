@@ -16,8 +16,18 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Knox County Pre-Trial — Case Console</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231f4e79'/><text x='16' y='22' font-size='15' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial,sans-serif'>PT</text></svg>">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#1f4e79">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0e13">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Pre-Trial">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="stylesheet" href="/static/console.css">
-<script>/* set theme before paint to avoid a flash */try{var _t=localStorage.getItem('ptc-theme');if(_t)document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
+<script>/* set theme before paint to avoid a flash. Explicit ptc-theme (light|dark) wins;
+   with no stored choice we follow the phone's light/dark setting. */
+try{var _t=localStorage.getItem('ptc-theme');if(_t!=='light'&&_t!=='dark'){_t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 </head>
 <body class="console">
 <div class="capp">
@@ -121,10 +131,23 @@ function ptToast(title, msg, tone){
   var btn=document.getElementById('themebtn');
   if(!btn)return;
   btn.addEventListener('click',function(){
-    var cur=document.documentElement.getAttribute('data-theme')==='dark'?'':'dark';
-    if(cur){document.documentElement.setAttribute('data-theme','dark');}else{document.documentElement.removeAttribute('data-theme');}
+    var cur=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',cur);
     try{localStorage.setItem('ptc-theme',cur);}catch(e){}
   });
+})();
+
+/* ── follow the phone's light/dark in real time, but only until the user has
+      made an explicit choice with the toggle above. ───────────────────────── */
+(function(){
+  try{
+    var mq=matchMedia('(prefers-color-scheme:dark)');
+    var onChange=function(e){
+      var s=localStorage.getItem('ptc-theme');
+      if(s!=='light'&&s!=='dark'){document.documentElement.setAttribute('data-theme',e.matches?'dark':'light');}
+    };
+    if(mq.addEventListener){mq.addEventListener('change',onChange);}else if(mq.addListener){mq.addListener(onChange);}
+  }catch(e){}
 })();
 
 /* ── as-of (track-date) control: sets a cookie + reloads; whole console re-runs
