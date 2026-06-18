@@ -25,9 +25,9 @@
 <meta name="apple-mobile-web-app-title" content="Pre-Trial">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="stylesheet" href="/static/console.css">
-<script>/* set theme before paint to avoid a flash. Explicit ptc-theme (light|dark) wins;
-   with no stored choice we follow the phone's light/dark setting. */
-try{var _t=localStorage.getItem('ptc-theme');if(_t!=='light'&&_t!=='dark'){_t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
+<script>/* set theme before paint to avoid a flash. ptc-theme is light|dark|system
+   (anything else / unset = system = follow the phone's light/dark). */
+try{var _m=localStorage.getItem('ptc-theme');if(_m!=='light'&&_m!=='dark')_m='system';var _e=_m==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):_m;document.documentElement.setAttribute('data-theme',_e);}catch(e){}</script>
 </head>
 <body class="console">
 <div class="capp">
@@ -128,26 +128,26 @@ function ptToast(title, msg, tone){
 
 /* ── theme toggle ─────────────────────────────────────────────────────────── */
 (function(){
+  /* 3-way cycle: Light → Dark → System. System (the default) follows the phone's
+     light/dark live; a manual pick sticks until you cycle back to System. */
+  var mq=matchMedia('(prefers-color-scheme:dark)');
   var btn=document.getElementById('themebtn');
-  if(!btn)return;
-  btn.addEventListener('click',function(){
-    var cur=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
-    document.documentElement.setAttribute('data-theme',cur);
-    try{localStorage.setItem('ptc-theme',cur);}catch(e){}
-  });
-})();
-
-/* ── follow the phone's light/dark in real time, but only until the user has
-      made an explicit choice with the toggle above. ───────────────────────── */
-(function(){
-  try{
-    var mq=matchMedia('(prefers-color-scheme:dark)');
-    var onChange=function(e){
-      var s=localStorage.getItem('ptc-theme');
-      if(s!=='light'&&s!=='dark'){document.documentElement.setAttribute('data-theme',e.matches?'dark':'light');}
-    };
-    if(mq.addEventListener){mq.addEventListener('change',onChange);}else if(mq.addListener){mq.addListener(onChange);}
-  }catch(e){}
+  var GLYPH={light:'☀',dark:'☾',system:'◐'};
+  var NEXT={light:'dark',dark:'system',system:'light'};
+  function mode(){var m=localStorage.getItem('ptc-theme');return (m==='light'||m==='dark'||m==='system')?m:'system';}
+  function eff(m){return m==='system'?(mq.matches?'dark':'light'):m;}
+  function paint(){
+    var m=mode();
+    document.documentElement.setAttribute('data-theme',eff(m));
+    if(btn){btn.textContent=GLYPH[m];btn.title='Theme: '+m+(m==='system'?' (follows your device)':'')+' — tap to change';btn.setAttribute('aria-label','Theme: '+m);}
+  }
+  if(btn){btn.addEventListener('click',function(){
+    try{localStorage.setItem('ptc-theme',NEXT[mode()]);}catch(e){}
+    paint();
+  });}
+  var onChange=function(){if(mode()==='system')paint();};
+  if(mq.addEventListener){mq.addEventListener('change',onChange);}else if(mq.addListener){mq.addListener(onChange);}
+  paint();
 })();
 
 /* ── as-of (track-date) control: sets a cookie + reloads; whole console re-runs
