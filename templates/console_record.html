@@ -232,6 +232,7 @@
         {{if $r.GPS.Vendor}}
         <table class="kv">
           <tr><td>Vendor</td><td>{{$r.GPS.Vendor}}{{if $r.GPS.HasSwitch}} → {{$r.GPS.Vendor2}}{{end}}</td></tr>
+          {{if $r.GpsInstall}}<tr><td>Install date</td><td>{{$r.GpsInstall}}</td></tr>{{end}}
           <tr><td>Daily rate</td><td>{{if $r.GPS.DailyRate}}{{moneyi (derefi $r.GPS.DailyRate)}}/day{{else}}—{{end}}</td></tr>
           <tr><td>Days active</td><td>{{intP $r.GPS.DaysActive}}</td></tr>
           <tr><td>Days covered</td><td>{{days1 $r.GPS.DaysCovered}}</td></tr>

@@ -8,6 +8,7 @@
   <div class="right">
     <button class="btn ghost sm" onclick="window.print()">Print / PDF</button>
     <a class="btn ghost sm" href="/export/cases.csv">Export cases CSV ⤓</a>
+    {{if .IsSupervisor}}<a class="btn ghost sm" href="/export/all.zip" title="Download every list — blue book, check-ins, payments, GPS, and the app's own data — as a ZIP of CSVs (Excel-ready)">Export all data ⤓</a>{{end}}
     <a class="btn sm" href="/reports" title="Letterhead-ready Behind / Missed / EM-fee reports">Printable reports →</a>
   </div>
 </div>

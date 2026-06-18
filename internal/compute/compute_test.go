@@ -385,3 +385,33 @@ func dumpGPS(g GPSResult) string {
 		" owed=" + f(g.TotalOwedDollars) + " surplus$=" + f(g.SurplusDollars) +
 		" surplusDays=" + i(g.SurplusDays)
 }
+
+func TestParseDateTime(t *testing.T) {
+	// Preserves the clock time from the real referral_date format.
+	if got, ok := ParseDateTime("4/30/2026 7:30"); !ok || got.Hour() != 7 || got.Minute() != 30 ||
+		got.Year() != 2026 || got.Month() != time.April || got.Day() != 30 {
+		t.Fatalf("US datetime: got %v ok=%v", got, ok)
+	}
+	// 24-hour times stay 24-hour (16:41 → 4:41 PM on screen).
+	if got, ok := ParseDateTime("4/29/2026 16:41"); !ok || got.Hour() != 16 || got.Minute() != 41 {
+		t.Fatalf("24h time: got %v ok=%v", got, ok)
+	}
+	// Same-day ordering: a later time sorts After an earlier one (feed = newest first).
+	a, _ := ParseDateTime("4/30/2026 7:30")
+	b, _ := ParseDateTime("4/30/2026 4:36")
+	if !a.After(b) {
+		t.Fatalf("expected 7:30 to sort after 4:36")
+	}
+	// ISO with time.
+	if got, ok := ParseDateTime("2026-04-30T09:15:00"); !ok || got.Hour() != 9 || got.Minute() != 15 {
+		t.Fatalf("ISO datetime: got %v ok=%v", got, ok)
+	}
+	// Date-only falls back to noon (still ok, so it's always safe to sort).
+	if got, ok := ParseDateTime("4/30/2026"); !ok || got.Hour() != 12 {
+		t.Fatalf("date-only should fall back to noon: got %v ok=%v", got, ok)
+	}
+	// Blank → not ok.
+	if _, ok := ParseDateTime("   "); ok {
+		t.Fatalf("blank should be !ok")
+	}
+}

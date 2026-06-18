@@ -279,6 +279,9 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 		if dt, ok := compute.ParseDay(norm(r["referral_date"])); ok {
 			c.RefD, c.RefOK = dt, true
 		}
+		if dt, ok := compute.ParseDateTime(norm(r["referral_date"])); ok {
+			c.RefDT, c.RefDTOK = dt, true
+		}
 		if dt, ok := compute.ParseDay(norm(r["closed_date"])); ok {
 			c.ClosedD, c.ClosedOK = dt, true
 		}

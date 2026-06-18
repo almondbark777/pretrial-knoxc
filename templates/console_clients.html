@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded',function(){
   /* ── render helpers ──────────────────────────────────────────────────────── */
   function esc(s){return (''+(s==null?'':s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
   function chip(tone,icon,label){return '<span class="chip '+tone+'">'+(icon?'<span class="g">'+icon+'</span>':'')+esc(label)+'</span>'}
-  function lvlChip(l,g){return g?chip('info','','GPS'):l===1?chip('ok','','Level 1'):l===2?chip('warn','','Level 2'):l===3?chip('risk','','Level 3'):chip('neutral','','Level —')}
+  function lvlChip(l,g){return g?chip('gps','','GPS'):l===1?chip('ok','','Level 1'):l===2?chip('warn','','Level 2'):l===3?chip('risk','','Level 3'):chip('neutral','','Level —')}
   function statusChip(label){return chip(label==='Active'?'info':'neutral','',label||'Unknown')}
   function compChip(label){
     switch(label){

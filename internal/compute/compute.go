@@ -32,6 +32,10 @@ func Noon(y int, m time.Month, d int) time.Time {
 var (
 	reISO = regexp.MustCompile(`^(\d{4})-(\d{1,2})-(\d{1,2})`)
 	reUS  = regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})`)
+	// Same shapes, but also capturing an optional clock time — for ParseDateTime,
+	// where ordering within a day matters (e.g. the new-referrals feed).
+	reISODT = regexp.MustCompile(`^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?`)
+	reUSDT  = regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?`)
 	// Fallback layouts (the regexes above catch every real format in the data;
 	// these only matter for oddballs, matching the JS `new Date(t)` fallback).
 	fallbackLayouts = []string{
@@ -68,6 +72,48 @@ func ParseDay(s string) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// ParseDateTime is like ParseDay but PRESERVES the clock time when the source
+// carries one (e.g. "4/30/2026 7:30" or an ISO timestamp). When only a date is
+// present it falls back to noon, so the result is always safe to sort. Used for
+// ordering within a day (the dashboard new-referrals feed). Returns (time, ok).
+func ParseDateTime(s string) (time.Time, bool) {
+	t := strings.TrimSpace(s)
+	if t == "" {
+		return time.Time{}, false
+	}
+	hms := func(hh, mm, ss string) (int, int, int) {
+		h, _ := strconv.Atoi(hh)
+		mi, _ := strconv.Atoi(mm)
+		se, _ := strconv.Atoi(ss)
+		return h, mi, se
+	}
+	if m := reISODT.FindStringSubmatch(t); m != nil {
+		y, _ := strconv.Atoi(m[1])
+		mo, _ := strconv.Atoi(m[2])
+		d, _ := strconv.Atoi(m[3])
+		if y > 0 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31 {
+			if m[4] != "" {
+				h, mi, se := hms(m[4], m[5], m[6])
+				return time.Date(y, time.Month(mo), d, h, mi, se, 0, time.UTC), true
+			}
+			return Noon(y, time.Month(mo), d), true
+		}
+	}
+	if m := reUSDT.FindStringSubmatch(t); m != nil {
+		mo, _ := strconv.Atoi(m[1])
+		d, _ := strconv.Atoi(m[2])
+		y, _ := strconv.Atoi(m[3])
+		if y > 0 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31 {
+			if m[4] != "" {
+				h, mi, se := hms(m[4], m[5], m[6])
+				return time.Date(y, time.Month(mo), d, h, mi, se, 0, time.UTC), true
+			}
+			return Noon(y, time.Month(mo), d), true
+		}
+	}
+	return ParseDay(t)
 }
 
 func addDays(d time.Time, n int) time.Time { return d.AddDate(0, 0, n) }
@@ -281,6 +327,8 @@ type Client struct {
 
 	RefD     time.Time
 	RefOK    bool
+	RefDT    time.Time // referral timestamp incl. clock time when present (feed sort/display)
+	RefDTOK  bool
 	ClosedD  time.Time
 	ClosedOK bool
 

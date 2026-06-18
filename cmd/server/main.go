@@ -204,6 +204,7 @@ func main() {
 	r.Get("/export/violations.csv", srv.ExportViolations)
 	r.Get("/export/cases.csv", srv.ExportCases)
 	r.Get("/export/em-fees.csv", srv.ExportEMFees)
+	r.Get("/export/all.zip", srv.ExportAllData) // full DB dump (supervisor-gated inside the handler)
 
 	// Printable reports (clean black-on-white via print CSS).
 	r.Get("/reports", srv.Reports)

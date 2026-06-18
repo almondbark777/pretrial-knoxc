@@ -236,6 +236,11 @@ a.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var
 .chip.ok{background:var(--ok-bg);color:var(--ok-ink);border-color:var(--ok-line)}
 .chip.info{background:var(--info-bg);color:var(--info-ink);border-color:var(--info-line)}
 .chip.neutral{background:var(--neut-bg);color:var(--neut-ink);border-color:var(--neut-line)}
+/* GPS tag — the one deliberately loud, solid-red chip so officers spot a
+   GPS-monitored client at a glance (Alex's request). It intentionally breaks
+   the soft Wong palette; the "GPS" text label keeps it colorblind-readable.
+   Solid fill works on both light and dark panels, so one rule covers both. */
+.chip.gps{background:#d32f2f;color:#fff;border-color:#b71c1c;font-weight:700}
 
 /* ── buttons ─────────────────────────────────────────────────────────────── */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;cursor:pointer;font:inherit;font-size:13px;font-weight:600;

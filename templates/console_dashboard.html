@@ -39,17 +39,17 @@
 
 <div class="grid2">
   <div class="panel">
-    <div class="h"><h2>New Referrals · Past 24 Hours</h2><span class="grow"></span><span class="count">{{$d.ReferralTotal}}</span></div>
+    <div class="h"><h2>New Referrals · Past 48 Hours</h2><span class="grow"></span><span class="count">{{$d.ReferralTotal}}</span></div>
     {{if gt $d.ReferralTotal (len $d.Referrals)}}<div class="muted" style="padding:8px 18px 0;font-size:12px">Showing the {{len $d.Referrals}} most recent of {{$d.ReferralTotal}} — full roster in <a href="/console/clients">Clients</a>.</div>{{end}}
     <div class="body" id="referralfeed">
       {{range $d.Referrals}}
       <div class="frow" data-mine="{{.Mine}}">
         <span class="rail {{.Chip.Tone}}">{{.Icon}}</span>
         <div class="grow"><div class="t"><a href="/console/clients/{{.IDN}}">{{.Name}}</a></div><div class="m">{{.Context}}</div></div>
-        {{template "chip" .Chip}}
+        {{if .GpsActive}}<span class="chip gps">GPS</span>{{end}}{{template "chip" .Chip}}
       </div>
       {{else}}
-      <div class="emptybox"><div class="big">◯</div>No new referrals in the past 24 hours.</div>
+      <div class="emptybox"><div class="big">◯</div>No new referrals in the past 48 hours.</div>
       {{end}}
     </div>
   </div>
@@ -60,7 +60,7 @@
       {{range $d.Schedule}}
       <div class="frow" data-mine="{{.Mine}}">
         <div class="grow"><div class="t">{{if .IDN}}<a href="/console/clients/{{.IDN}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}</div><div class="m">{{.Sub}}</div></div>
-        {{template "chip" .Chip}}
+        {{if .GpsActive}}<span class="chip gps">GPS</span>{{end}}{{template "chip" .Chip}}
       </div>
       {{else}}
       <div class="emptybox"><div class="big">◯</div>Nothing scheduled for today.</div>

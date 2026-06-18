@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"archive/zip"
 	"encoding/csv"
 	"net/http"
 	"strconv"
@@ -111,4 +112,39 @@ func yesNo(b bool) string {
 		return "yes"
 	}
 	return "no"
+}
+
+// ExportAllData streams every data table as its own CSV inside a single ZIP — the
+// supervisor's "see all the data like the SharePoint lists" full dump (blue book,
+// check-ins, payments, GPS, plus the app's own tables). Supervisor-gated because
+// it's the complete dataset (PII); a read-only GET, so no CSRF.
+func (s *Server) ExportAllData(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireSupervisor(w, r); !ok {
+		return
+	}
+	tables, err := db.ListUserTables(s.DB)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", `attachment; filename="ptr-all-data-`+stamp()+`.zip"`)
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	for _, t := range tables {
+		cols, rows, derr := db.DumpTable(s.DB, t)
+		if derr != nil {
+			continue // skip a problematic table rather than abort the whole dump
+		}
+		f, ferr := zw.Create(t + ".csv")
+		if ferr != nil {
+			return
+		}
+		cw := csv.NewWriter(f)
+		_ = cw.Write(cols)
+		for _, row := range rows {
+			_ = cw.Write(row)
+		}
+		cw.Flush()
+	}
 }

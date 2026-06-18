@@ -228,8 +228,9 @@ func violationsSinceEpoch(vs []models.Violation) []models.Violation {
 }
 
 // rosterStateCounts tallies the cheap, current-state roster sizes with NO
-// per-client compute: distinct IDNs, open/closed by status, and GPS-active (any
-// case). BehindGPS/MissedMonth are left zero — those require full roster passes,
+// per-client compute: distinct IDNs, open/closed by status, and GPS-active among
+// OPEN cases only (people currently wearing, not closed/old referrals).
+// BehindGPS/MissedMonth are left zero — those require full roster passes,
 // so callers that already hold the behind/missed rosters set the lengths
 // themselves instead of recomputing (see consoleDashboard).
 func rosterStateCounts(clients map[string][]*compute.Client) models.Stats {
@@ -244,10 +245,15 @@ func rosterStateCounts(clients map[string][]*compute.Client) models.Stats {
 		} else if strings.HasPrefix(strings.ToLower(c.Status), "closed") {
 			s.Closed++
 		}
-		for _, cc := range cases { // GPS-active if ANY case is
-			if cc.GpsActive {
-				s.GPSActive++
-				break
+		// GPS-active = currently wearing: count only people with an OPEN case on
+		// GPS, not closed/old GPS referrals (the KPI was over-reporting total
+		// referrals — supervisor feedback, 2026-06).
+		if reOpen.MatchString(c.Status) {
+			for _, cc := range cases {
+				if cc.GpsActive {
+					s.GPSActive++
+					break
+				}
 			}
 		}
 	}

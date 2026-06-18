@@ -94,25 +94,27 @@ type ConsoleKPIs struct {
 }
 
 // ConsoleReferral is one row in the "new referrals" feed: a client referred
-// within the past 24 hours. Newest first.
+// within the past 48 hours, newest first (by full referral timestamp).
 type ConsoleReferral struct {
-	IDN     string
-	Name    string
-	Context string
-	Chip    Chip
-	Icon    string    // glyph on the rail
-	Mine    bool      // belongs to the signed-in officer's caseload
-	ref     time.Time // referral date — sort key (newer = higher)
+	IDN       string
+	Name      string
+	Context   string
+	Chip      Chip
+	Icon      string    // glyph on the rail
+	Mine      bool      // belongs to the signed-in officer's caseload
+	GpsActive bool      // on GPS → red GPS tag in the feed
+	ref       time.Time // referral date — sort key (newer = higher)
 }
 
 // ConsoleSched is one row in today's schedule.
 type ConsoleSched struct {
-	IDN   string
-	Time  string
-	Title string
-	Sub   string
-	Chip  Chip
-	Mine  bool
+	IDN       string
+	Time      string
+	Title     string
+	Sub       string
+	Chip      Chip
+	Mine      bool
+	GpsActive bool // on GPS → red GPS tag in the schedule
 }
 
 // ConsoleDashboard is the whole "My Caseload" view-model. ReferralTotal is the
@@ -161,6 +163,7 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 				IDN: c.IDN, Time: "Check-in", Title: c.Name,
 				Sub:  "Check-in due today · " + ci.NextDue.Label,
 				Chip: Chip{Tone: "warn", Icon: "◯", Label: "Due"}, Mine: mine(c.Officer),
+				GpsActive: c.GpsActive,
 			})
 		}
 	}
@@ -183,7 +186,8 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 				Chip: Chip{Tone: "info", Icon: "·", Label: "Court"},
 				// Attribute to the client's supervising officer so the court
 				// appearance shows up under "My caseload" (not hidden as Mine=false).
-				Mine: mine(officerForIDN(clients, cd.IDN)),
+				Mine:      mine(officerForIDN(clients, cd.IDN)),
+				GpsActive: gpsActiveForIDN(clients, cd.IDN),
 			})
 		}
 	}
@@ -201,7 +205,8 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 			Sub:  "Scheduled check-in" + appendIf(" · ", sc.Type),
 			Chip: Chip{Tone: "info", Icon: "·", Label: "Scheduled"},
 			// Attribute to the supervising officer so it survives "My caseload".
-			Mine: mine(officerForIDN(clients, sc.IDN)),
+			Mine:      mine(officerForIDN(clients, sc.IDN)),
+			GpsActive: gpsActiveForIDN(clients, sc.IDN),
 		})
 	}
 
@@ -212,7 +217,7 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 	// compliance-alert feed — officers want the freshest intakes front-and-center
 	// to assign + set the first check-in. The behind/missed/violation rosters
 	// still feed the KPIs and the Compliance page.
-	cutoff := track.AddDate(0, 0, -1) // 24h window (referral dates are day-granular)
+	cutoff := track.AddDate(0, 0, -2) // 48h window (referral dates are day-granular)
 	for _, cases := range clients {
 		c := openRep(cases)
 		if c == nil || !c.RefOK || c.RefD.Before(cutoff) || c.RefD.After(track) {
@@ -223,11 +228,21 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 		if officer == "" {
 			officer = "Unassigned"
 		}
+		// Sort + display by the full referral timestamp when the source carries a
+		// clock time (it usually does), so same-day intakes order newest-first by
+		// time, not alphabetically. Noon == date-only → show the date alone.
+		refDisp, sortKey := c.RefD.Format("Jan 2"), c.RefD
+		if c.RefDTOK {
+			sortKey = c.RefDT
+			if !(c.RefDT.Hour() == 12 && c.RefDT.Minute() == 0 && c.RefDT.Second() == 0) {
+				refDisp = c.RefDT.Format("Jan 2, 3:04 PM")
+			}
+		}
 		d.Referrals = append(d.Referrals, ConsoleReferral{
 			IDN: c.IDN, Name: c.Name,
-			Context: "Referred " + c.RefD.Format("Jan 2") + " · " + officer,
+			Context: "Referred " + refDisp + " · " + officer,
 			Chip:    levelChip(lvl), Icon: "＋",
-			Mine: mine(c.Officer), ref: c.RefD,
+			Mine: mine(c.Officer), ref: sortKey, GpsActive: c.GpsActive,
 		})
 	}
 	sort.SliceStable(d.Referrals, func(i, j int) bool {
@@ -515,6 +530,7 @@ type ConsoleRecord struct {
 	PTR            compute.PTRResult
 	GPS            compute.GPSResult
 	GpsWaived      bool
+	GpsInstall     string
 	Notes          []models.Note
 	Activity       []ConsoleTLItem
 
@@ -551,9 +567,19 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		rec.ClosedDate = c.ClosedD.Format("Jan 2, 2006")
 	}
 
+	// GPS install date — already in the data (we flag it when missing); the
+	// supervisor wants it shown on the GPS card. Format like other record dates.
+	if c.GpInstall != "" {
+		if dt, ok := compute.ParseDay(c.GpInstall); ok {
+			rec.GpsInstall = dt.Format("Jan 2, 2006")
+		} else {
+			rec.GpsInstall = c.GpInstall
+		}
+	}
+
 	// Badges: GPS condition + any open violation.
 	if c.GpsActive {
-		rec.Badges = append(rec.Badges, Chip{Tone: "info", Label: "GPS Monitored"})
+		rec.Badges = append(rec.Badges, Chip{Tone: "gps", Label: "GPS Monitored"})
 	}
 	if len(extras.Violations) > 0 {
 		rec.Badges = append(rec.Badges, Chip{Tone: "risk", Icon: "⚠", Label: "Open Violation"})
@@ -1095,6 +1121,17 @@ func officerForIDN(clients map[string][]*compute.Client, idn string) string {
 		return c.Officer
 	}
 	return ""
+}
+
+// gpsActiveForIDN reports whether the client (any case) is on GPS — used to put
+// the red GPS tag on dashboard schedule rows that only carry an IDN.
+func gpsActiveForIDN(clients map[string][]*compute.Client, idn string) bool {
+	for _, c := range clients[idn] {
+		if c.GpsActive {
+			return true
+		}
+	}
+	return false
 }
 
 // toneIf returns tone when cond is true, else "" (no tone).
