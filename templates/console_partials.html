@@ -95,6 +95,30 @@ try{var _m=localStorage.getItem('ptc-theme');if(_m!=='light'&&_m!=='dark')_m='sy
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
+{{/* ── Group chat ──────────────────────────────────────────────────────────────
+     Floating launcher + docked panel. Live over SSE (/chat/stream); presence is
+     every approved user (.ChatRoster) lit green when online. Messages persist
+     server-side (7-day retention) and send via POST /chat/send. */}}
+<button type="button" id="chatFab" class="chat-fab" title="Team chat" aria-label="Open team chat" aria-expanded="false">
+  <span class="cf-ico" aria-hidden="true">💬</span>
+  <span class="chat-badge" id="chatBadge" hidden>0</span>
+</button>
+<section id="chatPanel" class="chat-panel" hidden aria-label="Team chat">
+  <header class="chat-head">
+    <div><b>Team Chat</b><span class="chat-online" id="chatOnline">0 online</span></div>
+    <button type="button" class="x" id="chatClose" aria-label="Close chat">×</button>
+  </header>
+  <div class="chat-roster" id="chatRoster">
+    {{range .ChatRoster}}<span class="cu" data-email="{{.Email}}" title="{{.Name}}"><i class="cu-dot"></i>{{.Name}}</span>{{end}}
+  </div>
+  <div class="chat-log" id="chatLog" aria-live="polite"></div>
+  <div class="chat-status" id="chatStatus">Connecting…</div>
+  <form class="chat-compose" id="chatForm">
+    <textarea id="chatInput" rows="1" placeholder="Message the team…" maxlength="4000" autocomplete="off" disabled></textarea>
+    <button type="submit" id="chatSend" disabled>Send</button>
+  </form>
+</section>
+
 {{/* keyboard-shortcut help overlay (opened with "?") */}}
 <div class="backdrop" id="kbdModal" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
@@ -333,6 +357,76 @@ document.addEventListener('submit',function(e){
   });
 })();
 {{if .Msg}}document.addEventListener('DOMContentLoaded',function(){ptToast({{.Msg}},'');});{{end}}
+
+/* ── Group chat (SSE) ─────────────────────────────────────────────────────────
+   EventSource auto-reconnects and resumes via Last-Event-ID, so a WiFi blip just
+   re-attaches and catches up. Bodies/authors are inserted via textContent only —
+   never innerHTML — so a message can't inject markup. */
+(function(){
+  var fab=document.getElementById('chatFab'), panel=document.getElementById('chatPanel');
+  if(!fab||!panel)return;
+  var log=document.getElementById('chatLog'), form=document.getElementById('chatForm'),
+      input=document.getElementById('chatInput'), sendBtn=document.getElementById('chatSend'),
+      roster=document.getElementById('chatRoster'), onlineLbl=document.getElementById('chatOnline'),
+      statusEl=document.getElementById('chatStatus'), badge=document.getElementById('chatBadge'),
+      closeBtn=document.getElementById('chatClose');
+  var ME={{.MeEmail}}, csrf='', seen={}, unread=0, es=null;
+
+  function open(){panel.hidden=false;fab.setAttribute('aria-expanded','true');unread=0;badge.hidden=true;
+    setTimeout(function(){log.scrollTop=log.scrollHeight;input.focus();},0);}
+  function close(){panel.hidden=true;fab.setAttribute('aria-expanded','false');}
+  fab.addEventListener('click',function(){panel.hidden?open():close();});
+  closeBtn.addEventListener('click',close);
+
+  function fmtOfficer(email){var l=(email||'').split('@')[0];return l.split(/[._]/).map(function(p){return p?p.charAt(0).toUpperCase()+p.slice(1):p;}).join(' ');}
+
+  function addMsg(m){
+    if(m.id&&seen[m.id])return; if(m.id)seen[m.id]=true;
+    var atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;
+    var row=document.createElement('div'); row.className='cm'+(m.self?' me':'');
+    if(!m.self){var who=document.createElement('div'); who.className='cm-who'; who.textContent=m.author||fmtOfficer(m.email); row.appendChild(who);}
+    var bub=document.createElement('div'); bub.className='cm-bub'; bub.textContent=m.body; row.appendChild(bub);
+    var t=document.createElement('div'); t.className='cm-t'; t.textContent=m.time||''; row.appendChild(t);
+    log.appendChild(row);
+    if(atBottom||m.self)log.scrollTop=log.scrollHeight;
+    if(panel.hidden&&!m.self){unread++;badge.textContent=unread>99?'99+':unread;badge.hidden=false;}
+  }
+
+  function setPresence(online){
+    var set={}; (online||[]).forEach(function(e){set[(e||'').toLowerCase()]=true;});
+    var n=0;
+    roster.querySelectorAll('.cu').forEach(function(el){
+      var on=!!set[el.getAttribute('data-email')]; el.classList.toggle('online',on); if(on)n++;
+    });
+    onlineLbl.textContent=n+' online';
+  }
+
+  function connect(){
+    es=new EventSource('/chat/stream');
+    es.onopen=function(){statusEl.hidden=true;};
+    es.onerror=function(){statusEl.hidden=false;statusEl.textContent='Reconnecting…';}; // EventSource retries on its own
+    es.onmessage=function(ev){
+      var d; try{d=JSON.parse(ev.data);}catch(e){return;}
+      if(d.type==='csrf'){csrf=d.token; input.disabled=false; sendBtn.disabled=false; statusEl.hidden=true;}
+      else if(d.type==='presence'){setPresence(d.online);}
+      else if(d.type==='msg'){addMsg(d);}
+    };
+  }
+  connect();
+
+  function submit(){
+    var body=input.value.trim(); if(!body||!csrf)return;
+    input.value=''; autosize();
+    fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'csrf='+encodeURIComponent(csrf)+'&body='+encodeURIComponent(body)})
+      .then(function(r){if(!r.ok){statusEl.hidden=false;statusEl.textContent='Message failed to send.';input.value=body;}})
+      .catch(function(){statusEl.hidden=false;statusEl.textContent='Message failed to send.';input.value=body;});
+  }
+  form.addEventListener('submit',function(e){e.preventDefault();submit();});
+  input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit();}});
+  function autosize(){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,120)+'px';}
+  input.addEventListener('input',autosize);
+})();
 </script>
 </body>
 </html>{{end}}

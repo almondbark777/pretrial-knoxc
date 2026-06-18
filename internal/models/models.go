@@ -354,3 +354,12 @@ type AppUser struct {
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
+
+// ChatMessage is one line in the group chat (app-owned; not from raw_*).
+// Author is the sender's email; Created is an RFC3339 timestamp in ET.
+type ChatMessage struct {
+	ID      int64  `json:"id"`
+	Author  string `json:"author"`
+	Body    string `json:"body"`
+	Created string `json:"created"`
+}

@@ -15,6 +15,7 @@ import (
 
 	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/build"
+	"pretrial-knoxc/internal/chat"
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/models"
@@ -43,6 +44,10 @@ type Server struct {
 	// call Invalidate() after a change so it takes effect immediately. May be nil
 	// in tests that don't exercise role management.
 	Roles *db.RoleCache
+
+	// Chat is the in-memory group-chat hub (presence + live message fan-out).
+	// Set in main after New(); may be nil in tests that don't exercise chat.
+	Chat *chat.Hub
 
 	cacheTTL time.Duration
 	mu       sync.Mutex

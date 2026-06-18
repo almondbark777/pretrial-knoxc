@@ -278,6 +278,14 @@ CREATE TABLE IF NOT EXISTS app_users (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    msg_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    author     TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to

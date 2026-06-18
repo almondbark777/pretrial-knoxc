@@ -52,11 +52,38 @@ func (s *Server) consoleBase(r *http.Request, active string, track time.Time) ma
 		"IsToday":      sameDay(track, compute.TodayET()),
 		"Epoch":        compute.StatsEpochLabel,  // go-live date for epoch-scoped stat labels
 		"Msg":          r.URL.Query().Get("msg"), // flash toast after a write redirect
+		"ChatRoster":   s.chatRoster(),           // every approved user for the chat presence list
+		"MeEmail":      strings.ToLower(strings.TrimSpace(user)),
 	}
 	// Data freshness renders from the `dataFreshness` template func at both the
 	// topbar and the sidebar foot (freshness.go is the one source of truth) — no
 	// per-handler plumbing, and both stamps agree on wording + source.
 	return data
+}
+
+// chatRosterEntry is one member in the chat presence list: display name + the
+// lowercased email the SSE presence feed keys on.
+type chatRosterEntry struct {
+	Name  string
+	Email string
+}
+
+// chatRoster returns every approved user (by display name + lowercased email),
+// sorted by name — the full membership the chat panel renders with online dots.
+func (s *Server) chatRoster() []chatRosterEntry {
+	emails := s.Auth.AllowedEmails()
+	out := make([]chatRosterEntry, 0, len(emails))
+	seen := map[string]bool{}
+	for _, e := range emails {
+		le := strings.ToLower(strings.TrimSpace(e))
+		if le == "" || seen[le] {
+			continue
+		}
+		seen[le] = true
+		out = append(out, chatRosterEntry{Name: compute.FmtOfficer(e), Email: le})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // renderConsole renders a console template, falling back to a graceful in-shell

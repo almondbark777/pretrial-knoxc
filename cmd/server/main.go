@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"html/template"
@@ -30,6 +31,7 @@ import (
 
 	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/build"
+	"pretrial-knoxc/internal/chat"
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/handlers"
@@ -117,6 +119,8 @@ func main() {
 	srv := handlers.New(database, a, tmpl, cacheTTL, importerRetired)
 	srv.DBPath = dbPath   // CSV upload page (importcsv.go): reconcile target + staging location
 	srv.Roles = roleCache // user-management handlers invalidate this after a role change
+	srv.Chat = chat.NewHub()
+	startChatPrune(database) // enforce the 7-day chat retention window
 	// Bind the real freshness lookup now that the Server exists (the parse-time
 	// placeholder in tmplFuncs returns an empty stamp). Funcs is safe to call
 	// after parsing; execution uses the latest map.
@@ -173,6 +177,10 @@ func main() {
 	r.Get("/console/help", srv.ConsoleHelp)
 	r.Get("/console/import", srv.ImportPage) // stop-gap SharePoint CSV upload (supervisor)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
+
+	// Group chat: SSE stream (live messages + presence) + a CSRF-guarded send.
+	r.Get("/chat/stream", srv.ChatStream)
+	r.With(csrfGuard(a)).Post("/chat/send", srv.ChatSend)
 
 	// The classic "Direction A" interface was removed (2026-06-09) — old bookmarks
 	// land on the console equivalent. The JSON endpoints below predate the console
@@ -354,6 +362,27 @@ func securityHeaders(next http.Handler) http.Handler {
 
 // csrfGuard rejects state-changing POSTs to /admin/* whose form CSRF token does
 // not match the session token (synchronizer-token pattern). GET/HEAD pass through.
+// startChatPrune enforces the group-chat retention window: delete messages older
+// than 7 days, once at startup and every 6 hours after. Best-effort; failures are
+// logged, never fatal.
+func startChatPrune(d *sql.DB) {
+	prune := func() {
+		if n, err := db.PruneChatMessages(d, compute.NowET().AddDate(0, 0, -7)); err != nil {
+			log.Printf("chat prune: %v", err)
+		} else if n > 0 {
+			log.Printf("chat prune: removed %d message(s) older than 7 days", n)
+		}
+	}
+	prune()
+	go func() {
+		t := time.NewTicker(6 * time.Hour)
+		defer t.Stop()
+		for range t.C {
+			prune()
+		}
+	}()
+}
+
 func csrfGuard(a *auth.Authenticator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
