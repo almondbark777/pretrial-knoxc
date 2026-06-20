@@ -168,7 +168,8 @@ func main() {
 	// Case Console — the application.
 	r.Get("/console", srv.Console)
 	r.Get("/console/clients", srv.ConsoleClients)
-	r.Get("/console/clients/new", srv.ConsoleIntake) // static segment wins over {idn}
+	r.Get("/console/referrals", srv.ConsoleReferrals) // app-entered referral data (SharePoint-list style)
+	r.Get("/console/clients/new", srv.ConsoleIntake)  // static segment wins over {idn}
 	r.Get("/console/clients/{idn}", srv.ConsoleRecordPage)
 	r.Get("/console/calendar", srv.ConsoleCalendar)
 	r.Get("/console/compliance", srv.ConsoleCompliance)
@@ -204,7 +205,8 @@ func main() {
 	r.Get("/export/violations.csv", srv.ExportViolations)
 	r.Get("/export/cases.csv", srv.ExportCases)
 	r.Get("/export/em-fees.csv", srv.ExportEMFees)
-	r.Get("/export/all.zip", srv.ExportAllData) // full DB dump (supervisor-gated inside the handler)
+	r.Get("/export/referrals.csv", srv.ExportReferrals) // app-entered referral data
+	r.Get("/export/all.zip", srv.ExportAllData)         // full DB dump (supervisor-gated inside the handler)
 
 	// Printable reports (clean black-on-white via print CSS).
 	r.Get("/reports", srv.Reports)
@@ -254,6 +256,8 @@ func main() {
 		ar.Post("/checkin/delete", srv.DeleteAddedCheckIn)
 		ar.Post("/schedule/add", srv.AddScheduledCheckIn)
 		ar.Post("/schedule/delete", srv.DeleteScheduledCheckIn)
+		ar.Post("/custody/add", srv.AddCustodyPeriod)       // GPS-off (in custody) span
+		ar.Post("/custody/delete", srv.DeleteCustodyPeriod) // remove a custody span
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)

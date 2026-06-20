@@ -39,6 +39,7 @@ try{var _m=localStorage.getItem('ptc-theme');if(_m!=='light'&&_m!=='dark')_m='sy
     <nav class="cnav">
       <a href="/console"{{if eq .ActiveNav "dashboard"}} class="active"{{end}} title="Dashboard"><span class="ico">◫</span><span class="label">Dashboard</span></a>
       <a href="/console/clients"{{if eq .ActiveNav "clients"}} class="active"{{end}} title="Clients"><span class="ico">≣</span><span class="label">Clients</span></a>
+      <a href="/console/referrals"{{if eq .ActiveNav "referrals"}} class="active"{{end}} title="Referral data (entered in the app)"><span class="ico">▤</span><span class="label">Referrals</span></a>
       <a href="/console/calendar"{{if eq .ActiveNav "calendar"}} class="active"{{end}} title="Calendar"><span class="ico">▦</span><span class="label">Calendar</span></a>
       <a href="/console/compliance"{{if eq .ActiveNav "compliance"}} class="active"{{end}} title="Compliance"><span class="ico">⚑</span><span class="label">Compliance</span></a>
       <a href="/console/reports"{{if eq .ActiveNav "reports"}} class="active"{{end}} title="Reports"><span class="ico">▥</span><span class="label">Reports</span></a>

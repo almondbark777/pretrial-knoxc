@@ -190,6 +190,31 @@ func TestJunkAndNoTypeSkipped(t *testing.T) {
 	}
 }
 
+// TestOpenNameFallsBackToBlueBook reproduces the live-export defect where the GPS
+// 48-hour file ships a blank Defendant column for every row: the Open show-cause
+// record must still get its name from the blue book (by IDN) so the letter is never
+// printed nameless. The junk filter must also run on the resolved name.
+func TestOpenNameFallsBackToBlueBook(t *testing.T) {
+	gps := []map[string]string{
+		gpsRow("1", "", "@100", "OPEN", "ALLIED", "4/1/2026"), // blank name (live export)
+		gpsRow("2", "", "@200", "OPEN", "SCRAM", "4/1/2026"),  // blank name, junk in blue book
+	}
+	bb := []map[string]string{
+		{"idn": "1", "defendant": "SMITH, JOHN", "case_status": "OPEN", "warrant_case_num": "@100"},
+		{"idn": "2", "defendant": "TEST DUMMY", "case_status": "OPEN", "warrant_case_num": "@200"},
+	}
+	res := Compute(gps, nil, bb, asOf("5/1/2026"))
+	if len(res.Open) != 1 {
+		t.Fatalf("open=%d want 1 (idn2 is junk via blue-book name)", len(res.Open))
+	}
+	if res.Open[0].Name != "SMITH, JOHN" {
+		t.Fatalf("name not recovered from blue book: %q", res.Open[0].Name)
+	}
+	if res.SkippedJunk != 1 {
+		t.Fatalf("SkippedJunk=%d want 1 (idn2 resolved to a TEST name)", res.SkippedJunk)
+	}
+}
+
 // reliefRow is a 48-hour row that also records a "Switched To"/"Switched GPS Date".
 func reliefRow(idn, name, caseNo, status, gtype, install, switchedTo, switchDate string) map[string]string {
 	r := gpsRow(idn, name, caseNo, status, gtype, install)

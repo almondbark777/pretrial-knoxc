@@ -172,6 +172,10 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 	if err != nil {
 		return nil, err
 	}
+	custody, err := loadCustodyForCompute(d) // in-custody days excluded from GPS billing
+	if err != nil {
+		return nil, err
+	}
 
 	// GPS map: install-nonempty row wins per idn.
 	gpMap := map[string]map[string]string{}
@@ -256,6 +260,7 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 			CheckIns:  ciMap[idn],
 			Payments:  pmMap[idn],
 			Overrides: ovIdn,
+			Custody:   custody[idn],
 
 			ChargeType:      norm(r["charge_type"]),
 			BondAmount:      norm(r["bond_amount"]),

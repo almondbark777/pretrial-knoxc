@@ -30,6 +30,22 @@ func writeCSV(w http.ResponseWriter, filename string, header []string, rows [][]
 // stamp returns today's ET date for filenames, e.g. "2026-05-31".
 func stamp() string { return compute.TodayET().Format("2006-01-02") }
 
+// ExportReferrals streams the app-entered referrals (added_defendants) as CSV —
+// the "Export to Excel" for the Referrals view, every captured field as a column.
+func (s *Server) ExportReferrals(w http.ResponseWriter, r *http.Request) {
+	entries, err := db.ReferralEntries(s.DB)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	labels, rows := referralView(entries)
+	out := make([][]string, len(rows))
+	for i, row := range rows {
+		out[i] = row.Cells
+	}
+	writeCSV(w, "app-referrals-"+stamp()+".csv", labels, out)
+}
+
 // ExportBehind streams the Behind-on-GPS roster as CSV.
 func (s *Server) ExportBehind(w http.ResponseWriter, r *http.Request) {
 	clients, err := s.clients()

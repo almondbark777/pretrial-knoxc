@@ -211,6 +211,17 @@ CREATE TABLE IF NOT EXISTS drug_screens (
 );
 CREATE INDEX IF NOT EXISTS idx_screen_idn ON drug_screens(idn);
 
+CREATE TABLE IF NOT EXISTS custody_periods (
+    custody_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn         TEXT NOT NULL,
+    start_date  TEXT NOT NULL,
+    end_date    TEXT NULL,
+    note        TEXT NULL,
+    author      TEXT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_custody_idn ON custody_periods(idn);
+
 CREATE TABLE IF NOT EXISTS pinned_defendants (
     pin_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     TEXT NOT NULL,
@@ -548,6 +559,7 @@ var extensionTablesByIDN = []string{
 	"defendant_notes", "defendant_tags", "court_dates", "violations",
 	"reminders", "overrides", "pinned_defendants", "defendant_documents",
 	"scheduled_check_ins", "drug_screens", "fee_waivers", "letter_log",
+	"custody_periods",
 }
 
 // raw tables physically purged only on the IMPORTER_RETIRED path.

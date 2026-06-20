@@ -17,6 +17,7 @@ package compute
 import (
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -340,6 +341,68 @@ type Client struct {
 	// "override (app)". Populated by BuildClients after splicing the override
 	// into the raw row, so all downstream compute already sees the fixed value.
 	Overrides map[string]string
+
+	// Custody holds the client's in-custody (GPS-off) periods. Days inside a
+	// period are excluded from GPS billing (ComputeGPS). Populated by BuildClients.
+	Custody []CustodyPeriod
+}
+
+// CustodyPeriod is one in-custody span: GPS is off, so [Start, End) is NOT billed.
+// End is the "back on GPS"/reinstall date and IS billed (so a same-day re-fit
+// counts). EndOK=false means still in custody — excluded through the window end.
+type CustodyPeriod struct {
+	Start, End     time.Time
+	StartOK, EndOK bool
+}
+
+// CustodyDaysInWindow returns how many days inside [winStart, winEnd] (inclusive)
+// fall in a custody period and so must NOT be billed for GPS. Each period excludes
+// [Start, End) — the End ("back on GPS") day is billable; an open period (EndOK
+// false) excludes through winEnd. Overlapping periods are merged so a day is never
+// counted twice.
+func CustodyDaysInWindow(periods []CustodyPeriod, winStart, winEnd time.Time) int {
+	if len(periods) == 0 || winEnd.Before(winStart) {
+		return 0
+	}
+	winEndExcl := winEnd.AddDate(0, 0, 1) // exclusive upper bound
+	type span struct{ a, b time.Time }    // [a, b)
+	var spans []span
+	for _, p := range periods {
+		if !p.StartOK {
+			continue
+		}
+		a := p.Start
+		if a.Before(winStart) {
+			a = winStart
+		}
+		b := winEndExcl
+		if p.EndOK {
+			b = p.End
+		}
+		if b.After(winEndExcl) {
+			b = winEndExcl
+		}
+		if b.After(a) {
+			spans = append(spans, span{a, b})
+		}
+	}
+	if len(spans) == 0 {
+		return 0
+	}
+	sort.Slice(spans, func(i, j int) bool { return spans[i].a.Before(spans[j].a) })
+	total, curA, curB := 0, spans[0].a, spans[0].b
+	for _, s := range spans[1:] {
+		if !s.a.After(curB) { // overlap or touch → merge
+			if s.b.After(curB) {
+				curB = s.b
+			}
+			continue
+		}
+		total += daysBetween(curA, curB)
+		curA, curB = s.a, s.b
+	}
+	total += daysBetween(curA, curB)
+	return total
 }
 
 // Window is one required check-in window. Per office policy a window requires
@@ -399,6 +462,8 @@ type GPSResult struct {
 	TotalOwedDollars *float64 `json:"totalOwedDollars"`
 	TotalGpsPaid     float64  `json:"totalGpsPaid"`
 	DaysActive       *int     `json:"daysActive"`
+	CustodyDays      *int     `json:"custodyDays"`  // days in custody excluded from billing
+	BillableDays     *int     `json:"billableDays"` // DaysActive − CustodyDays (what GPS is billed on)
 	DaysCovered      *float64 `json:"daysCovered"`
 	Adj              float64  `json:"adj"`
 	AdjDollars       float64  `json:"adjDollars"`
@@ -818,6 +883,22 @@ func ComputeGPS(c Client, track time.Time, sessionAdj *float64, caseFilter strin
 		}
 	}
 
+	// In-custody days are excluded from GPS billing. The "back on GPS"/reinstall
+	// day is billed (CustodyDaysInWindow excludes [start, end)); an open period
+	// runs through the window end. BillableDays = active − custody, for display.
+	var custodyDays, billableDays *int
+	if startOK && endOK {
+		cd := CustodyDaysInWindow(c.Custody, start, end)
+		custodyDays = &cd
+		if daysActive != nil {
+			b := *daysActive - cd
+			if b < 0 {
+				b = 0
+			}
+			billableDays = &b
+		}
+	}
+
 	// Adjustment converted to dollars at the rate in force at window end.
 	var adjRate *int
 	if hasSwitch && dailyRate2 != nil {
@@ -828,6 +909,15 @@ func ComputeGPS(c Client, track time.Time, sessionAdj *float64, caseFilter strin
 	adjDollars := 0.0
 	if adjRate != nil {
 		adjDollars = adj * float64(*adjRate)
+	}
+
+	// Subtract the excluded custody days from the owed side at that rate.
+	if totalOwed != nil && custodyDays != nil && *custodyDays > 0 && adjRate != nil {
+		v := *totalOwed - float64(*custodyDays*(*adjRate))
+		if v < 0 {
+			v = 0
+		}
+		totalOwed = &v
 	}
 
 	// daysCovered: dollars-paid divided by the current rate, plus the day
@@ -879,6 +969,7 @@ func ComputeGPS(c Client, track time.Time, sessionAdj *float64, caseFilter strin
 		Vendor: vendor, DailyRate: dailyRate, Vendor2: vendor2, DailyRate2: dailyRate2,
 		HasSwitch: hasSwitch, ReliefSwitch: isReliefSwitch(c.GpSwitchedTo),
 		TotalOwedDollars: totalOwed, TotalGpsPaid: totalGpsPaid, DaysActive: daysActive,
+		CustodyDays: custodyDays, BillableDays: billableDays,
 		DaysCovered: daysCovered,
 		Adj:         adj, AdjDollars: adjDollars, SurplusDollars: surplusDollars,
 		Surplus: surplus, SurplusDays: surplusDays, Covered: covered,

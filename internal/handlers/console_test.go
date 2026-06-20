@@ -267,7 +267,7 @@ func TestConsoleRecordParity(t *testing.T) {
 	ci := compute.ComputeCheckIns(*c, adminTrack)
 	ptr := compute.ComputePTRFees(*c, adminTrack, "")
 	gps := compute.ComputeGPS(*c, adminTrack, nil, "")
-	rec := consoleRecord(c, cases, adminTrack, ci, ptr, gps, models.DefendantExtras{})
+	rec := consoleRecord(c, cases, adminTrack, ci, ptr, gps, models.DefendantExtras{}, db.Ledger{})
 
 	// The record must carry the exact computed numbers (single source of truth).
 	if rec.GPS.SurplusDollars == nil || *rec.GPS.SurplusDollars >= 0 {
@@ -502,7 +502,7 @@ func TestConsoleRecordDrugScreens(t *testing.T) {
 		{ID: 1, IDN: "1", ScreenDate: "2026-05-01", TestType: "urine", Result: "negative",
 			Officer: "tester@knoxsheriff.org"},
 	}}
-	rec := consoleRecord(c, []*compute.Client{c}, track, ci, ptr, gps, extras)
+	rec := consoleRecord(c, []*compute.Client{c}, track, ci, ptr, gps, extras, db.Ledger{})
 
 	if len(rec.DrugScreens) != 2 {
 		t.Fatalf("DrugScreens = %d rows, want 2", len(rec.DrugScreens))
@@ -551,7 +551,7 @@ func TestConsoleRecordActivitySorted(t *testing.T) {
 	extras := models.DefendantExtras{Notes: []models.Note{
 		{IDN: "1", Author: "alex.bentley@knoxsheriff.org", Body: "newest note", CreatedAt: "2026-12-31 09:00:00"},
 	}}
-	rec := consoleRecord(c, []*compute.Client{c}, track, ci, ptr, gps, extras)
+	rec := consoleRecord(c, []*compute.Client{c}, track, ci, ptr, gps, extras, db.Ledger{})
 	if len(rec.Activity) == 0 {
 		t.Fatal("activity empty")
 	}

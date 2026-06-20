@@ -1,0 +1,68 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Referrals</h1>
+    <div class="sub">Every referral entered through the app's New&nbsp;Referral wizard, with all captured fields — like a SharePoint list or spreadsheet. Bulk SharePoint-imported clients live on the <a href="/console/clients">Clients</a> roster.</div>
+  </div>
+  <div class="right">
+    <a class="btn newref" href="/console/clients/new" title="Start a new referral">+ New Referral</a>
+    <a class="btn ghost sm" href="/export/referrals.csv" style="margin-left:8px" title="Download all referral data as a CSV (opens in Excel)">Export CSV ⤓</a>
+  </div>
+</div>
+
+<div class="filters" style="margin-bottom:14px">
+  <input type="text" id="rfilter" placeholder="Filter referrals by name, IDN, officer, case #, any field…" aria-label="Filter referrals">
+  <span class="count" id="rcount">{{.Count}}</span>
+</div>
+
+{{if .Rows}}
+<div class="panel">
+  <div class="refscroll cv-auto">
+    <table class="data refgrid">
+      <thead><tr>{{range .Cols}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+      <tbody>
+      {{range .Rows}}{{$row := .}}<tr>
+        {{range $i, $cell := .Cells}}{{if eq $i 0}}<td class="nmcell"><a href="/console/clients/{{$row.IDN}}">{{if $cell}}{{$cell}}{{else}}(no name){{end}}</a></td>{{else}}<td>{{if $cell}}{{$cell}}{{else}}<span class="muted">—</span>{{end}}</td>{{end}}{{end}}
+      </tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="muted" style="padding:0;margin-top:12px;font-size:12.5px">Showing {{.Count}} app-entered referral{{if ne .Count 1}}s{{end}}. These rows merge into every view by IDN (Clients roster, client record, EM-fee letters). Supervisor-deleted referrals are filtered out here too.</p>
+{{else}}
+<div class="panel"><div class="emptybox"><div class="big">▤</div>No referrals have been entered in the app yet.<div class="m" style="margin-top:6px">Use <b>+ New Referral</b> to add one — it will appear here with every field, and on the Clients roster.</div></div></div>
+{{end}}
+
+<style>
+/* Wide spreadsheet-style grid: horizontal scroll, sticky header + first column,
+   no cell wrap so columns stay aligned the way a SharePoint list / Excel sheet would. */
+.refscroll{overflow:auto;max-height:calc(100vh - 240px)}
+.refgrid{min-width:100%;border-collapse:separate;border-spacing:0}
+.refgrid th,.refgrid td{white-space:nowrap;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px}
+.refgrid thead th{position:sticky;top:0;z-index:3;background:var(--panel-2,var(--panel));text-align:left}
+.refgrid td.nmcell,.refgrid th:first-child{position:sticky;left:0;z-index:2;background:var(--panel)}
+.refgrid thead th:first-child{z-index:4}
+.refgrid td.nmcell a{font-weight:600;color:var(--accent-ink,var(--ink))}
+.refgrid tbody tr:hover td{background:var(--panel-3)}
+.refgrid tbody tr:hover td.nmcell{background:var(--panel-3)}
+</style>
+
+<script>
+/* Client-side filter across every field (app-entered referrals are a small set —
+   no windowing needed). Hides non-matching rows and updates the count badge. */
+document.addEventListener('DOMContentLoaded',function(){
+  var inp=document.getElementById('rfilter'),badge=document.getElementById('rcount');
+  if(!inp)return;
+  var rows=[].slice.call(document.querySelectorAll('.refgrid tbody tr')).map(function(tr){
+    return {tr:tr,txt:tr.textContent.toLowerCase()};
+  });
+  var base=rows.length,t=null;
+  function apply(){
+    var q=inp.value.trim().toLowerCase(),n=0;
+    rows.forEach(function(r){var hit=!q||r.txt.indexOf(q)>=0;r.tr.style.display=hit?'':'none';if(hit)n++;});
+    badge.textContent=q?(n+' of '+base):base;
+  }
+  inp.addEventListener('input',function(){clearTimeout(t);t=setTimeout(apply,120);});
+});
+</script>
+{{template "c_bot" .}}

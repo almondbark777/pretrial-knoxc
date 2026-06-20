@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/models"
 )
 
@@ -499,6 +500,36 @@ type ConsoleReminderRow struct {
 	Author string
 }
 
+// ConsoleLedgerCI is one row of the FULL check-in history (imported + app),
+// the same complete person-scoped feed the bundled tracker shows.
+type ConsoleLedgerCI struct {
+	Date    string
+	Type    string
+	Officer string
+	Note    string
+	Source  string // "Imported" | "App"
+}
+
+// ConsoleLedgerPayment is one row of the FULL payment history (imported + app).
+type ConsoleLedgerPayment struct {
+	Date    string
+	Type    string
+	Amount  string
+	Case    string
+	Officer string
+	Source  string // "Imported" | "App"
+}
+
+// ConsoleCustodyRow is one in-custody (GPS-off) span shown on the record. End ""
+// means still in custody. ID drives the per-row remove form.
+type ConsoleCustodyRow struct {
+	ID     int64
+	Start  string
+	End    string
+	Note   string
+	Author string
+}
+
 // ConsoleRecord is the full client-record view-model.
 type ConsoleRecord struct {
 	IDN        string
@@ -516,23 +547,28 @@ type ConsoleRecord struct {
 	ClosedDate string
 	Missing    []string
 
-	Summary        []ConsoleField
-	Conditions     []ConsoleCondition
-	CheckIns       []ConsoleTLItem
-	Court          []ConsoleCourtRow
-	LoggedCheckIns []ConsoleLoggedCI
-	Scheduled      []ConsoleSchedCI
-	LoggedPayments []ConsoleLoggedPayment
-	DrugScreens    []ConsoleDrugScreen
-	Violations     []ConsoleViolationRow
-	Reminders      []ConsoleReminderRow
-	PTRMonths      []ConsolePTRMonth
-	PTR            compute.PTRResult
-	GPS            compute.GPSResult
-	GpsWaived      bool
-	GpsInstall     string
-	Notes          []models.Note
-	Activity       []ConsoleTLItem
+	Summary         []ConsoleField
+	Conditions      []ConsoleCondition
+	CheckIns        []ConsoleTLItem
+	AllCheckIns     []ConsoleLedgerCI      // full check-in history (imported + app), newest first
+	AllPayments     []ConsoleLedgerPayment // full payment history (imported + app), newest first
+	Court           []ConsoleCourtRow
+	LoggedCheckIns  []ConsoleLoggedCI
+	Scheduled       []ConsoleSchedCI
+	LoggedPayments  []ConsoleLoggedPayment
+	DrugScreens     []ConsoleDrugScreen
+	Violations      []ConsoleViolationRow
+	Reminders       []ConsoleReminderRow
+	PTRMonths       []ConsolePTRMonth
+	CustodyPeriods  []ConsoleCustodyRow
+	GpsCustodyDays  int // total in-custody days excluded from GPS billing
+	GpsBillableDays int // GPS days active minus custody days
+	PTR             compute.PTRResult
+	GPS             compute.GPSResult
+	GpsWaived       bool
+	GpsInstall      string
+	Notes           []models.Note
+	Activity        []ConsoleTLItem
 
 	CI   compute.CheckInResult
 	AsOf string
@@ -552,7 +588,7 @@ type ConsoleSchedCI struct {
 
 func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Time,
 	ci compute.CheckInResult, ptr compute.PTRResult, gps compute.GPSResult,
-	extras models.DefendantExtras) ConsoleRecord {
+	extras models.DefendantExtras, lg db.Ledger) ConsoleRecord {
 
 	level, _ := compute.ParseLevel(c.Level)
 	rec := ConsoleRecord{
@@ -575,6 +611,22 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		} else {
 			rec.GpsInstall = c.GpInstall
 		}
+	}
+
+	// In-custody periods (GPS-off): the days excluded from billing + the list for
+	// the record's custody panel. Card numbers come from the GPS math.
+	if gps.CustodyDays != nil {
+		rec.GpsCustodyDays = *gps.CustodyDays
+	}
+	if gps.BillableDays != nil {
+		rec.GpsBillableDays = *gps.BillableDays
+	}
+	for _, p := range extras.CustodyPeriods {
+		row := ConsoleCustodyRow{ID: p.ID, Start: shortStamp(p.Start), Note: p.Note, Author: compute.FmtOfficer(p.Author)}
+		if strings.TrimSpace(p.End) != "" {
+			row.End = shortStamp(p.End)
+		}
+		rec.CustodyPeriods = append(rec.CustodyPeriods, row)
 	}
 
 	// Badges: GPS condition + any open violation.
@@ -681,6 +733,23 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 				Tone: "warn", Icon: "◯",
 			})
 		}
+	}
+
+	// Full check-in history (imported + app), newest first — the complete ledger
+	// the tracker shows, so officers don't have to switch tools to see every visit.
+	for _, x := range lg.CheckIns {
+		rec.AllCheckIns = append(rec.AllCheckIns, ConsoleLedgerCI{
+			Date: x.Date, Type: dash(x.Type), Officer: dash(compute.FmtOfficer(x.Officer)),
+			Note: x.Note, Source: x.Source,
+		})
+	}
+
+	// Full payment history (imported + app), newest first.
+	for _, x := range lg.Payments {
+		rec.AllPayments = append(rec.AllPayments, ConsoleLedgerPayment{
+			Date: x.Date, Type: dash(x.Type), Amount: fmtPayAmount(x.Amount),
+			Case: dash(x.Case), Officer: dash(compute.FmtOfficer(x.Officer)), Source: x.Source,
+		})
 	}
 
 	// App-logged check-ins with their per-check-in notes (fitment details, etc.).
@@ -1029,6 +1098,112 @@ func consoleConditions(c *compute.Client, level int, ci compute.CheckInResult,
 
 func rec_isWaived(c *compute.Client) bool { return compute.IsFeesWaived(c.GpNotes) }
 
+// ── Referrals (app-entered intake data, SharePoint-list style) ────────────────
+
+// refColumn is one column of the Referrals spreadsheet: the added_defendants key,
+// its header label, and a formatting kind ("" | date | datetime | officer).
+type refColumn struct{ Key, Label, Kind string }
+
+// referralColumns is the full ordered field set the intake wizard captures
+// (added_defendants), grouped Identity → Case → GPS → Victim → Other → Meta, so
+// the Referrals view shows everything an officer keyed in, like a SharePoint list.
+var referralColumns = []refColumn{
+	{"defendant", "Defendant", ""}, // cell 0 — rendered as a link to the record
+	{"idn", "IDN", ""},
+	{"warrant_case_num", "Case #", ""},
+	{"pretrial_level", "Level", ""},
+	{"case_status", "Status", ""},
+	{"supervising_officer", "Officer", "officer"},
+	{"referral_date", "Referral Date", "date"},
+	{"charge_type", "Charge Type", ""},
+	{"bond_amount", "Bond Amount", ""},
+	{"bond_conditions", "Bond Conditions", ""},
+	{"supervision_type", "Supervision Type", ""},
+	{"court", "Court", ""},
+	{"order_from", "Order From", ""},
+	{"dma", "DMA", ""},
+	{"birthdate", "DOB", "date"},
+	{"gps", "GPS", ""},
+	{"gps_type", "GPS Type", ""},
+	{"gps_install_date", "GPS Install", "date"},
+	{"court_order", "Court-Ordered GPS", ""},
+	{"switched_to", "Switched To", ""},
+	{"switched_gps_date", "Switched Date", "date"},
+	{"paid", "Paid", ""},
+	{"da_emailed", "DA Emailed", ""},
+	{"victim", "Victim", ""},
+	{"victim_idn", "Victim IDN", ""},
+	{"victim_2", "Victim 2", ""},
+	{"victim_2_idn", "Victim 2 IDN", ""},
+	{"victim_3", "Victim 3", ""},
+	{"victim_3_idn", "Victim 3 IDN", ""},
+	{"victim_time_48", "Victim 48h Time", ""},
+	{"victim_accept_deny_gps", "Victim Accept/Deny GPS", ""},
+	{"comments", "Comments", ""},
+	{"received_signed_copy_date", "Signed Copy Date", "date"},
+	{"contact_date", "Contact Date", "date"},
+	{"released_to_hilltop_date", "Released to Hilltop", "date"},
+	{"closed_date", "Closed Date", "date"},
+	{"day_adjustment", "Day Adjustment", ""},
+	{"ptr_successfully_completed", "PTR Completed?", ""},
+	{"author", "Entered By", "officer"},
+	{"created_at", "Entered", "datetime"},
+}
+
+// ReferralListRow is one referral with its IDN (for the record link) and the
+// formatted cells aligned to referralColumns (cell 0 = Defendant name).
+type ReferralListRow struct {
+	IDN   string
+	Cells []string
+}
+
+// referralView formats the raw added_defendants rows into header labels + display
+// rows. Blank cells render as "" (the template shows a dash; CSV stays empty).
+func referralView(entries []map[string]string) (labels []string, rows []ReferralListRow) {
+	labels = make([]string, len(referralColumns))
+	for i, c := range referralColumns {
+		labels[i] = c.Label
+	}
+	for _, e := range entries {
+		cells := make([]string, len(referralColumns))
+		for i, c := range referralColumns {
+			cells[i] = fmtRefCell(e[c.Key], c.Kind)
+		}
+		rows = append(rows, ReferralListRow{IDN: strings.TrimSpace(e["idn"]), Cells: cells})
+	}
+	return labels, rows
+}
+
+// fmtRefCell formats one referral cell by kind. Blank → "" (callers decide how to
+// show emptiness); dates are normalized, officer/author emails humanized.
+func fmtRefCell(val, kind string) string {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return ""
+	}
+	switch kind {
+	case "officer":
+		return compute.FmtOfficer(val)
+	case "date":
+		if dt, ok := compute.ParseDay(val); ok {
+			return dt.Format("Jan 2, 2006")
+		}
+		return val
+	case "datetime":
+		if dt, ok := compute.ParseDay(val); ok {
+			return dt.Format("Jan 2, 2006")
+		}
+		if len(val) >= 10 {
+			if dt, ok := compute.ParseDay(val[:10]); ok {
+				return dt.Format("Jan 2, 2006")
+			}
+		}
+		return val
+	default:
+		return val
+	}
+}
+
 // ── small formatting helpers (display only) ───────────────────────────────────
 
 // Initials renders an avatar monogram from a display name ("Alex Bentley" → "AB").
@@ -1049,6 +1224,20 @@ func Initials(name string) string {
 func dash(s string) string {
 	if strings.TrimSpace(s) == "" {
 		return "—"
+	}
+	return s
+}
+
+// fmtPayAmount renders a stored payment amount ("120", "$1,234.5", "") as a
+// money string. Falls back to the raw text when it isn't a number.
+func fmtPayAmount(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "—"
+	}
+	cleaned := strings.NewReplacer("$", "", ",", "").Replace(s)
+	if f, err := strconv.ParseFloat(cleaned, 64); err == nil {
+		return "$" + strconv.FormatFloat(f, 'f', 2, 64)
 	}
 	return s
 }

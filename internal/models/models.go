@@ -197,6 +197,20 @@ type ScheduledCheckIn struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+// CustodyPeriod is one in-custody (GPS-off) span for a GPS client. The days from
+// Start through the day before End are NOT billed for GPS; End is the "back on
+// GPS"/reinstall date and IS billed. End empty = still in custody (excluded
+// through today). App-owned + audited; folded into the GPS billing math.
+type CustodyPeriod struct {
+	ID        int64  `json:"id"`
+	IDN       string `json:"idn"`
+	Start     string `json:"start"`
+	End       string `json:"end"`
+	Note      string `json:"note"`
+	Author    string `json:"author"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // Violation is one recorded violation.
 type Violation struct {
 	ID            int64  `json:"id"`
@@ -330,6 +344,7 @@ type DefendantExtras struct {
 	AddedCheckIns     []AddedCheckIn
 	ScheduledCheckIns []ScheduledCheckIn
 	Letters           []LetterLogEntry
+	CustodyPeriods    []CustodyPeriod
 }
 
 // LetterLogEntry is one generated letter from letter_log (migration 007) —

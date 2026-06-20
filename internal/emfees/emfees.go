@@ -64,23 +64,78 @@ func isJunkName(name string) bool { return junkNameRe.MatchString(name) }
 
 // Rec is one past-due record (one memo). Fields mirror the Python rec dict.
 type Rec struct {
-	Name       string
-	IDN        string
-	Case       string
-	Court      string
-	Type       string // ALLIED | SCRAM
-	Rate       int
-	Start      time.Time // install date (Open) or billing-period start (Closed)
-	End        time.Time // as-of (Open) or closed date (Closed)
-	Days       int
-	Owed       float64
-	Paid       float64
-	Behind     float64 // the arrearage printed on the memo (owed − paid)
-	DaysBehind float64
-	StartSrc   string // how the Closed start date was derived (audit trail)
-	SwitchType string // ALLIED|SCRAM if a mid-period device switch was billed
-	HasSwitch  bool
-	Closed     bool // false = Open list, true = Closed list
+	Name        string
+	IDN         string
+	Case        string
+	Court       string
+	Type        string // ALLIED | SCRAM
+	Rate        int
+	Start       time.Time // install date (Open) or billing-period start (Closed)
+	End         time.Time // as-of (Open) or closed date (Closed)
+	Days        int
+	Owed        float64
+	Paid        float64
+	Behind      float64 // the arrearage printed on the memo (owed − paid)
+	DaysBehind  float64
+	StartSrc    string // how the Closed start date was derived (audit trail)
+	SwitchType  string // ALLIED|SCRAM if a mid-period device switch was billed
+	HasSwitch   bool
+	CustodyDays int  // in-custody days excluded from this person's billing
+	Closed      bool // false = Open list, true = Closed list
+}
+
+// CustodyRange is one raw in-custody span (date strings as stored). The days from
+// Start through the day before End are excluded from GPS billing; End is the "back
+// on GPS" day and is billed. Empty End = still in custody (excluded through the
+// billing-period end). Parsed with the same parseDate the rest of the engine uses.
+type CustodyRange struct{ Start, End string }
+
+// custodyDaysInWindow returns how many days of [winStart, winEnd] (inclusive) fall
+// in a custody span and so must not be billed. Each span excludes [Start, End)
+// (End/reinstall billed); an empty End runs through winEnd. Overlaps are merged.
+func custodyDaysInWindow(ranges []CustodyRange, winStart, winEnd time.Time) int {
+	if len(ranges) == 0 || winEnd.Before(winStart) {
+		return 0
+	}
+	winEndExcl := winEnd.AddDate(0, 0, 1)
+	type span struct{ a, b time.Time }
+	var spans []span
+	for _, r := range ranges {
+		s, ok := parseDate(r.Start)
+		if !ok {
+			continue
+		}
+		if s.Before(winStart) {
+			s = winStart
+		}
+		e := winEndExcl
+		if ed, ok := parseDate(r.End); ok {
+			e = ed
+		}
+		if e.After(winEndExcl) {
+			e = winEndExcl
+		}
+		if e.After(s) {
+			spans = append(spans, span{s, e})
+		}
+	}
+	if len(spans) == 0 {
+		return 0
+	}
+	sort.Slice(spans, func(i, j int) bool { return spans[i].a.Before(spans[j].a) })
+	total, curA, curB := 0, spans[0].a, spans[0].b
+	for _, sp := range spans[1:] {
+		if !sp.a.After(curB) {
+			if sp.b.After(curB) {
+				curB = sp.b
+			}
+			continue
+		}
+		total += daysBetween(curA, curB)
+		curA, curB = sp.a, sp.b
+	}
+	total += daysBetween(curA, curB)
+	return total
 }
 
 // Result is the full computation: the Open and Closed record lists plus the as-of
@@ -250,6 +305,20 @@ func lookupCourt(bb map[string][]map[string]string, idn, caseNo string) string {
 	return ""
 }
 
+// lookupName returns the defendant name from the blue book for this IDN, used when
+// the GPS 48-hour row's Defendant column is blank. The live SharePoint export of the
+// 48-hour file ships an empty Defendant column for every row, so without this fall
+// back every Open show-cause letter would print with no name. The blue book carries
+// a name for effectively every IDN, so this fills the gap. Returns "" if none.
+func lookupName(bb map[string][]map[string]string, idn string) string {
+	for _, r := range bb[idn] {
+		if n := get(r, "defendant"); n != "" {
+			return n
+		}
+	}
+	return ""
+}
+
 // lookupGPSType finds a known ALLIED/SCRAM type in the blue book when the 48-hour
 // row lacks one. Returns "" if none.
 func lookupGPSType(bb map[string][]map[string]string, idn string) string {
@@ -296,6 +365,14 @@ func computeOwed(start, end time.Time, r int, switchRate int, switchDate time.Ti
 // GPS 48-hour rows (Open + any 48h Closed), Pass 2 supplements with blue-book-only
 // closed cases that never appear in the 48-hour file.
 func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Result {
+	return ComputeWithCustody(gps48, payments, blueBook, nil, asOf)
+}
+
+// ComputeWithCustody is Compute plus per-IDN in-custody spans, whose days are
+// excluded from each person's GPS billing (and so can drop someone below the
+// 5-day threshold entirely). custody is keyed by IDN; nil means "no custody data"
+// and behaves exactly like Compute.
+func ComputeWithCustody(gps48, payments, blueBook []map[string]string, custody map[string][]CustodyRange, asOf time.Time) Result {
 	asOf = time.Date(asOf.Year(), asOf.Month(), asOf.Day(), 0, 0, 0, 0, time.UTC)
 	pay := loadPayments(payments)
 	bbOrder, bb := groupByIDN(blueBook)
@@ -309,12 +386,15 @@ func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Resu
 		if !ok {
 			continue
 		}
+		idn := get(r, "idn")
 		name := get(r, "defendant")
+		if name == "" {
+			name = lookupName(bb, idn) // 48-hour Defendant column is blank in the live export
+		}
 		if isJunkName(name) {
 			res.SkippedJunk++
 			continue
 		}
-		idn := get(r, "idn")
 		caseNo := get(r, "case_number")
 		status := strings.ToUpper(get(r, "case_status"))
 
@@ -370,6 +450,19 @@ func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Resu
 		if hasSwitch {
 			effRate = switchRate
 		}
+		// In-custody days aren't billed (the "back on GPS" day is). Subtract them
+		// before the threshold test so custody can clear someone off the list.
+		custodyDays := custodyDaysInWindow(custody[idn], install, end)
+		if custodyDays > 0 {
+			days -= custodyDays
+			if days < 0 {
+				days = 0
+			}
+			owed -= float64(custodyDays * effRate)
+			if owed < 0 {
+				owed = 0
+			}
+		}
 		paid := pay.paidFor(caseNo, idn)
 		behind := owed - paid
 		if behind/float64(effRate) < daysBehindThreshold {
@@ -381,7 +474,7 @@ func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Resu
 			Start: install, End: end, Days: days,
 			Owed: owed, Paid: paid, Behind: behind, DaysBehind: behind / float64(effRate),
 			Court: lookupCourt(bb, idn, caseNo), StartSrc: "Install (48hr)",
-			SwitchType: switchType, HasSwitch: hasSwitch, Closed: status == "CLOSED",
+			SwitchType: switchType, HasSwitch: hasSwitch, CustodyDays: custodyDays, Closed: status == "CLOSED",
 		}
 		seen[idn] = true
 		if rec.Closed {
@@ -480,6 +573,17 @@ func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Resu
 		if days <= 0 {
 			continue
 		}
+		custodyDays := custodyDaysInWindow(custody[idn], start, end)
+		if custodyDays > 0 {
+			days -= custodyDays
+			if days < 0 {
+				days = 0
+			}
+			owed -= float64(custodyDays * rt)
+			if owed < 0 {
+				owed = 0
+			}
+		}
 		paid := pay.byIDN[idn]
 		behind := owed - paid
 		if behind/float64(rt) < daysBehindThreshold {
@@ -490,7 +594,7 @@ func Compute(gps48, payments, blueBook []map[string]string, asOf time.Time) Resu
 			Name: name, IDN: idn, Case: caseNo, Type: gpsType, Rate: rt,
 			Start: start, End: end, Days: days,
 			Owed: owed, Paid: paid, Behind: behind, DaysBehind: behind / float64(rt),
-			Court: lookupCourt(bb, idn, caseNo), StartSrc: startSrc, Closed: true,
+			Court: lookupCourt(bb, idn, caseNo), StartSrc: startSrc, CustodyDays: custodyDays, Closed: true,
 		})
 	}
 

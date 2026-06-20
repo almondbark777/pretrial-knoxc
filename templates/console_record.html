@@ -29,6 +29,7 @@
       <div class="pop" id="ovpop">
         <a href="/console/calendar?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">View calendar</a>
         <button type="button" onclick="cmOpen('paymentModal')">Record payment</button>
+        <button type="button" onclick="cmOpen('custodyModal')">Add custody dates</button>
         <button type="button" onclick="cmOpen('courtModal')">Add court date</button>
         <button type="button" onclick="cmOpen('violationModal')">Record violation</button>
         <button type="button" onclick="cmOpen('screenModal')">Record drug screen</button>
@@ -114,6 +115,17 @@
 {{/* ── Check-ins ── */}}
 <div class="tabpane" id="t-checkins">
   <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><button class="btn ghost" onclick="cmOpen('scheduleModal')">Schedule Check-in</button><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
+  {{if $r.AllCheckIns}}
+  <div class="panel" style="margin-bottom:14px">
+    <div class="h"><h2>All check-ins</h2><span class="muted" style="margin-left:8px;font-size:12px">imported + app · full history</span><span class="grow"></span><span class="count">{{len $r.AllCheckIns}}</span></div>
+    <div class="tscroll cv-auto">
+      <table class="data">
+        <thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Officer</th><th scope="col">Notes</th><th scope="col">Source</th></tr></thead>
+        <tbody>{{range $r.AllCheckIns}}<tr style="cursor:default"><td>{{.Date}}</td><td>{{.Type}}</td><td>{{.Officer}}</td><td class="muted">{{if .Note}}{{.Note}}{{else}}—{{end}}</td><td class="muted">{{.Source}}</td></tr>{{end}}</tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
   {{if $r.Scheduled}}
   <div class="panel" style="margin-bottom:14px">
     <div class="h"><h2>Scheduled check-ins</h2><span class="grow"></span><span class="count">{{len $r.Scheduled}}</span></div>
@@ -235,6 +247,8 @@
           {{if $r.GpsInstall}}<tr><td>Install date</td><td>{{$r.GpsInstall}}</td></tr>{{end}}
           <tr><td>Daily rate</td><td>{{if $r.GPS.DailyRate}}{{moneyi (derefi $r.GPS.DailyRate)}}/day{{else}}—{{end}}</td></tr>
           <tr><td>Days active</td><td>{{intP $r.GPS.DaysActive}}</td></tr>
+          {{if gt $r.GpsCustodyDays 0}}<tr><td>Days in custody (not billed)</td><td class="ok-t">−{{$r.GpsCustodyDays}}</td></tr>
+          <tr><td>Billable days</td><td>{{$r.GpsBillableDays}}</td></tr>{{end}}
           <tr><td>Days covered</td><td>{{days1 $r.GPS.DaysCovered}}</td></tr>
           <tr><td>Total owed</td><td>{{moneyP $r.GPS.TotalOwedDollars}}</td></tr>
           <tr><td>Total paid</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr>
@@ -247,6 +261,38 @@
       </div>
     </div>
   </div>
+
+  {{/* In-custody (GPS-off) periods — days excluded from GPS billing. */}}
+  <div class="panel" style="margin-top:16px">
+    <div class="h"><h2>In-custody periods</h2><span class="muted" style="margin-left:8px;font-size:12px">days in custody aren't billed for GPS</span><span class="grow"></span>{{if $r.CustodyPeriods}}<span class="count">{{len $r.CustodyPeriods}}</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('custodyModal')">+ Add custody dates</button></div>
+    <div class="body">
+      {{if $r.CustodyPeriods}}
+      {{range $r.CustodyPeriods}}
+      <div class="frow"><span class="rail neutral">▦</span><div class="grow">
+        <div class="t" style="font-weight:600">In custody {{.Start}} → {{if .End}}back on GPS {{.End}}{{else}}<span class="warn-t">still in custody</span>{{end}}</div>
+        <div class="m">{{if .Note}}{{.Note}} · {{end}}{{if .Author}}{{.Author}}{{end}}{{if not .End}} · billing paused from {{.Start}}{{end}}</div>
+      </div>
+      <form method="post" action="/admin/custody/delete" style="margin:0;align-self:center" onsubmit="return confirm('Remove these custody dates? GPS billing will recalculate.');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Remove custody dates">×</button>
+      </form></div>
+      {{end}}
+      {{else}}<div class="emptybox" style="padding:22px"><div class="big">▦</div>No custody periods recorded.<div class="m" style="margin-top:6px">If this client spent time in custody, add the dates with <b>+ Add custody dates</b> — those days won't be billed for GPS.</div></div>{{end}}
+    </div>
+  </div>
+
+  {{/* Full payment history — imported + app, the complete ledger the tracker shows. */}}
+  {{if $r.AllPayments}}
+  <div class="panel" style="margin-top:16px">
+    <div class="h"><h2>All payments</h2><span class="muted" style="margin-left:8px;font-size:12px">imported + app · full history</span><span class="grow"></span><span class="count">{{len $r.AllPayments}}</span></div>
+    <div class="tscroll cv-auto">
+      <table class="data">
+        <thead><tr><th scope="col">Date</th><th scope="col">Type</th><th class="num" scope="col">Amount</th><th scope="col">Case</th><th scope="col">Officer</th><th scope="col">Source</th></tr></thead>
+        <tbody>{{range $r.AllPayments}}<tr style="cursor:default"><td>{{.Date}}</td><td>{{.Type}}</td><td class="num">{{.Amount}}</td><td>{{.Case}}</td><td>{{.Officer}}</td><td class="muted">{{.Source}}</td></tr>{{end}}</tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
 
   {{/* App-entered payments (reflected in the fee totals above). */}}
   <div class="panel" style="margin-top:16px">
@@ -339,6 +385,20 @@
       <div class="note-hint">GPS / Allied / SCRAM credit GPS coverage; “PTR Fee” credits the PTR supervision balance. App-entered payments feed the fee totals — they never touch imported data.</div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('paymentModal')">Cancel</button><button type="submit" class="btn">Record payment</button></div>
+  </form>
+</div></div>
+
+<div class="backdrop" id="custodyModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/custody/add">
+    <div class="mh"><h3>Add Custody Dates</h3><button type="button" class="x" onclick="cmClose('custodyModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <div class="note-hint">Days in custody aren't billed for GPS. The <b>Back on GPS</b> date is the reinstall day and <b>is</b> billed — so a same-day re-fit counts. Leave it blank if they're still in custody.</div>
+      <div class="fld"><label>In custody from</label><input type="date" name="start_date" required></div>
+      <div class="fld"><label>Back on GPS <span class="muted" style="font-weight:400">(reinstall date — leave blank if still in custody)</span></label><input type="date" name="end_date"></div>
+      <div class="fld"><label>Note <span class="muted" style="font-weight:400">(optional)</span></label><input type="text" name="note" placeholder="e.g. booked into jail; GPS removed"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('custodyModal')">Cancel</button><button type="submit" class="btn">Save custody dates</button></div>
   </form>
 </div></div>
 

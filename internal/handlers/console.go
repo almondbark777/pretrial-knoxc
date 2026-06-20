@@ -152,6 +152,28 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	s.renderConsole(w, "console_clients.html", data)
 }
 
+// ── /console/referrals — app-entered referral data (SharePoint-list style) ────
+
+// ConsoleReferrals renders every referral keyed in through the app
+// (added_defendants) as a wide, spreadsheet-style table — all captured fields
+// visible, the way a SharePoint list or Excel sheet shows them. Bulk
+// SharePoint-imported clients live on the Clients roster; this is specifically
+// the data officers entered via the New Referral wizard.
+func (s *Server) ConsoleReferrals(w http.ResponseWriter, r *http.Request) {
+	entries, err := db.ReferralEntries(s.DB)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	track := s.trackFrom(r)
+	data := s.consoleBase(r, "referrals", track)
+	labels, rows := referralView(entries)
+	data["Cols"] = labels
+	data["Rows"] = rows
+	data["Count"] = len(rows)
+	s.renderConsole(w, "console_referrals.html", data)
+}
+
 // ── /console/help — quick reference ───────────────────────────────────────────
 
 // ConsoleHelp renders the static in-app guide: the daily workflow, what the
@@ -227,7 +249,12 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	data["R"] = consoleRecord(c, cases, track, ci, ptr, gps, extras)
+	ledger, err := db.ClientLedger(s.DB, idn) // full imported + app check-in/payment history
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	data["R"] = consoleRecord(c, cases, track, ci, ptr, gps, extras, ledger)
 	data["CSRF"] = s.Auth.CSRF(w, r)
 	data["OverridableFields"] = db.OverridableFields() // for the supervisor "Correct field" modal
 	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)

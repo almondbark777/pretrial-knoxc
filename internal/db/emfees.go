@@ -71,7 +71,15 @@ func EMFees(d *sql.DB, asOf time.Time) (emfees.Result, error) {
 		return norm(firstNonEmpty(r["warrant_case_num"], r["case_number"]))
 	})
 
-	return emfees.Compute(gps48, payments, blueBook, asOf), nil
+	// In-custody days are excluded from each person's GPS arrearage (the "back on
+	// GPS"/reinstall day is billed), so a stretch in jail lowers — or clears — the
+	// show-cause letter, matching the console GPS card.
+	custody, err := loadCustodyForEMFees(d)
+	if err != nil {
+		return emfees.Result{}, err
+	}
+
+	return emfees.ComputeWithCustody(gps48, payments, blueBook, custody, asOf), nil
 }
 
 // filterTomb drops rows for whole-person tombstones and for the specific suppressed

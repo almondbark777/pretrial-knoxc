@@ -394,6 +394,9 @@ func LoadExtras(d *sql.DB, idn string) (models.DefendantExtras, error) {
 	if e.Letters, err = ListLetters(d, idn); err != nil {
 		return e, err
 	}
+	if e.CustodyPeriods, err = ListCustodyPeriods(d, idn); err != nil {
+		return e, err
+	}
 	return e, nil
 }
 
