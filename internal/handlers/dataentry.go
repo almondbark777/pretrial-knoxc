@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -231,6 +232,33 @@ func (s *Server) DeleteClientDate(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	_, back := profileBack(r)
 	s.afterWrite(w, r, back, db.DeleteClientDate(s.DB, formID(r), auth.User(r)), "Date removed.")
+}
+
+// ReportProblem records a "Report a problem" submission — the user's free-text
+// description plus the page they were on when they clicked. It's persisted to
+// problem_reports AND written to the server log, so it shows up in journalctl on
+// ptr1. Officer-accessible. POST /admin/problem/report
+func (s *Server) ReportProblem(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	back := safeNext(r, "/console")
+	body := strings.TrimSpace(r.FormValue("body"))
+	page := strings.TrimSpace(r.FormValue("page"))
+	if body == "" {
+		redirectMsg(w, r, back, "Please describe the problem before sending.")
+		return
+	}
+	user := auth.User(r)
+	id, err := db.AddProblemReport(s.DB, page, body, r.Header.Get("User-Agent"), user)
+	if err != nil {
+		redirectMsg(w, r, back, "Could not send report: "+err.Error())
+		return
+	}
+	logged := body
+	if len(logged) > 500 {
+		logged = logged[:500] + "…"
+	}
+	log.Printf("PROBLEM REPORT #%d by %s on %q: %s", id, user, page, logged)
+	redirectMsg(w, r, back, "Thanks — your problem report was sent to the team.")
 }
 
 // AddPayment records a payment on an existing client's profile.

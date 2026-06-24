@@ -39,9 +39,10 @@ func (s *Server) trackFrom(r *http.Request) time.Time {
 // active-nav highlight, as-of date). UserName is the display name for the
 // "my caseload / all" scope toggle. AsOfInput/IsToday drive the top-bar as-of
 // date control.
-func (s *Server) consoleBase(r *http.Request, active string, track time.Time) map[string]any {
+func (s *Server) consoleBase(w http.ResponseWriter, r *http.Request, active string, track time.Time) map[string]any {
 	user := auth.User(r)
 	data := map[string]any{
+		"CSRF":         s.Auth.CSRF(w, r), // session token for the global "Report a problem" chrome form
 		"User":         user,
 		"UserName":     compute.FmtOfficer(user),
 		"IsSupervisor": s.Auth.IsSupervisor(user),
@@ -110,7 +111,7 @@ func (s *Server) Console(w http.ResponseWriter, r *http.Request) {
 	scheds, _ := db.ListAllScheduledCheckInsLive(s.DB)
 
 	reopened, _ := db.ReopenedSince(s.DB, track.AddDate(0, 0, -2)) // recently reopened → new-referrals feed
-	data := s.consoleBase(r, "dashboard", track)
+	data := s.consoleBase(w, r, "dashboard", track)
 	data["D"] = consoleDashboard(clients, track, courtDates, violations, scheds, compute.FmtOfficer(auth.User(r)), reopened)
 	if pins, _ := db.PinnedIDNs(s.DB, auth.User(r)); len(pins) > 0 {
 		data["Pinned"] = pinnedRows(clients, pins)
@@ -129,7 +130,7 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	track := s.trackFrom(r)
 	courtByIDN := nextCourtByIDN(s.DB, track)
 
-	data := s.consoleBase(r, "clients", track)
+	data := s.consoleBase(w, r, "clients", track)
 	// consoleClientRows builds the behind/missed sets internally; reuse them to
 	// assemble Stats without a second full-roster pass (#11 dedup).
 	rows, behind, missed := consoleClientRows(clients, track, courtByIDN)
@@ -173,7 +174,7 @@ func (s *Server) ConsoleReferrals(w http.ResponseWriter, r *http.Request) {
 	}
 	track := s.trackFrom(r)
 	rows := referralWorklist(clients)
-	data := s.consoleBase(r, "referrals", track)
+	data := s.consoleBase(w, r, "referrals", track)
 	data["RowsJSON"] = referralWorklistJSON(rows) // client-side windowing
 	data["Count"] = len(rows)
 	data["Officers"] = distinctOfficers(clients) // officer filter
@@ -188,7 +189,18 @@ func (s *Server) ConsoleReferrals(w http.ResponseWriter, r *http.Request) {
 // fees/billing basics, roles, and keyboard shortcuts. Content lives entirely
 // in templates/console_help.html.
 func (s *Server) ConsoleHelp(w http.ResponseWriter, r *http.Request) {
-	s.renderConsole(w, "console_help.html", s.consoleBase(r, "help", s.trackFrom(r)))
+	s.renderConsole(w, "console_help.html", s.consoleBase(w, r, "help", s.trackFrom(r)))
+}
+
+// ConsoleProblems lists submitted "Report a problem" feedback (supervisor only).
+func (s *Server) ConsoleProblems(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireSupervisor(w, r); !ok {
+		return
+	}
+	reports, _ := db.ListProblemReports(s.DB, 200)
+	data := s.consoleBase(w, r, "admin", s.trackFrom(r))
+	data["Problems"] = reports
+	s.renderConsole(w, "console_problems.html", data)
 }
 
 // ── /console/clients/new — intake wizard (demo-safe) ──────────────────────────
@@ -205,7 +217,7 @@ func (s *Server) ConsoleIntake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	track := s.trackFrom(r)
-	data := s.consoleBase(r, "clients", track)
+	data := s.consoleBase(w, r, "clients", track)
 	data["Officers"] = s.officerChoices(clients)
 	data["CSRF"] = s.Auth.CSRF(w, r) // final step creates a real client via /admin/add_defendant
 	s.renderConsole(w, "console_intake.html", data)
@@ -267,7 +279,7 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	track := s.trackFrom(r)
-	data := s.consoleBase(r, "clients", track)
+	data := s.consoleBase(w, r, "clients", track)
 
 	cases := clients[idn]
 	if len(cases) == 0 {
@@ -352,7 +364,7 @@ func (s *Server) ConsoleCalendar(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cur := compute.Noon(year, month, 1)
-	data := s.consoleBase(r, "calendar", track)
+	data := s.consoleBase(w, r, "calendar", track)
 	data["PrevMonth"] = cur.AddDate(0, -1, 0).Format("2006-01")
 	data["NextMonth"] = cur.AddDate(0, 1, 0).Format("2006-01")
 
@@ -385,7 +397,7 @@ func (s *Server) ConsoleCompliance(w http.ResponseWriter, r *http.Request) {
 	}
 	track := s.trackFrom(r)
 	now := compute.NowET()
-	data := s.consoleBase(r, "compliance", track)
+	data := s.consoleBase(w, r, "compliance", track)
 	data["Behind"] = behindRoster(clients, track)
 	data["Missed"] = missedCheckInsRoster(clients, track)
 	violations, _ := db.ListAllViolations(s.DB)
@@ -406,7 +418,7 @@ func (s *Server) ConsoleReports(w http.ResponseWriter, r *http.Request) {
 	}
 	track := s.trackFrom(r)
 	a := analyticsData(clients, track)
-	data := s.consoleBase(r, "reports", track)
+	data := s.consoleBase(w, r, "reports", track)
 	data["A"] = a
 	// Derived rates (all from the existing math) for the headline strip.
 	data["GpsCollectRate"] = pct(a.TotalGpsPaid, a.TotalGpsOwed)
@@ -428,7 +440,7 @@ type adminUserRow struct {
 
 func (s *Server) ConsoleAdmin(w http.ResponseWriter, r *http.Request) {
 	track := s.trackFrom(r)
-	data := s.consoleBase(r, "admin", track)
+	data := s.consoleBase(w, r, "admin", track)
 	// Tombstones + recent audit (real); users/conditions/templates are demo-safe
 	// placeholders rendered by the template until those config tables exist.
 	tomb, _ := db.ListTombstones(s.DB)

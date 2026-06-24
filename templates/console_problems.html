@@ -1,0 +1,21 @@
+{{template "c_top" .}}
+<a class="backlink" href="/console/admin">← Admin</a>
+<div class="phead">
+  <div>
+    <h1>Problem reports</h1>
+    <div class="sub">What officers submitted via the “⚠ Report a problem” button, newest first. Also logged to the server (journalctl) on submit.</div>
+  </div>
+</div>
+<div class="panel">
+  <div class="body">
+    {{range .Problems}}
+    <div class="frow"><span class="rail info">⚠</span><div class="grow">
+      <div class="t" style="white-space:pre-wrap;font-weight:500">{{.Body}}</div>
+      <div class="m">{{officer .Author}} · {{shortdate .CreatedAt}}{{if .Page}} · <a href="{{.Page}}">{{.Page}}</a>{{end}}</div>
+    </div></div>
+    {{else}}
+    <div class="emptybox" style="padding:30px"><div class="big">✓</div>No problem reports yet.</div>
+    {{end}}
+  </div>
+</div>
+{{template "c_bot" .}}

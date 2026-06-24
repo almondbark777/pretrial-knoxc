@@ -41,7 +41,7 @@ func (s *Server) ConsolePtrCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	// Lives under Reports (entry point is a button on the Reports header), so keep
 	// the Reports nav item highlighted while it's open.
-	data := s.consoleBase(r, "reports", s.trackFrom(r))
+	data := s.consoleBase(w, r, "reports", s.trackFrom(r))
 	data["BBJson"] = ptrCheckBlueBookJSON(clients)
 	s.renderConsole(w, "console_ptr_check.html", data)
 }

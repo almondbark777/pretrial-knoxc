@@ -66,6 +66,7 @@ try{var _m=localStorage.getItem('ptc-theme');if(_m!=='light'&&_m!=='dark')_m='sy
           <input type="date" id="asof-input" value="{{.AsOfInput}}" aria-label="As-of date">
           {{if not .IsToday}}<button class="asof-reset" id="asof-reset" title="Reset to today" aria-label="Reset to today">×</button>{{end}}
         </div>
+        <button class="iconbtn" id="reportbtn" title="Report a problem" aria-label="Report a problem">⚠</button>
         <button class="iconbtn" id="themebtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
         <div class="cuser">
           <div class="menu">
@@ -73,6 +74,7 @@ try{var _m=localStorage.getItem('ptc-theme');if(_m!=='light'&&_m!=='dark')_m='sy
             <div class="pop" id="userpop">
               <a class="who" style="pointer-events:none"><b>{{.UserName}}</b></a>
               <a href="/">← Client Tracker</a>
+              {{if .IsSupervisor}}<a href="/console/problems">Problem reports</a>{{end}}
               <button type="button" onclick="fetch('/api/logout',{method:'POST'}).then(()=>location.href='/login')">Sign out</button>
             </div>
           </div>
@@ -120,6 +122,25 @@ try{var _m=localStorage.getItem('ptc-theme');if(_m!=='light'&&_m!=='dark')_m='sy
   </form>
 </section>
 
+{{/* ── Report a problem ── global feedback. Captures the page the user is on and
+      a free-text description; POSTs to /admin/problem/report which logs it to the
+      DB + server log (journalctl on ptr1). */}}
+<div class="backdrop" id="problemModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Report a problem">
+    <form method="post" action="/admin/problem/report">
+      <div class="mh"><h3>Report a problem</h3><button type="button" class="x" onclick="closeProblem()" aria-label="Close">×</button></div>
+      <div class="mb">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <input type="hidden" name="page" id="problemPage" value="">
+        <input type="hidden" name="next" id="problemNext" value="/console">
+        <p class="note-hint" style="margin:0 0 10px">Tell us what's going wrong. We'll automatically note the page you're on (<span id="problemWhere" class="muted"></span>) so we can track it down.</p>
+        <div class="fld"><label>What's the problem?</label><textarea name="body" id="problemBody" rows="5" required maxlength="4000" placeholder="Describe what happened, what you expected, and anything you clicked…"></textarea></div>
+      </div>
+      <div class="mf"><button type="button" class="btn ghost" onclick="closeProblem()">Cancel</button><button type="submit" class="btn">Send report</button></div>
+    </form>
+  </div>
+</div>
+
 {{/* keyboard-shortcut help overlay (opened with "?") */}}
 <div class="backdrop" id="kbdModal" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
@@ -150,6 +171,21 @@ function ptToast(title, msg, tone){
   host.appendChild(el);
   setTimeout(function(){el.style.transition='opacity .4s,transform .4s';el.style.opacity='0';el.style.transform='translateX(20px)';setTimeout(function(){el.remove()},400)},4200);
 }
+
+/* ── report a problem ─────────────────────────────────────────────────────── */
+function openProblem(){
+  var loc=location.pathname+location.search;
+  var p=document.getElementById('problemPage'); if(p)p.value=location.href;
+  var n=document.getElementById('problemNext'); if(n)n.value=loc;
+  var wEl=document.getElementById('problemWhere'); if(wEl)wEl.textContent=loc;
+  var m=document.getElementById('problemModal'); if(m){m.classList.add('show');m.setAttribute('aria-hidden','false');}
+  var b=document.getElementById('problemBody'); if(b)setTimeout(function(){b.focus();},40);
+}
+function closeProblem(){var m=document.getElementById('problemModal'); if(m){m.classList.remove('show');m.setAttribute('aria-hidden','true');}}
+(function(){
+  var btn=document.getElementById('reportbtn'); if(btn)btn.addEventListener('click',openProblem);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeProblem();});
+})();
 
 /* ── theme toggle ─────────────────────────────────────────────────────────── */
 (function(){

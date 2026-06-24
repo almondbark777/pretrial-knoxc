@@ -184,7 +184,7 @@ func tailStr(s string, n int) string {
 }
 
 func (s *Server) importBase(w http.ResponseWriter, r *http.Request) map[string]any {
-	data := s.consoleBase(r, "admin", s.trackFrom(r))
+	data := s.consoleBase(w, r, "admin", s.trackFrom(r))
 	data["CSRF"] = s.Auth.CSRF(w, r)
 	data["Mode"] = "form"
 	return data

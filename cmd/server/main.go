@@ -211,6 +211,7 @@ func main() {
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
 	r.Get("/console/help", srv.ConsoleHelp)
+	r.Get("/console/problems", srv.ConsoleProblems)  // submitted "Report a problem" feedback (supervisor)
 	r.Get("/console/ptr-check", srv.ConsolePtrCheck) // check the daily PTR export .txt vs live Blue Book (browser-side)
 	r.Get("/console/import", srv.ImportPage)         // stop-gap SharePoint CSV upload (supervisor)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
@@ -302,6 +303,7 @@ func main() {
 		ar.Post("/case/status", srv.ToggleCaseStatus)       // mark a case open / closed
 		ar.Post("/date/add", srv.AddClientDate)             // attach an additional labeled date
 		ar.Post("/date/delete", srv.DeleteClientDate)       // remove an additional date
+		ar.Post("/problem/report", srv.ReportProblem)       // "Report a problem" — logs page + description
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)

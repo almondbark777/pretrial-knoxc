@@ -111,6 +111,15 @@ CREATE TABLE IF NOT EXISTS client_dates (
 );
 CREATE INDEX IF NOT EXISTS idx_client_dates_idn ON client_dates(idn);
 
+CREATE TABLE IF NOT EXISTS problem_reports (
+    report_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    page       TEXT NULL,
+    body       TEXT NOT NULL,
+    user_agent TEXT NULL,
+    author     TEXT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS violations (
     violation_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     idn            INTEGER NOT NULL,

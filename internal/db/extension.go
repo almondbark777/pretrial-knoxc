@@ -192,6 +192,57 @@ func DeleteClientDate(d *sql.DB, id int64, by string) error {
 	return txDeleteByID(d, "client_dates", "client_date_id", id, by, "client_date_delete")
 }
 
+// ── Problem reports ("Report a problem" button) ─────────────────────────────
+
+// ProblemReport is one user-submitted problem report: the free-text description,
+// the page they were on when they clicked, and who/when.
+type ProblemReport struct {
+	ID        int64
+	Page      string
+	Body      string
+	UserAgent string
+	Author    string
+	CreatedAt string
+}
+
+// AddProblemReport records a problem report and returns its id.
+func AddProblemReport(d *sql.DB, page, body, userAgent, author string) (int64, error) {
+	if strings.TrimSpace(body) == "" {
+		return 0, errEmptyField
+	}
+	res, err := d.Exec(
+		`INSERT INTO problem_reports (page, body, user_agent, author) VALUES (?, ?, ?, ?)`,
+		nz(strings.TrimSpace(page)), strings.TrimSpace(body), nz(strings.TrimSpace(userAgent)), nz(author))
+	if err != nil {
+		return 0, err
+	}
+	id, _ := res.LastInsertId()
+	return id, nil
+}
+
+// ListProblemReports returns recent problem reports, newest first.
+func ListProblemReports(d *sql.DB, limit int) ([]ProblemReport, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := d.Query(
+		`SELECT report_id, IFNULL(page,''), body, IFNULL(user_agent,''), IFNULL(author,''), IFNULL(created_at,'')
+		   FROM problem_reports ORDER BY report_id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ProblemReport
+	for rows.Next() {
+		var p ProblemReport
+		if err := rows.Scan(&p.ID, &p.Page, &p.Body, &p.UserAgent, &p.Author, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // ── Reminders ─────────────────────────────────────────────────────────────
 
 func ListReminders(d *sql.DB, idn string) ([]models.Reminder, error) {
