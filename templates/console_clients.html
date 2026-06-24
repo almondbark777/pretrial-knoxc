@@ -334,7 +334,9 @@ document.addEventListener('DOMContentLoaded',function(){
         })
         .catch(function(){ closeAction(); ptToast('Bulk check-in failed','Network error — please retry.','warn'); });
     });
+    amLastFocus=document.activeElement;
     var m=document.getElementById('actionModal');m.classList.add('show');m.setAttribute('aria-hidden','false');
+    setTimeout(function(){var f=m.querySelector('select,input:not([type=hidden]),textarea');if(f)f.focus();},30);
   });
 
   /* ── paging ──────────────────────────────────────────────────────────────── */

@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"encoding/csv"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -30,20 +31,23 @@ func writeCSV(w http.ResponseWriter, filename string, header []string, rows [][]
 // stamp returns today's ET date for filenames, e.g. "2026-05-31".
 func stamp() string { return compute.TodayET().Format("2006-01-02") }
 
-// ExportReferrals streams the app-entered referrals (added_defendants) as CSV —
-// the "Export to Excel" for the Referrals view, every captured field as a column.
+// ExportReferrals streams EVERY client (most-recently-referred first) as CSV with
+// the full per-client field set — the "full data" companion to the compact
+// on-screen Referrals worklist. Runs off BuildClients, so tombstones/overrides are
+// already applied. The header must stay aligned with referralExportRows' cells.
 func (s *Server) ExportReferrals(w http.ResponseWriter, r *http.Request) {
-	entries, err := db.ReferralEntries(s.DB)
+	clients, err := s.clients()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	labels, rows := referralView(entries)
-	out := make([][]string, len(rows))
-	for i, row := range rows {
-		out[i] = row.Cells
+	header := []string{
+		"Name", "IDN", "Case #(s)", "Level", "Status", "Officer",
+		"Referred", "Closed", "GPS Active", "GPS Type", "GPS Install",
+		"GPS Switched To", "GPS Switched Date", "Charge Type", "Bond Amount",
+		"Supervision Type", "Order From", "DMA", "Birthdate", "GPS Notes",
 	}
-	writeCSV(w, "app-referrals-"+stamp()+".csv", labels, out)
+	writeCSV(w, "referrals-"+stamp()+".csv", header, referralExportRows(clients))
 }
 
 // ExportBehind streams the Behind-on-GPS roster as CSV.
@@ -146,7 +150,11 @@ func (s *Server) ExportAllData(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", `attachment; filename="ptr-all-data-`+stamp()+`.zip"`)
 	zw := zip.NewWriter(w)
-	defer zw.Close()
+	defer func() {
+		if err := zw.Close(); err != nil {
+			log.Printf("ExportAllData: zip close error: %v", err)
+		}
+	}()
 	for _, t := range tables {
 		cols, rows, derr := db.DumpTable(s.DB, t)
 		if derr != nil {
@@ -154,7 +162,8 @@ func (s *Server) ExportAllData(w http.ResponseWriter, r *http.Request) {
 		}
 		f, ferr := zw.Create(t + ".csv")
 		if ferr != nil {
-			return
+			log.Printf("ExportAllData: zip.Create(%q): %v", t, ferr)
+			continue // log and skip rather than abandoning remaining tables
 		}
 		cw := csv.NewWriter(f)
 		_ = cw.Write(cols)
@@ -162,5 +171,8 @@ func (s *Server) ExportAllData(w http.ResponseWriter, r *http.Request) {
 			_ = cw.Write(row)
 		}
 		cw.Flush()
+		if err := cw.Error(); err != nil {
+			log.Printf("ExportAllData: csv flush error for table %q: %v", t, err)
+		}
 	}
 }

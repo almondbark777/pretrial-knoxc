@@ -29,6 +29,7 @@
       <div class="pop" id="ovpop">
         <a href="/console/calendar?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">View calendar</a>
         <button type="button" onclick="cmOpen('paymentModal')">Record payment</button>
+        <button type="button" onclick="cmOpen('gpsModal')">Edit GPS details</button>
         <button type="button" onclick="cmOpen('custodyModal')">Add custody dates</button>
         <button type="button" onclick="cmOpen('courtModal')">Add court date</button>
         <button type="button" onclick="cmOpen('violationModal')">Record violation</button>
@@ -239,12 +240,15 @@
     </div>
 
     <div class="panel">
-      <div class="h"><h2>GPS Electronic Monitoring</h2>{{if $r.GpsWaived}}<span class="grow"></span><span class="chip neutral">Fees waived</span>{{end}}</div>
+      <div class="h"><h2>GPS Electronic Monitoring</h2><span class="grow"></span>{{if $r.GpsWaived}}<span class="chip neutral">Fees waived</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('gpsModal')">Edit GPS details</button></div>
       <div class="pad">
         {{if $r.GPS.Vendor}}
         <table class="kv">
           <tr><td>Vendor</td><td>{{$r.GPS.Vendor}}{{if $r.GPS.HasSwitch}} → {{$r.GPS.Vendor2}}{{end}}</td></tr>
           {{if $r.GpsInstall}}<tr><td>Install date</td><td>{{$r.GpsInstall}}</td></tr>{{end}}
+          {{if $r.GpsSwitchedTo}}<tr><td>Switched to</td><td>{{$r.GpsSwitchedTo}}{{if $r.GpsSwitchedDate}} · {{$r.GpsSwitchedDate}}{{end}}</td></tr>{{end}}
+          {{if $r.GpsCourtOrder}}<tr><td>Court-ordered</td><td>{{$r.GpsCourtOrder}}</td></tr>{{end}}
+          {{if $r.GpsDAEmailed}}<tr><td>DA emailed</td><td>{{$r.GpsDAEmailed}}</td></tr>{{end}}
           <tr><td>Daily rate</td><td>{{if $r.GPS.DailyRate}}{{moneyi (derefi $r.GPS.DailyRate)}}/day{{else}}—{{end}}</td></tr>
           <tr><td>Days active</td><td>{{intP $r.GPS.DaysActive}}</td></tr>
           {{if gt $r.GpsCustodyDays 0}}<tr><td>Days in custody (not billed)</td><td class="ok-t">−{{$r.GpsCustodyDays}}</td></tr>
@@ -255,12 +259,32 @@
           {{if $r.GPS.Adj}}<tr><td>Day adjustment</td><td>{{$r.GPS.Adj}} days ({{money $r.GPS.AdjDollars}})</td></tr>{{end}}
           <tr><td>{{if boolP $r.GPS.Covered}}Surplus{{else}}Behind{{end}}</td><td class="{{if boolP $r.GPS.Covered}}ok-t{{else}}risk-t{{end}}">{{moneyP $r.GPS.SurplusDollars}}{{if $r.GPS.SurplusDays}} · {{intP $r.GPS.SurplusDays}} days{{end}}</td></tr>
         </table>
+        {{else if $r.GpsActive}}
+        <div class="banner" style="margin:0 0 12px"><span>⚠</span><div><b>GPS vendor not set.</b> This client is on GPS but the vendor/install date are blank — use <b>Edit GPS details</b> to set them so fees calculate.</div></div>
+        {{if $r.GPS.TotalGpsPaid}}<table class="kv"><tr><td>GPS payments on file</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr></table>{{end}}
         {{else if $r.GPS.TotalGpsPaid}}
         <table class="kv"><tr><td>GPS payments on file</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr><tr><td>Vendor / rate</td><td class="warn-t">MISSING</td></tr></table>
         {{else}}<p class="muted" style="padding:0">No GPS monitoring on this client.</p>{{end}}
       </div>
     </div>
   </div>
+
+  {{/* Victim & 48-hour notification — shows on the record so officers can see and
+       update who was notified and when (item: "add victim info to the dashboard"). */}}
+  {{if or $r.Victims $r.Victim48 $r.VictimAcceptDeny $r.GpsActive}}
+  <div class="panel" style="margin-top:16px">
+    <div class="h"><h2>Victim &amp; 48-hour notification</h2><span class="grow"></span><button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('gpsModal')">Edit</button></div>
+    <div class="pad">
+      {{if or $r.Victims $r.Victim48 $r.VictimAcceptDeny}}
+      <table class="kv">
+        {{if $r.Victim48}}<tr><td>48-hour notification</td><td>{{$r.Victim48}}</td></tr>{{end}}
+        {{if $r.VictimAcceptDeny}}<tr><td>Victim accept / deny GPS</td><td>{{$r.VictimAcceptDeny}}</td></tr>{{end}}
+        {{range $i, $v := $r.Victims}}<tr><td>{{if eq $i 0}}Victim{{else if eq $i 1}}Victim 2{{else}}Victim 3{{end}}</td><td>{{$v.Name}}{{if $v.IDN}} · IDN {{$v.IDN}}{{end}}</td></tr>{{end}}
+      </table>
+      {{else}}<p class="muted" style="padding:0">No victim or 48-hour notification on record. Use <b>Edit</b> to add it (e.g. when re-notifying after a device is tampered with).</p>{{end}}
+    </div>
+  </div>
+  {{end}}
 
   {{/* In-custody (GPS-off) periods — days excluded from GPS billing. */}}
   <div class="panel" style="margin-top:16px">
@@ -481,6 +505,45 @@
       <div class="fld"><label>Tag label</label><input type="text" name="label" required placeholder="e.g. High risk, Veteran, Interpreter needed"></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('tagModal')">Cancel</button><button type="submit" class="btn">Add tag</button></div>
+  </form>
+</div></div>
+
+{{/* ── Edit GPS / monitoring details (any officer — vendor, install, switch,
+      victim 48-hour). Stored as importer-proof, audited field overrides. ── */}}
+<div class="backdrop" id="gpsModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/gps/update">
+    <div class="mh"><h3>Edit GPS / Monitoring Details</h3><button type="button" class="x" onclick="cmClose('gpsModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">Set the GPS vendor, install date, any device switch, and the victim 48-hour notification. Saved values show everywhere, survive the daily import, and are audited &amp; reversible. Leave a field blank to clear it.</p>
+      <div class="fld"><label>GPS vendor</label><select name="gps_type">
+        <option value="">— choose —</option>
+        <option value="ALLIED"{{if eq $r.GpsVendorVal "ALLIED"}} selected{{end}}>ALLIED — $8/day</option>
+        <option value="SCRAM"{{if eq $r.GpsVendorVal "SCRAM"}} selected{{end}}>SCRAM — $15/day</option>
+        <option value="IC"{{if eq $r.GpsVendorVal "IC"}} selected{{end}}>IC — $0/day (indigent)</option>
+        <option value="IN CUSTODY"{{if eq $r.GpsVendorVal "IN CUSTODY"}} selected{{end}}>IN CUSTODY</option>
+      </select></div>
+      <div class="fld"><label>Install date</label><input type="date" name="gps_install_date" value="{{$r.GpsInstallInput}}"></div>
+      <div class="fld"><label>Switched to <span class="muted" style="font-weight:400">(only if the device changed vendor)</span></label><select name="switched_to">
+        <option value="">— not switched —</option>
+        <option value="ALLIED"{{if eq $r.GpsSwitchedTo "ALLIED"}} selected{{end}}>ALLIED</option>
+        <option value="SCRAM"{{if eq $r.GpsSwitchedTo "SCRAM"}} selected{{end}}>SCRAM</option>
+        <option value="IC"{{if eq $r.GpsSwitchedTo "IC"}} selected{{end}}>IC</option>
+      </select></div>
+      <div class="fld"><label>Switched date</label><input type="date" name="switched_gps_date" value="{{$r.GpsSwitchedInput}}"></div>
+      <div class="fld"><label>DA emailed (date)</label><input type="date" name="da_emailed" value="{{$r.GpsDAEmailedInput}}"></div>
+      <div class="fld"><label>Court-ordered?</label><select name="court_order"><option value="">— choose —</option><option{{if eq $r.GpsCourtOrder "Yes"}} selected{{end}}>Yes</option><option{{if eq $r.GpsCourtOrder "No"}} selected{{end}}>No</option></select></div>
+      <div class="note-hint" style="margin:14px 0 12px"><b>Victim 48-hour notification</b> — update the time after re-notifying (e.g. when a device is tampered with).</div>
+      <div class="fld"><label>48-hour notification (date &amp; time)</label><input type="datetime-local" name="victim_time_48" value="{{$r.Victim48Input}}"></div>
+      <div class="fld"><label>Victim accept / deny GPS</label><select name="victim_accept_deny_gps"><option value="">— choose —</option><option{{if eq $r.VictimAcceptDeny "Accept"}} selected{{end}}>Accept</option><option{{if eq $r.VictimAcceptDeny "Deny"}} selected{{end}}>Deny</option><option{{if eq $r.VictimAcceptDeny "Pending"}} selected{{end}}>Pending</option></select></div>
+      <div class="fld"><label>Victim</label><input type="text" name="victim" value="{{$r.VictimName}}" placeholder="LAST, FIRST"></div>
+      <div class="fld"><label>Victim IDN</label><input type="text" name="victim_idn" value="{{$r.VictimIDN}}" inputmode="numeric"></div>
+      <div class="fld"><label>Victim 2</label><input type="text" name="victim_2" value="{{$r.Victim2Name}}" placeholder="LAST, FIRST"></div>
+      <div class="fld"><label>Victim 2 IDN</label><input type="text" name="victim_2_idn" value="{{$r.Victim2IDN}}" inputmode="numeric"></div>
+      <div class="fld"><label>Victim 3</label><input type="text" name="victim_3" value="{{$r.Victim3Name}}" placeholder="LAST, FIRST"></div>
+      <div class="fld"><label>Victim 3 IDN</label><input type="text" name="victim_3_idn" value="{{$r.Victim3IDN}}" inputmode="numeric"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('gpsModal')">Cancel</button><button type="submit" class="btn">Save GPS details</button></div>
   </form>
 </div></div>
 

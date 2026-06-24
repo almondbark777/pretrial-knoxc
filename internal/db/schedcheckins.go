@@ -60,6 +60,28 @@ func ListAllScheduledCheckIns(d *sql.DB) ([]models.ScheduledCheckIn, error) {
 	return scanScheds(rows)
 }
 
+// ListAllScheduledCheckInsLive is like ListAllScheduledCheckIns but excludes rows
+// whose IDN is whole-person tombstoned. Use this for the dashboard's Today's
+// Schedule feed so deleted people do not reappear via their booked appointments.
+func ListAllScheduledCheckInsLive(d *sql.DB) ([]models.ScheduledCheckIn, error) {
+	all, err := ListAllScheduledCheckIns(d)
+	if err != nil {
+		return nil, err
+	}
+	ts, err := loadTombstones(d)
+	if err != nil {
+		return nil, err
+	}
+	out := all[:0:0]
+	for _, s := range all {
+		if ts.whole[strings.TrimSpace(s.IDN)] {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
 // AddScheduledCheckIn books a future check-in (any allowed officer; audited).
 func AddScheduledCheckIn(d *sql.DB, idn, scheduledFor, checkInType, officer, by string) error {
 	idn, scheduledFor = strings.TrimSpace(idn), strings.TrimSpace(scheduledFor)

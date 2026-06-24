@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -49,10 +50,17 @@ type Server struct {
 	// Set in main after New(); may be nil in tests that don't exercise chat.
 	Chat *chat.Hub
 
-	cacheTTL time.Duration
-	mu       sync.Mutex
-	cached   map[string][]*compute.Client
-	cachedAt time.Time
+	cacheTTL   time.Duration
+	mu         sync.Mutex
+	cached     map[string][]*compute.Client
+	cachedAt   time.Time
+	refreshing bool   // true while a background rebuild is in flight (#12)
+	cacheGen   uint64 // bumped by clearCache; a rebuild whose gen is stale is discarded so it can't overwrite a post-mutation clear (#12 stale-write fix)
+
+	// buildClientsFunc is the build function to use in clients(). When nil the
+	// real db.BuildClients is called. Tests inject a stub here to avoid a real DB
+	// and to count rebuild invocations.
+	buildClientsFunc func() (map[string][]*compute.Client, error)
 
 	importMu sync.Mutex // one CSV upload/reconcile at a time
 }
@@ -63,25 +71,97 @@ func New(db *sql.DB, a *auth.Authenticator, tmpl *template.Template, ttl time.Du
 }
 
 // clients returns the joined client set (idn -> all case rows), rebuilt at most
-// once per TTL.
+// once per TTL. Serve-stale-while-refresh pattern (#12 stampede fix):
+//   - Fresh snapshot: return it under the brief lock.
+//   - Stale but present: fire ONE background rebuild goroutine, return the stale
+//     snapshot immediately (no convoy on the TTL boundary). The goroutine swaps in
+//     the new snapshot when done and keeps the old one on error.
+//   - Cold start (no snapshot yet): rebuild synchronously so the first request
+//     never returns an empty map.
 func (s *Server) clients() (map[string][]*compute.Client, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cached != nil && time.Since(s.cachedAt) < s.cacheTTL {
-		return s.cached, nil
+	now := time.Now()
+	if s.cached != nil && now.Sub(s.cachedAt) < s.cacheTTL {
+		// Fast path: fresh snapshot — return under the lock (no copy needed; the map
+		// is read-only after it's written to s.cached).
+		snap := s.cached
+		s.mu.Unlock()
+		return snap, nil
 	}
-	cl, err := db.BuildClients(s.DB, compute.TodayET())
+	if s.cached != nil {
+		// Stale snapshot present: serve it immediately and kick off exactly one
+		// background rebuild (coalesce concurrent stale callers via refreshing flag).
+		snap := s.cached
+		if !s.refreshing {
+			s.refreshing = true
+			go s.backgroundRefresh(s.cacheGen)
+		}
+		s.mu.Unlock()
+		return snap, nil
+	}
+	// Cold start: no snapshot at all — rebuild synchronously.
+	gen := s.cacheGen
+	s.mu.Unlock()
+	return s.syncRefresh(gen)
+}
+
+// buildClients calls the injected stub (tests) or the real db.BuildClients.
+func (s *Server) buildClients() (map[string][]*compute.Client, error) {
+	if s.buildClientsFunc != nil {
+		return s.buildClientsFunc()
+	}
+	return db.BuildClients(s.DB, compute.TodayET())
+}
+
+// syncRefresh builds a fresh snapshot synchronously and stores it. Used on cold
+// start. Concurrent cold callers both build (the map is immutable once stored, so
+// the last writer wins with no corruption). For the common case (a single server
+// process) there is at most one cold start.
+func (s *Server) syncRefresh(gen uint64) (map[string][]*compute.Client, error) {
+	cl, err := s.buildClients()
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	// Only store if no clearCache() landed during the build: otherwise this snapshot
+	// may predate the mutation that cleared the cache, so we'd serve stale data.
+	if s.cacheGen == gen {
+		s.cached = cl
+		s.cachedAt = time.Now()
+	}
+	s.mu.Unlock()
+	return cl, nil
+}
+
+// backgroundRefresh rebuilds the client snapshot in the background. On success it
+// atomically replaces the stored snapshot — UNLESS a clearCache() landed while the
+// build was in flight (gen changed), in which case the snapshot may predate that
+// mutation, so it is discarded rather than overwrite the clear (#12 stale-write).
+// On error it keeps the prior snapshot and logs. Always clears refreshing so the
+// next stale hit can try again.
+func (s *Server) backgroundRefresh(gen uint64) {
+	cl, err := s.buildClients()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refreshing = false
+	if err != nil {
+		log.Printf("cache: background rebuild failed (keeping prior snapshot): %v", err)
+		return
+	}
+	if s.cacheGen != gen {
+		// A clearCache() (post-mutation) raced this build — discard so a just-made
+		// add/delete/override isn't hidden for a full TTL. The next request cold-starts.
+		return
+	}
 	s.cached = cl
 	s.cachedAt = time.Now()
-	return cl, nil
 }
 
 func (s *Server) clearCache() {
 	s.mu.Lock()
 	s.cached = nil
+	s.refreshing = false
+	s.cacheGen++ // invalidate any in-flight rebuild so it can't overwrite this clear
 	s.mu.Unlock()
 }
 
@@ -104,10 +184,9 @@ func (s *Server) Health(w http.ResponseWriter, r *http.Request) {
 // ── Auth pages ────────────────────────────────────────────────────────────────
 
 func (s *Server) LoginPage(w http.ResponseWriter, r *http.Request) {
-	next := r.URL.Query().Get("next")
-	if next == "" {
-		next = "/"
-	}
+	// Sanitize the reflected ?next= so a crafted login link can't bounce the user
+	// off-site after sign-in (open redirect). Defaults to the landing page.
+	next := sanitizeNext(r.URL.Query().Get("next"), "/")
 	s.render(w, "login.html", map[string]any{"Next": next, "Error": r.URL.Query().Get("err")})
 }
 
@@ -115,17 +194,27 @@ func (s *Server) APILogin(w http.ResponseWriter, r *http.Request) {
 	var body struct{ Email, Password, Next string }
 	ct := r.Header.Get("Content-Type")
 	if strings.Contains(ct, "application/json") {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "malformed request body"})
+			return
+		}
 	} else {
 		_ = r.ParseForm()
 		body.Email = r.FormValue("email")
 		body.Password = r.FormValue("password")
 		body.Next = r.FormValue("next")
 	}
-	if body.Next == "" {
-		body.Next = "/"
-	}
+	// Validate the post-login redirect for BOTH branches: a same-origin path or "/".
+	body.Next = sanitizeNext(body.Next, "/")
+	// Check the (shared) password FIRST. Only FAILED attempts burn the brute-force
+	// budget — a successful login never consumes a token, so a whole office behind one
+	// shared NAT + one APP_PASSWORD can't be 429-locked by legitimate sign-ins. A
+	// flood of wrong passwords from an IP still trips the limiter into a 429.
 	if !s.Auth.Login(w, r, body.Email, body.Password) {
+		if !s.Auth.AllowLogin(auth.ClientIP(r)) {
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{"ok": false, "error": "too many attempts — wait a minute and try again"})
+			return
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "Invalid email or password"})
 		return
 	}

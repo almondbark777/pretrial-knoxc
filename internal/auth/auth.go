@@ -15,6 +15,8 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gorilla/sessions"
 )
@@ -62,6 +64,9 @@ type Authenticator struct {
 	roleFn      func(email string) (string, bool)
 	password    string
 	store       *sessions.CookieStore
+
+	loginLimiter  *loginLimiter
+	trustCfAccess bool // trust the Cf-Access-Authenticated-User-Email header (default true)
 }
 
 const sessionName = "kh_sess"
@@ -106,7 +111,104 @@ func New(password, sessionSecret string, allowedEmails, supervisorEmails, adminE
 		SameSite: http.SameSiteLaxMode,
 		// TLS terminated upstream by Cloudflare, so Secure is left false here.
 	}
-	return &Authenticator{allowed: allowed, supervisors: supervisors, admins: admins, password: password, store: store}
+	return &Authenticator{allowed: allowed, supervisors: supervisors, admins: admins, password: password, store: store, loginLimiter: newLoginLimiter(loginBurst, loginRefill), trustCfAccess: true}
+}
+
+// SetTrustCfAccess controls whether resolve() trusts the upstream
+// Cf-Access-Authenticated-User-Email header (defense-in-depth: the header is only
+// trustworthy when nothing but the local cloudflared sidecar can reach the
+// listener). Default is true to preserve the existing two-gate behavior; main
+// turns it off via TRUST_CF_ACCESS_HEADER=0 and refuses to start it on a
+// non-loopback listener while trust is on.
+func (a *Authenticator) SetTrustCfAccess(trust bool) { a.trustCfAccess = trust }
+
+// ── Login rate-limit (in-memory token bucket, keyed by client IP) ─────────────
+//
+// The whole office shares one APP_PASSWORD, so a single guessable secret is the
+// brute-force target. AllowLogin caps attempts per source IP across BOTH the
+// JSON login (APILogin) and the HTTP Basic fallback (basicAuth) — one shared
+// budget so an attacker can't dodge the limit by switching transports. The limiter
+// is process-local (the app is a single binary); it resets on restart, which is
+// acceptable for a lockout backstop, not an audit control.
+
+const (
+	loginBurst  = 50              // FAILED attempts allowed in a burst per key (success never consumes); sized for a shared-NAT office
+	loginRefill = 6 * time.Second // one token back every 6s (~10/min steady-state)
+)
+
+type bucket struct {
+	tokens float64
+	last   time.Time
+}
+
+type loginLimiter struct {
+	mu      sync.Mutex
+	buckets map[string]*bucket
+	burst   float64
+	refill  time.Duration
+	now     func() time.Time // injectable for tests
+}
+
+func newLoginLimiter(burst int, refill time.Duration) *loginLimiter {
+	return &loginLimiter{
+		buckets: make(map[string]*bucket),
+		burst:   float64(burst),
+		refill:  refill,
+		now:     time.Now,
+	}
+}
+
+// allow consumes one token for key, returning false when the bucket is empty.
+// It refills lazily based on elapsed time and prunes buckets that have fully
+// refilled so the map can't grow without bound under IP churn.
+func (l *loginLimiter) allow(key string) bool {
+	if key == "" {
+		key = "?"
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	b := l.buckets[key]
+	if b == nil {
+		b = &bucket{tokens: l.burst, last: now}
+		l.buckets[key] = b
+	} else {
+		elapsed := now.Sub(b.last)
+		if elapsed > 0 && l.refill > 0 {
+			b.tokens += float64(elapsed) / float64(l.refill)
+			if b.tokens > l.burst {
+				b.tokens = l.burst
+			}
+			b.last = now
+		}
+	}
+	l.pruneLocked(now)
+	if b.tokens < 1 {
+		return false
+	}
+	b.tokens--
+	return true
+}
+
+// pruneLocked drops fully-refilled, idle buckets (called under l.mu).
+func (l *loginLimiter) pruneLocked(now time.Time) {
+	if len(l.buckets) < 1024 {
+		return // cheap-enough map; only sweep once it's large
+	}
+	for k, b := range l.buckets {
+		if b.tokens >= l.burst && now.Sub(b.last) > 10*time.Minute {
+			delete(l.buckets, k)
+		}
+	}
+}
+
+// AllowLogin reports whether another login attempt from key (the true client IP)
+// is within the rate limit; a false return means the caller should answer 429.
+func (a *Authenticator) AllowLogin(key string) bool {
+	if a.loginLimiter == nil {
+		return true
+	}
+	return a.loginLimiter.allow(key)
 }
 
 // SetRoleSource wires the DB-backed role lookup (a db.RoleCache.RoleOf). It returns
@@ -311,10 +413,15 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 }
 
 func (a *Authenticator) resolve(r *http.Request) string {
-	// 1) Cloudflare Access header (trusted upstream identity).
-	if email := r.Header.Get("Cf-Access-Authenticated-User-Email"); email != "" {
-		if a.IsAllowed(email) {
-			return strings.ToLower(strings.TrimSpace(email))
+	// 1) Cloudflare Access header (trusted upstream identity) — only when trust is
+	// enabled. The header is spoofable by anyone who can reach the listener
+	// directly, so it's safe to trust only behind the loopback-bound cloudflared
+	// sidecar (enforced at startup in main).
+	if a.trustCfAccess {
+		if email := r.Header.Get("Cf-Access-Authenticated-User-Email"); email != "" {
+			if a.IsAllowed(email) {
+				return strings.ToLower(strings.TrimSpace(email))
+			}
 		}
 	}
 	// 2) Session cookie.
@@ -345,9 +452,33 @@ func (a *Authenticator) basicAuth(r *http.Request) string {
 	}
 	user = strings.ToLower(strings.TrimSpace(user))
 	if a.IsAllowed(user) && a.checkPassword(pass) {
-		return user
+		return user // success never consumes the budget — valid Basic callers/pollers are never throttled
 	}
+	// Only a FAILED Basic attempt burns a token, from the same shared IP bucket as
+	// APILogin, so an attacker can't sidestep the JSON-login limit via the Basic
+	// fallback (its failures still count toward the 429).
+	a.AllowLogin(ClientIP(r))
 	return ""
+}
+
+// ClientIP extracts the true client IP, preferring Cloudflare's CF-Connecting-IP
+// then the left-most X-Forwarded-For hop, falling back to RemoteAddr (host only).
+// Exported so the HTTP layer keys its own login limiter the same way.
+func ClientIP(r *http.Request) string {
+	if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
+		return ip
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return strings.TrimSpace(xff)
+	}
+	host := r.RemoteAddr
+	if i := strings.LastIndexByte(host, ':'); i >= 0 {
+		host = host[:i]
+	}
+	return strings.TrimSpace(host)
 }
 
 func wantsHTML(r *http.Request) bool {

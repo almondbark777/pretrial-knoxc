@@ -55,3 +55,37 @@ func TestHubPresenceAndFanout(t *testing.T) {
 		t.Fatal("alice's channel should be closed after Unsubscribe")
 	}
 }
+
+// TestFanoutDoesNotBlockOnStuckClient verifies a client that never drains its
+// channel cannot wedge the hub: fanout drops to it (default branch) so other
+// clients keep receiving and Publish never blocks.
+func TestFanoutDoesNotBlockOnStuckClient(t *testing.T) {
+	h := NewHub()
+
+	// "stuck" never reads its channel; "live" does.
+	stuck := h.Subscribe("stuck@knoxsheriff.org")
+	recv(t, stuck.C) // its own presence snapshot (the only one we ever drain)
+	live := h.Subscribe("live@knoxsheriff.org")
+	recv(t, live.C) // live's own presence snapshot (on register)
+
+	// Publish more events than the per-client buffer (32) can hold. Without the
+	// non-blocking fanout this would deadlock once stuck's buffer fills.
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 200; i++ {
+			h.Publish(Event{Type: "msg", ID: int64(i), Data: "x"})
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Publish blocked on a stuck (non-draining) client")
+	}
+
+	// The live client still gets fresh events.
+	got := recv(t, live.C)
+	if got.Type != "msg" {
+		t.Fatalf("live client should still receive msgs, got %+v", got)
+	}
+}

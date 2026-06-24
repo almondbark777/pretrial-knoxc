@@ -67,10 +67,7 @@ func redirectMsg(w http.ResponseWriter, r *http.Request, to, msg string) {
 }
 
 func backOr(r *http.Request, def string) string {
-	if b := strings.TrimSpace(r.FormValue("next")); b != "" {
-		return b
-	}
-	return def
+	return safeNext(r, def)
 }
 
 // ── Delete / restore (supervisor-gated) ──────────────────────────────────────
@@ -293,14 +290,23 @@ func (s *Server) ClearOverride(w http.ResponseWriter, r *http.Request) {
 
 // ── Per-defendant CRUD (any allowed officer) ─────────────────────────────────
 
-// safeNext returns the request's `next` form value if it's a same-origin path
-// (starts with "/" but not "//"), else def. Guards against open redirects on the
-// shared /admin/* endpoints.
-func safeNext(r *http.Request, def string) string {
-	if n := strings.TrimSpace(r.FormValue("next")); strings.HasPrefix(n, "/") && !strings.HasPrefix(n, "//") {
+// sanitizeNext validates a candidate post-login / post-action redirect target,
+// returning n only when it is an unambiguous same-origin absolute path; otherwise
+// def. It rejects schema-relative ("//evil.com") and backslash-smuggled ("/\evil")
+// values that browsers normalize to an off-site host — the open-redirect vector.
+// Shared by safeNext (admin forms), LoginPage (reflected), and APILogin (form+JSON).
+func sanitizeNext(n, def string) string {
+	n = strings.TrimSpace(n)
+	if strings.HasPrefix(n, "/") && !strings.HasPrefix(n, "//") && !strings.HasPrefix(n, "/\\") {
 		return n
 	}
 	return def
+}
+
+// safeNext returns the request's `next` form value if it's a same-origin path,
+// else def. Guards against open redirects on the shared /admin/* endpoints.
+func safeNext(r *http.Request, def string) string {
+	return sanitizeNext(r.FormValue("next"), def)
 }
 
 // profileBack returns the client-record redirect target for the posted idn.

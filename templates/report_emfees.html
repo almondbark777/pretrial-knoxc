@@ -60,7 +60,8 @@
       <td class="num">{{.Rate}}</td><td>{{.Start}}</td><td class="num">{{.Days}}</td>
       <td class="num">{{.Owed}}</td><td class="num">{{.Paid}}</td><td class="num"><strong>{{.Behind}}</strong></td><td class="num">{{.DaysBehind}}</td>
       <td{{if .LastLetterBy}} title="by {{.LastLetterBy}}"{{end}}>{{if .LastLetter}}{{.LastLetter}}{{else}}<span class="muted">never</span>{{end}}</td>
-      <td class="no-print"><a class="export" href="/reports/em-fees/memo?kind=open&idn={{.IDN}}&case={{.Case}}">.docx ⤓</a></td>
+      <td class="no-print"><button type="submit" form="memoOne" class="export memolink" formaction="/reports/em-fees/memo"
+        onclick="memoOneSet('open','{{.IDN}}','{{.Case}}')">.docx ⤓</button></td>
     </tr>{{end}}
     </tbody>
   </table>
@@ -91,7 +92,8 @@
       <td class="num">{{.Owed}}</td><td class="num">{{.Paid}}</td><td class="num"><strong>{{.Behind}}</strong></td><td class="num">{{.DaysBehind}}</td>
       <td>{{.StartSrc}}</td>
       <td{{if .LastLetterBy}} title="by {{.LastLetterBy}}"{{end}}>{{if .LastLetter}}{{.LastLetter}}{{else}}<span class="muted">never</span>{{end}}</td>
-      <td class="no-print"><a class="export" href="/reports/em-fees/memo?kind=closed&idn={{.IDN}}&case={{.Case}}">.docx ⤓</a></td>
+      <td class="no-print"><button type="submit" form="memoOne" class="export memolink" formaction="/reports/em-fees/memo"
+        onclick="memoOneSet('closed','{{.IDN}}','{{.Case}}')">.docx ⤓</button></td>
     </tr>{{end}}
     </tbody>
   </table>
@@ -100,6 +102,16 @@
   <p class="empty empty-ok" style="margin:0 24px">✓ No closed cases are behind (or none in this dataset — older 48-hour exports carry only active installs).</p>
   {{end}}
 </form>
+
+  <!-- Single-memo download. A separate (non-nested) CSRF-guarded POST form the per-row
+       buttons above target via form="memoOne"; the button's onclick fills these hidden
+       fields. POST because generating a memo writes letter_log. -->
+  <form method="post" id="memoOne" class="no-print" style="display:none">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="kind" id="memoOneKind">
+    <input type="hidden" name="idn" id="memoOneIDN">
+    <input type="hidden" name="case" id="memoOneCase">
+  </form>
 
   <p class="muted no-print" style="margin:16px 24px;max-width:900px">
     Daily rates: ALLIED $8 · SCRAM $15 · 5+ days behind. Daily-fee payments only
@@ -113,6 +125,13 @@
 </div>
 
 <script>
+/* Per-row single-memo download: fill the hidden #memoOne POST form before its
+   submit button fires (state-changing memo generation must not ride a GET). */
+function memoOneSet(kind, idn, caseNo){
+  document.getElementById('memoOneKind').value = kind;
+  document.getElementById('memoOneIDN').value = idn;
+  document.getElementById('memoOneCase').value = caseNo;
+}
 /* Selection drives the batch: live count on the generate button, per-section
    select-all, and a guard so an empty selection never posts. */
 document.addEventListener('DOMContentLoaded', function(){

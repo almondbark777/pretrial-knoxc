@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"pretrial-knoxc/internal/db"
 )
@@ -205,5 +206,66 @@ func TestAddDefendantGPSFields(t *testing.T) {
 	}
 	if got := addedField(t, d, no, "victim"); got != "" {
 		t.Errorf("victim should be cleared on No, got %q", got)
+	}
+}
+
+// The record-level "Edit GPS details" endpoint (POST /admin/gps/update) lets any
+// officer fill the vendor / install / switch / victim-48h fields the import left
+// blank; the values flow back into the computed client via BuildClients. Bypasses
+// the router's CSRF middleware (not under test); the handler itself is officer-
+// accessible (no supervisor gate).
+func TestUpdateGPSPersistsAndShows(t *testing.T) {
+	d := testDB(t)
+	srv := newServer(d)
+
+	// A GPS-active referral with vendor + install blank (Dunaway's situation).
+	idn := "999780111"
+	postAdd(t, srv, url.Values{
+		"defendant": {"VENDORLESS, VAL"}, "idn": {idn}, "warrant_case_num": {"@780111"},
+		"gps": {"true"}, // GPS on, but no gps_type / install
+	})
+
+	req := httptest.NewRequest("POST", "/admin/gps/update", strings.NewReader(url.Values{
+		"idn":                    {idn},
+		"gps_type":               {"ALLIED"},
+		"gps_install_date":       {"2026-06-01"},
+		"switched_to":            {"SCRAM"},
+		"switched_gps_date":      {"2026-07-01"},
+		"victim_time_48":         {"2026-06-02T14:30"},
+		"victim_accept_deny_gps": {"Accept"},
+		"victim":                 {"DOE, JANE"},
+		"victim_idn":             {"987654"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.UpdateGPS(rec, req)
+	if rec.Code != http.StatusSeeOther && rec.Code != http.StatusOK {
+		t.Fatalf("UpdateGPS status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	clients, err := db.BuildClients(d, time.Now())
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	cases := clients[idn]
+	if len(cases) == 0 {
+		t.Fatalf("client %s not found after GPS update", idn)
+	}
+	c := cases[0]
+	// SetGPSDetails stores the submitted value verbatim (overrides table), so the
+	// computed client reflects exactly what the form posted.
+	for label, gw := range map[string][2]string{
+		"vendor":     {c.GpsType, "ALLIED"},
+		"install":    {c.GpInstall, "2026-06-01"},
+		"switchedTo": {c.GpSwitchedTo, "SCRAM"},
+		"switchDate": {c.GpSwitchedDate, "2026-07-01"},
+		"victim48":   {c.VictimNotify48, "2026-06-02T14:30"},
+		"acceptDeny": {c.VictimAcceptDeny, "Accept"},
+		"victim":     {c.Victim, "DOE, JANE"},
+		"victimIDN":  {c.VictimIDN, "987654"},
+	} {
+		if gw[0] != gw[1] {
+			t.Errorf("%s = %q, want %q", label, gw[0], gw[1])
+		}
 	}
 }

@@ -488,6 +488,41 @@ var overridableFields = map[string]bool{
 	"day_adjustment":      true,
 	"supervising_officer": true,
 	"defendant":           true,
+	// GPS / victim-48-hour detail — editable from the record's "Edit GPS details"
+	// modal (officer-accessible), overlaid onto the GPS record in BuildClients.
+	"gps_install_date":       true,
+	"switched_to":            true,
+	"switched_gps_date":      true,
+	"da_emailed":             true,
+	"court_order":            true,
+	"victim_time_48":         true,
+	"victim_accept_deny_gps": true,
+	"victim":                 true,
+	"victim_idn":             true,
+	"victim_2":               true,
+	"victim_2_idn":           true,
+	"victim_3":               true,
+	"victim_3_idn":           true,
+}
+
+// gpsDetailFields is the subset of overridable fields the GPS-details editor
+// writes (officer-accessible). Kept separate from the supervisor "correct field"
+// dropdown so that generic-override UI stays focused on imported case fields.
+var gpsDetailFields = []string{
+	"gps_type", "gps_install_date", "switched_to", "switched_gps_date",
+	"da_emailed", "court_order", "victim_time_48", "victim_accept_deny_gps",
+	"victim", "victim_idn", "victim_2", "victim_2_idn", "victim_3", "victim_3_idn",
+}
+
+// IsGPSDetailField reports whether field is one the GPS-details editor may set.
+func IsGPSDetailField(field string) bool {
+	field = strings.TrimSpace(field)
+	for _, f := range gpsDetailFields {
+		if f == field {
+			return true
+		}
+	}
+	return false
 }
 
 // FieldOption is one overridable field for the override form's dropdown.
@@ -806,6 +841,68 @@ func SetOverride(d *sql.DB, idn, field, value, by string) error {
 		OldValue: old.String, NewValue: value,
 	}); err != nil {
 		return err
+	}
+	return tx.Commit()
+}
+
+// SetGPSDetails records the record-level "Edit GPS details" form in one
+// transaction: each supplied GPS/victim field is upserted as an override when
+// non-empty, or cleared (reverting to the imported value) when blanked. Only
+// fields that actually change are written + audited, so a no-op save is silent.
+// Officer-accessible — these are operational monitoring details the import often
+// leaves blank, not sensitive corrections.
+func SetGPSDetails(d *sql.DB, idn string, vals map[string]string, by string) error {
+	idn = strings.TrimSpace(idn)
+	if idn == "" {
+		return errEmptyIDN
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := compute.NowET().Format("2006-01-02 15:04:05 MST")
+	for _, field := range gpsDetailFields {
+		val, ok := vals[field]
+		if !ok {
+			continue // field not on the form this submit — leave it untouched
+		}
+		val = strings.TrimSpace(val)
+		var old sql.NullString
+		_ = tx.QueryRow("SELECT value FROM overrides WHERE idn = ? AND field = ?", idn, field).Scan(&old)
+		if val == old.String && (val != "" || old.Valid) {
+			continue // unchanged — no write, no audit noise
+		}
+		if val == "" {
+			if !old.Valid {
+				continue // nothing to clear
+			}
+			if _, err := tx.Exec("DELETE FROM overrides WHERE idn = ? AND field = ?", idn, field); err != nil {
+				return err
+			}
+			if err := WriteAudit(tx, AuditEvent{
+				User: by, Action: "gps_detail_clear", Table: "overrides", RowID: idn, Col: field, OldValue: old.String,
+			}); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO overrides (idn, field, value, author, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(idn, field) DO UPDATE SET value = excluded.value,
+			   author = excluded.author, updated_at = excluded.updated_at`,
+			idn, field, val, nz(by), now, now,
+		); err != nil {
+			return err
+		}
+		if err := WriteAudit(tx, AuditEvent{
+			User: by, Action: "gps_detail_set", Table: "overrides", RowID: idn, Col: field,
+			OldValue: old.String, NewValue: val,
+		}); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

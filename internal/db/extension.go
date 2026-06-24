@@ -242,6 +242,28 @@ func ListAllCourtDates(d *sql.DB) ([]models.CourtDate, error) {
 	return out, rows.Err()
 }
 
+// ListAllCourtDatesLive is like ListAllCourtDates but excludes rows whose IDN is
+// whole-person tombstoned. Use this for dashboard/KPI feeds where a deleted person
+// must not reappear via their app-entered extension rows.
+func ListAllCourtDatesLive(d *sql.DB) ([]models.CourtDate, error) {
+	all, err := ListAllCourtDates(d)
+	if err != nil {
+		return nil, err
+	}
+	ts, err := loadTombstones(d)
+	if err != nil {
+		return nil, err
+	}
+	out := all[:0:0]
+	for _, c := range all {
+		if ts.whole[strings.TrimSpace(c.IDN)] {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
 // ListAllViolations returns every recorded violation across all defendants,
 // newest first. Tolerant of a DB without the table (returns nil).
 func ListAllViolations(d *sql.DB) ([]models.Violation, error) {
@@ -266,6 +288,27 @@ func ListAllViolations(d *sql.DB) ([]models.Violation, error) {
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+// ListAllViolationsLive is like ListAllViolations but excludes rows whose IDN is
+// whole-person tombstoned. Use this for dashboard/KPI feeds.
+func ListAllViolationsLive(d *sql.DB) ([]models.Violation, error) {
+	all, err := ListAllViolations(d)
+	if err != nil {
+		return nil, err
+	}
+	ts, err := loadTombstones(d)
+	if err != nil {
+		return nil, err
+	}
+	out := all[:0:0]
+	for _, v := range all {
+		if ts.whole[strings.TrimSpace(v.IDN)] {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out, nil
 }
 
 // ── Admin views: tombstones + overrides ──────────────────────────────────────

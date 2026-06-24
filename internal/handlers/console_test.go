@@ -172,7 +172,7 @@ func TestConsoleClientRowsParity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildClients: %v", err)
 	}
-	rows := consoleClientRows(clients, adminTrack, nil)
+	rows, _, _ := consoleClientRows(clients, adminTrack, nil)
 	if len(rows) != len(defendantRows(clients, adminTrack)) {
 		t.Errorf("row count %d != defendantRows %d", len(rows), len(defendantRows(clients, adminTrack)))
 	}
@@ -204,7 +204,7 @@ func TestConsoleClientRowsDateSortKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildClients: %v", err)
 	}
-	rows := consoleClientRows(clients, adminTrack, nil) // nil court map → every Next Court blank
+	rows, _, _ := consoleClientRows(clients, adminTrack, nil) // nil court map → every Next Court blank
 	iso := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	for _, r := range rows {
 		if !iso.MatchString(r.NextCheckInSort) {
@@ -235,7 +235,7 @@ func TestConsoleClientRowsDateSortKeys(t *testing.T) {
 		break
 	}
 	if len(court) == 1 {
-		got := consoleClientRows(clients, adminTrack, court)
+		got, _, _ := consoleClientRows(clients, adminTrack, court)
 		var found bool
 		for _, r := range got {
 			if r.NextCourt == "Jan 2" {
@@ -602,5 +602,43 @@ func TestInitials(t *testing.T) {
 		if got := Initials(in); got != want {
 			t.Errorf("Initials(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestConsoleClientRowsStatsDedup asserts that the Stats assembled from the
+// behind/missed sets returned by consoleClientRows are identical to those produced
+// by the full computeStats pass — verifying the #11 dedup is parity-correct.
+func TestConsoleClientRowsStatsDedup(t *testing.T) {
+	d := testDB(t)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	// Build Stats the old way (reference).
+	wantStats := computeStats(clients, adminTrack)
+
+	// Build Stats the new way (dedup path used by ConsoleClients).
+	_, behind, missed := consoleClientRows(clients, adminTrack, nil)
+	st := rosterStateCounts(clients)
+	st.BehindGPS = len(behind)
+	st.MissedMonth = len(missed)
+
+	if st != wantStats {
+		t.Errorf("deduped Stats %+v != computeStats %+v", st, wantStats)
+	}
+}
+
+// TestAnalyticsDataStatsDedup asserts that analyticsData builds Stats from a
+// single behind/missed pass, matching computeStats (#14 dedup parity check).
+func TestAnalyticsDataStatsDedup(t *testing.T) {
+	d := testDB(t)
+	clients, err := db.BuildClients(d, adminTrack)
+	if err != nil {
+		t.Fatalf("BuildClients: %v", err)
+	}
+	wantStats := computeStats(clients, adminTrack)
+	a := analyticsData(clients, adminTrack)
+	if a.Stats != wantStats {
+		t.Errorf("analyticsData Stats %+v != computeStats %+v", a.Stats, wantStats)
 	}
 }

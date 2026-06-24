@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/models"
 )
 
 // openEnsured copies the offline DB, opens it, and runs EnsureSchema so the
@@ -162,4 +163,273 @@ func mustBuild(t *testing.T, d *sql.DB) map[string][]*compute.Client {
 		t.Fatalf("BuildClients: %v", err)
 	}
 	return cl
+}
+
+// TestLiveListsFilterTombstones verifies that ListAllCourtDatesLive,
+// ListAllViolationsLive, and ListAllScheduledCheckInsLive suppress rows
+// belonging to a whole-person tombstoned IDN (item #7).
+//
+// The tombstone is planted directly into deleted_idns WITHOUT going through
+// DeletePerson (which also purges extension rows) so that the filter in the
+// Live variants is the only thing removing these rows from the feeds.
+func TestLiveListsFilterTombstones(t *testing.T) {
+	d := openEnsured(t)
+	const liveIDN = "999001001"
+	const deadIDN = "999001002"
+
+	// Add two defendants (no GPS, level 1 — minimal).
+	for _, idn := range []string{liveIDN, deadIDN} {
+		if err := AddDefendant(d, NewDefendant{IDN: idn, Name: "ZZLIVE " + idn, Level: "1", Status: "Open"}, "by"); err != nil {
+			t.Fatalf("AddDefendant %s: %v", idn, err)
+		}
+	}
+
+	// Seed court date, violation, and scheduled check-in for both.
+	for _, idn := range []string{liveIDN, deadIDN} {
+		if err := AddCourtDate(d, idn, "2026-08-01", "Room A", "", "by"); err != nil {
+			t.Fatalf("AddCourtDate %s: %v", idn, err)
+		}
+		if err := AddViolation(d, idn, "2026-07-01", "Curfew", "minor", "test", "", "by"); err != nil {
+			t.Fatalf("AddViolation %s: %v", idn, err)
+		}
+		if err := AddScheduledCheckIn(d, idn, "2026-07-10", "In-person", "", "by"); err != nil {
+			t.Fatalf("AddScheduledCheckIn %s: %v", idn, err)
+		}
+	}
+
+	// Before tombstone: Live variants must include both IDNs.
+	courts, _ := ListAllCourtDatesLive(d)
+	viols, _ := ListAllViolationsLive(d)
+	scheds, _ := ListAllScheduledCheckInsLive(d)
+	if !containsIDN(courts, deadIDN) || !containsIDN(courts, liveIDN) {
+		t.Errorf("pre-tombstone: court dates missing expected IDNs (courts=%d)", len(courts))
+	}
+	if !containsIDNV(viols, deadIDN) || !containsIDNV(viols, liveIDN) {
+		t.Errorf("pre-tombstone: violations missing expected IDNs (viols=%d)", len(viols))
+	}
+	if !containsIDNS(scheds, deadIDN) || !containsIDNS(scheds, liveIDN) {
+		t.Errorf("pre-tombstone: scheds missing expected IDNs (scheds=%d)", len(scheds))
+	}
+
+	// Plant a whole-person tombstone directly (no extension-row purge), so the
+	// Live-variant filter is what must suppress the rows.
+	if _, err := d.Exec(
+		`INSERT OR IGNORE INTO deleted_idns (idn, case_number, deleted_by, reason, deleted_at)
+		 VALUES (?, NULL, 'supervisor', 'live-filter test', '2026-06-20 12:00:00')`, deadIDN,
+	); err != nil {
+		t.Fatalf("insert tombstone: %v", err)
+	}
+
+	// Live variants must exclude deadIDN but keep liveIDN.
+	courts, _ = ListAllCourtDatesLive(d)
+	viols, _ = ListAllViolationsLive(d)
+	scheds, _ = ListAllScheduledCheckInsLive(d)
+	if containsIDN(courts, deadIDN) {
+		t.Errorf("ListAllCourtDatesLive leaked tombstoned IDN %s", deadIDN)
+	}
+	if !containsIDN(courts, liveIDN) {
+		t.Errorf("ListAllCourtDatesLive dropped live IDN %s", liveIDN)
+	}
+	if containsIDNV(viols, deadIDN) {
+		t.Errorf("ListAllViolationsLive leaked tombstoned IDN %s", deadIDN)
+	}
+	if !containsIDNV(viols, liveIDN) {
+		t.Errorf("ListAllViolationsLive dropped live IDN %s", liveIDN)
+	}
+	if containsIDNS(scheds, deadIDN) {
+		t.Errorf("ListAllScheduledCheckInsLive leaked tombstoned IDN %s", deadIDN)
+	}
+	if !containsIDNS(scheds, liveIDN) {
+		t.Errorf("ListAllScheduledCheckInsLive dropped live IDN %s", liveIDN)
+	}
+
+	// Non-Live variants must still include deadIDN (extension rows not purged).
+	allCourts, _ := ListAllCourtDates(d)
+	allViols, _ := ListAllViolations(d)
+	allScheds, _ := ListAllScheduledCheckIns(d)
+	if !containsIDN(allCourts, deadIDN) {
+		t.Errorf("ListAllCourtDates (non-live) should include tombstoned IDN %s (rows not purged)", deadIDN)
+	}
+	if !containsIDNV(allViols, deadIDN) {
+		t.Errorf("ListAllViolations (non-live) should include tombstoned IDN %s (rows not purged)", deadIDN)
+	}
+	if !containsIDNS(allScheds, deadIDN) {
+		t.Errorf("ListAllScheduledCheckIns (non-live) should include tombstoned IDN %s (rows not purged)", deadIDN)
+	}
+}
+
+// containsIDN reports whether any CourtDate in the slice has the given IDN.
+func containsIDN(cds []models.CourtDate, idn string) bool {
+	for _, c := range cds {
+		if c.IDN == idn {
+			return true
+		}
+	}
+	return false
+}
+
+// containsIDNV reports whether any Violation in the slice has the given IDN.
+func containsIDNV(vs []models.Violation, idn string) bool {
+	for _, v := range vs {
+		if v.IDN == idn {
+			return true
+		}
+	}
+	return false
+}
+
+// containsIDNS reports whether any ScheduledCheckIn in the slice has the given IDN.
+func containsIDNS(ss []models.ScheduledCheckIn, idn string) bool {
+	for _, s := range ss {
+		if s.IDN == idn {
+			return true
+		}
+	}
+	return false
+}
+
+// rawCount returns COUNT(*) from the named table, or -1 if the table does not
+// exist. The -1 sentinel lets the assertion loop distinguish "table absent" from
+// "table present but empty" — both are acceptable initial states.
+func rawCount(t *testing.T, d *sql.DB, table string) int {
+	t.Helper()
+	var n int
+	err := d.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&n)
+	if err != nil {
+		// Table not present in this test DB variant — treat as zero rows.
+		return 0
+	}
+	return n
+}
+
+// TestAppWritesNeverTouchRaw is the canonical guard for the "app writes NEVER
+// touch raw_*" invariant (audit plan item #29). It snapshots the four raw table
+// counts, exercises every app-layer write path — AddDefendant, AddPayment,
+// AddCheckIn, their delete paths, SetOverride, and DeletePerson with
+// importerRetired=false — and asserts every raw count is identical after. It
+// also asserts the app-owned tables DID change so the test isn't vacuously green.
+func TestAppWritesNeverTouchRaw(t *testing.T) {
+	d := openEnsured(t)
+
+	// Snapshot raw_* counts before any app writes.
+	rawTables := []string{"raw_blue_book", "raw_check_ins", "raw_payments", "raw_gps_48_hours"}
+	before := make(map[string]int, len(rawTables))
+	for _, tbl := range rawTables {
+		before[tbl] = rawCount(t, d, tbl)
+	}
+
+	// ── exercise every app-layer write path ──────────────────────────────────
+
+	const idn1 = "999888001"
+	const idn2 = "999888002"
+
+	// AddDefendant (both without GPS and with GPS install date).
+	if err := AddDefendant(d, NewDefendant{
+		IDN: idn1, Name: "ZZRAW, ONE", Level: "2", Status: "Open",
+		GPS: "true", GPSType: "SCRAM", CaseNumber: "@RAW1",
+	}, "rawtest"); err != nil {
+		t.Fatalf("AddDefendant idn1: %v", err)
+	}
+	if err := AddDefendant(d, NewDefendant{
+		IDN: idn2, Name: "ZZRAW, TWO", Level: "3", Status: "Open",
+		GPS: "true", GPSType: "ALLIED", CaseNumber: "@RAW2",
+	}, "rawtest"); err != nil {
+		t.Fatalf("AddDefendant idn2: %v", err)
+	}
+
+	// AddPayment + delete.
+	if err := AddPayment(d, idn1, "@RAW1", "6/1/2026", "150", "GPS", "Officer X", "rawtest"); err != nil {
+		t.Fatalf("AddPayment: %v", err)
+	}
+	pays, err := ListAddedPayments(d, idn1)
+	if err != nil || len(pays) == 0 {
+		t.Fatalf("ListAddedPayments after add: err=%v n=%d", err, len(pays))
+	}
+	if err := DeleteAddedPayment(d, pays[0].ID, "rawtest"); err != nil {
+		t.Fatalf("DeleteAddedPayment: %v", err)
+	}
+
+	// AddCheckIn + delete.
+	if err := AddCheckIn(d, idn1, "6/2/2026", "In Person", "GPS fitment test", "rawtest"); err != nil {
+		t.Fatalf("AddCheckIn: %v", err)
+	}
+	cis, err := ListAddedCheckIns(d, idn1)
+	if err != nil || len(cis) == 0 {
+		t.Fatalf("ListAddedCheckIns after add: err=%v n=%d", err, len(cis))
+	}
+	if err := DeleteAddedCheckIn(d, cis[0].ID, "rawtest"); err != nil {
+		t.Fatalf("DeleteAddedCheckIn: %v", err)
+	}
+
+	// SetOverride — writes to the overrides extension table, not raw_*.
+	if err := SetOverride(d, idn1, "gps_type", "ALLIED", "rawtest"); err != nil {
+		t.Fatalf("SetOverride: %v", err)
+	}
+
+	// DeletePerson with importerRetired=false — must NOT touch raw_*.
+	if err := DeletePerson(d, idn2, "rawtest", "raw invariant test", false); err != nil {
+		t.Fatalf("DeletePerson(importerRetired=false): %v", err)
+	}
+
+	// ── assert raw_* counts are UNCHANGED ────────────────────────────────────
+	for _, tbl := range rawTables {
+		after := rawCount(t, d, tbl)
+		if after != before[tbl] {
+			t.Errorf("raw table %s changed: before=%d after=%d (app writes must never touch raw_*)",
+				tbl, before[tbl], after)
+		}
+	}
+
+	// ── assert app-owned extension tables DID change ──────────────────────────
+
+	// added_defendants must contain idn1 (idn2 was tombstoned, but row may be
+	// gone from added_defendants after DeletePerson purges extension rows).
+	var addedCount int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM added_defendants WHERE idn = ?`, idn1).Scan(&addedCount); err != nil {
+		t.Fatalf("count added_defendants: %v", err)
+	}
+	if addedCount == 0 {
+		t.Errorf("added_defendants: expected idn1 %s to be present", idn1)
+	}
+
+	// deleted_idns must contain idn2 (the one we tombstoned).
+	var tombCount int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM deleted_idns WHERE idn = ? AND case_number IS NULL`, idn2).Scan(&tombCount); err != nil {
+		t.Fatalf("count deleted_idns: %v", err)
+	}
+	if tombCount == 0 {
+		t.Errorf("deleted_idns: expected idn2 %s whole-person tombstone", idn2)
+	}
+}
+
+// TestReAddTombstonedIDNReturnsHint verifies item #10: re-adding a tombstoned IDN
+// returns errTombstonedIDN (not errExistingIDN), while a non-tombstoned duplicate
+// still returns errExistingIDN.
+func TestReAddTombstonedIDNReturnsHint(t *testing.T) {
+	d := openEnsured(t)
+	const idn = "999002001"
+
+	// Add and then whole-delete a defendant (creates a tombstone).
+	if err := AddDefendant(d, NewDefendant{IDN: idn, Name: "ZZTOMB, TEST", Level: "1", Status: "Open"}, "by"); err != nil {
+		t.Fatalf("AddDefendant: %v", err)
+	}
+	if err := DeletePerson(d, idn, "supervisor", "test", false); err != nil {
+		t.Fatalf("DeletePerson: %v", err)
+	}
+
+	// Re-adding the tombstoned IDN must return errTombstonedIDN, not errExistingIDN.
+	err := AddDefendant(d, NewDefendant{IDN: idn, Name: "ZZTOMB, TEST", Level: "1", Status: "Open"}, "by")
+	if err != errTombstonedIDN {
+		t.Fatalf("re-add tombstoned IDN: err = %v, want errTombstonedIDN", err)
+	}
+
+	// A genuine duplicate (no tombstone) must still return errExistingIDN.
+	const dupIDN = "999002002"
+	if err := AddDefendant(d, NewDefendant{IDN: dupIDN, Name: "ZZDUP, DOE", Level: "1", Status: "Open"}, "by"); err != nil {
+		t.Fatalf("AddDefendant dup setup: %v", err)
+	}
+	err = AddDefendant(d, NewDefendant{IDN: dupIDN, Name: "ZZDUP, DOE", Level: "1", Status: "Open"}, "by")
+	if err != errExistingIDN {
+		t.Fatalf("duplicate (non-tombstoned) IDN: err = %v, want errExistingIDN", err)
+	}
 }

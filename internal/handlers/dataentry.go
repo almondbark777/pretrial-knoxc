@@ -112,6 +112,35 @@ func isTruthyForm(s string) bool {
 	return false
 }
 
+// UpdateGPS records the record-level "Edit GPS details" form: vendor, install
+// date, device switch, and the victim 48-hour notification details. Values are
+// stored as field overrides (importer-proof + audited) and merged back into every
+// view by BuildClients. Officer-accessible — these are monitoring details the
+// daily import frequently leaves blank, not sensitive corrections.
+// POST /admin/gps/update
+func (s *Server) UpdateGPS(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	idn, back := profileBack(r)
+	vals := map[string]string{
+		"gps_type":               r.FormValue("gps_type"),
+		"gps_install_date":       r.FormValue("gps_install_date"),
+		"switched_to":            r.FormValue("switched_to"),
+		"switched_gps_date":      r.FormValue("switched_gps_date"),
+		"da_emailed":             r.FormValue("da_emailed"),
+		"court_order":            r.FormValue("court_order"),
+		"victim_time_48":         r.FormValue("victim_time_48"),
+		"victim_accept_deny_gps": r.FormValue("victim_accept_deny_gps"),
+		"victim":                 r.FormValue("victim"),
+		"victim_idn":             r.FormValue("victim_idn"),
+		"victim_2":               r.FormValue("victim_2"),
+		"victim_2_idn":           r.FormValue("victim_2_idn"),
+		"victim_3":               r.FormValue("victim_3"),
+		"victim_3_idn":           r.FormValue("victim_3_idn"),
+	}
+	err := db.SetGPSDetails(s.DB, idn, vals, auth.User(r))
+	s.afterWrite(w, r, back, err, "GPS details updated.")
+}
+
 // AddPayment records a payment on an existing client's profile.
 // POST /admin/payment/add
 func (s *Server) AddPayment(w http.ResponseWriter, r *http.Request) {

@@ -79,3 +79,41 @@ func TestChatPruneByAge(t *testing.T) {
 		t.Fatalf("after prune want [fresh], got %+v", recent)
 	}
 }
+
+// TestChatPruneDSTBoundary exercises the case a naive lexicographic compare gets
+// wrong: two rows whose stored RFC3339 offsets differ (one in EDT -04:00, one in
+// EST -05:00) straddling the cutoff. The strftime-to-UTC normalization must keep
+// the comparison instant-correct so exactly the older-in-real-time row is pruned.
+func TestChatPruneDSTBoundary(t *testing.T) {
+	d := freshChatDB(t)
+
+	// Two instants 30 minutes apart in real (UTC) time, written with DIFFERENT
+	// local offsets so their raw RFC3339 strings sort the WRONG way lexically:
+	//   earlier : 2025-11-02T01:50:00-04:00  == 05:50:00Z (EDT, before the fall-back)
+	//   later   : 2025-11-02T01:20:00-05:00  == 06:20:00Z (EST, after the fall-back)
+	// Lexically "01:50...-04:00" > "01:20...-05:00", i.e. reversed from real order.
+	earlier := "2025-11-02T01:50:00-04:00" // 05:50Z — should be pruned
+	later := "2025-11-02T01:20:00-05:00"   // 06:20Z — should survive
+	for _, ts := range []string{earlier, later} {
+		if _, err := d.Exec(
+			`INSERT INTO chat_messages (author, body, created_at) VALUES (?,?,?)`,
+			"a@knoxsheriff.org", ts, ts); err != nil {
+			t.Fatalf("insert %s: %v", ts, err)
+		}
+	}
+
+	// Cutoff at 06:00Z: prunes the 05:50Z row, keeps the 06:20Z row. A naive
+	// string compare would prune the wrong one (or neither).
+	cutoff := time.Date(2025, 11, 2, 6, 0, 0, 0, time.UTC)
+	n, err := PruneChatMessages(d, cutoff)
+	if err != nil {
+		t.Fatalf("prune: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("prune removed %d, want exactly 1 (the 05:50Z row)", n)
+	}
+	recent, _ := RecentChatMessages(d, 50)
+	if len(recent) != 1 || recent[0].Body != later {
+		t.Fatalf("after DST prune want [%s], got %+v", later, recent)
+	}
+}

@@ -52,12 +52,17 @@ func chatCSRFJSON(token string) string {
 }
 
 // writeSSE writes one Server-Sent-Events frame. A positive id sets the SSE id:
-// field so a reconnecting EventSource can resume via Last-Event-ID.
-func writeSSE(w http.ResponseWriter, id int64, data string) {
+// field so a reconnecting EventSource can resume via Last-Event-ID. It returns
+// the first write error (e.g. a write-deadline timeout on a wedged client) so
+// the caller can tear the connection down instead of blocking forever.
+func writeSSE(w http.ResponseWriter, id int64, data string) error {
 	if id > 0 {
-		fmt.Fprintf(w, "id: %d\n", id)
+		if _, err := fmt.Fprintf(w, "id: %d\n", id); err != nil {
+			return err
+		}
 	}
-	fmt.Fprintf(w, "data: %s\n\n", data)
+	_, err := fmt.Fprintf(w, "data: %s\n\n", data)
+	return err
 }
 
 // ChatStream is the SSE endpoint (GET /chat/stream): it sends a CSRF token, the
@@ -65,11 +70,11 @@ func writeSSE(w http.ResponseWriter, id int64, data string) {
 // messages + presence until the client disconnects. A 20s heartbeat keeps the
 // connection alive through the Cloudflare tunnel.
 func (s *Server) ChatStream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
+	if _, ok := w.(http.Flusher); !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
+	rc := http.NewResponseController(w)
 	me := strings.ToLower(strings.TrimSpace(auth.User(r)))
 
 	// Mint/read the CSRF token BEFORE writing any body (CSRF may Set-Cookie). The
@@ -84,7 +89,19 @@ func (s *Server) ChatStream(w http.ResponseWriter, r *http.Request) {
 	cl := s.Chat.Subscribe(me)
 	defer s.Chat.Unsubscribe(cl)
 
-	writeSSE(w, 0, chatCSRFJSON(token))
+	// arm re-sets a per-batch write deadline so a wedged client (one whose TCP
+	// window is full and never drains) fails its write within sseWriteTimeout
+	// instead of blocking the handler goroutine until the kernel TCP timeout.
+	// Re-armed before every write batch (backlog, live, heartbeat). A nil from
+	// SetWriteDeadline isn't required — if the platform doesn't support it the
+	// writes still go through; we only need the deadline when it IS supported.
+	const sseWriteTimeout = 5 * time.Second
+	arm := func() { _ = rc.SetWriteDeadline(time.Now().Add(sseWriteTimeout)) }
+
+	arm()
+	if err := writeSSE(w, 0, chatCSRFJSON(token)); err != nil {
+		return
+	}
 
 	var backlog []models.ChatMessage
 	if last := strings.TrimSpace(r.Header.Get("Last-Event-ID")); last != "" {
@@ -94,10 +111,15 @@ func (s *Server) ChatStream(w http.ResponseWriter, r *http.Request) {
 	} else {
 		backlog, _ = db.RecentChatMessages(s.DB, 50)
 	}
+	arm()
 	for _, m := range backlog {
-		writeSSE(w, m.ID, chatMsgJSON(m, me))
+		if err := writeSSE(w, m.ID, chatMsgJSON(m, me)); err != nil {
+			return
+		}
 	}
-	flusher.Flush()
+	if err := rc.Flush(); err != nil {
+		return
+	}
 
 	ctx := r.Context()
 	ping := time.NewTicker(20 * time.Second)
@@ -108,20 +130,32 @@ func (s *Server) ChatStream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
+			arm()
 			switch ev.Type {
 			case "msg":
 				if m, ok := ev.Data.(models.ChatMessage); ok {
-					writeSSE(w, m.ID, chatMsgJSON(m, me))
+					if err := writeSSE(w, m.ID, chatMsgJSON(m, me)); err != nil {
+						return
+					}
 				}
 			case "presence":
 				if online, ok := ev.Data.([]string); ok {
-					writeSSE(w, 0, chatPresenceJSON(online))
+					if err := writeSSE(w, 0, chatPresenceJSON(online)); err != nil {
+						return
+					}
 				}
 			}
-			flusher.Flush()
+			if err := rc.Flush(); err != nil {
+				return
+			}
 		case <-ping.C:
-			fmt.Fprint(w, ": ping\n\n")
-			flusher.Flush()
+			arm()
+			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
+				return
+			}
+			if err := rc.Flush(); err != nil {
+				return
+			}
 		case <-ctx.Done():
 			return
 		}

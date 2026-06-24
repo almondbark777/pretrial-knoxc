@@ -192,17 +192,19 @@ function ptToast(title, msg, tone){
 
 /* ── roster rows: keyboard-operable navigation ──────────────────────────────
       Server-rendered rosters (compliance, calendar, …) use clickable
-      <tr data-href> rows. Make them focusable + Enter/Space-activatable so they
-      match the windowed clients table, instead of being mouse-only. Runs at
+      <tr data-href> rows. Make them focusable + Enter/Space/click-activatable so
+      they match the windowed clients table, instead of being mouse-only. Runs at
       parse time, so the clients table's later-rendered rows (which already carry
       tabindex + their own key handler) are skipped by the guard below. */
 (function(){
   document.querySelectorAll('table.data tbody tr[data-href]').forEach(function(tr){
     if(tr.hasAttribute('tabindex'))return;
     tr.setAttribute('tabindex','0');
+    tr.setAttribute('role','link');
     tr.addEventListener('keydown',function(e){
       if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();location.href=tr.dataset.href;}
     });
+    tr.addEventListener('click',function(){location.href=tr.dataset.href;});
   });
 })();
 
@@ -311,8 +313,10 @@ var ACTIONS={
   soon:{title:'Coming soon',submit:null,toast:['Coming soon','This action is part of a later build milestone.'],
     body:function(n){return '<div class="note-hint">This control is wired into the UI but its write path lands in a later milestone. Read views are fully live.</div>'}}
 };
+var amLastFocus=null;
 function openAction(kind,name){
   var a=ACTIONS[kind]||ACTIONS.soon; name=name||'this client';
+  amLastFocus=document.activeElement;
   document.getElementById('am-title').textContent=a.title;
   document.getElementById('am-body').innerHTML=a.body(name);
   var foot=document.getElementById('am-foot');
@@ -322,8 +326,9 @@ function openAction(kind,name){
   if(s)s.addEventListener('click',function(){closeAction();ptToast(a.toast[0],a.toast[1],a.tone||'')});
   else ptToast(a.toast[0],a.toast[1],a.tone||'');
   var m=document.getElementById('actionModal');m.classList.add('show');m.setAttribute('aria-hidden','false');
+  var f=m.querySelector('textarea,input:not([type=hidden]),select,button');if(f)setTimeout(function(){f.focus();},30);
 }
-function closeAction(){var m=document.getElementById('actionModal');m.classList.remove('show');m.setAttribute('aria-hidden','true')}
+function closeAction(){var m=document.getElementById('actionModal');m.classList.remove('show');m.setAttribute('aria-hidden','true');if(amLastFocus&&amLastFocus.focus){amLastFocus.focus();amLastFocus=null;}}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAction()});
 document.getElementById('actionModal').addEventListener('click',function(e){if(e.target.id==='actionModal')closeAction()});
 /* keyboard-shortcut overlay: close on backdrop click or Esc */
@@ -348,14 +353,10 @@ document.addEventListener('submit',function(e){
   },0);}
 },true);
 
-/* ── accessibility: keyboard-navigable rows + aria-current on active nav ───── */
+/* ── accessibility: aria-current on active nav + page title ────────────────── */
 (function(){
   var an=document.querySelector('.cnav a.active');
   if(an){an.setAttribute('aria-current','page');var lbl=(an.querySelector('.label')||an).textContent.trim();if(lbl)document.title=lbl+' · PTR Case Console';}
-  document.querySelectorAll('tr[data-href]').forEach(function(tr){
-    tr.setAttribute('tabindex','0'); tr.setAttribute('role','link');
-    tr.addEventListener('keydown',function(e){if(e.key==='Enter'){location.href=tr.dataset.href;}});
-  });
 })();
 {{if .Msg}}document.addEventListener('DOMContentLoaded',function(){ptToast({{.Msg}},'');});{{end}}
 
@@ -385,10 +386,21 @@ document.addEventListener('submit',function(e){
     if(m.id&&seen[m.id])return; if(m.id)seen[m.id]=true;
     var atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;
     var row=document.createElement('div'); row.className='cm'+(m.self?' me':'');
+    if(m.id)row.dataset.mid=m.id;
     if(!m.self){var who=document.createElement('div'); who.className='cm-who'; who.textContent=m.author||fmtOfficer(m.email); row.appendChild(who);}
     var bub=document.createElement('div'); bub.className='cm-bub'; bub.textContent=m.body; row.appendChild(bub);
     var t=document.createElement('div'); t.className='cm-t'; t.textContent=m.time||''; row.appendChild(t);
-    log.appendChild(row);
+    // Insert in msg_id order: concurrent sends can arrive out of order, so place
+    // this row before the first existing child with a greater mid (else append).
+    var before=null;
+    if(m.id){
+      var kids=log.children;
+      for(var i=0;i<kids.length;i++){
+        var mid=parseInt(kids[i].dataset.mid,10);
+        if(!isNaN(mid)&&mid>m.id){before=kids[i];break;}
+      }
+    }
+    if(before)log.insertBefore(row,before); else log.appendChild(row);
     if(atBottom||m.self)log.scrollTop=log.scrollHeight;
     if(panel.hidden&&!m.self){unread++;badge.textContent=unread>99?'99+':unread;badge.hidden=false;}
   }

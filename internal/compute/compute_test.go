@@ -143,6 +143,34 @@ func TestCheckIns_Closed_Collins(t *testing.T) {
 	}
 }
 
+// L1 has only the initial 3-day window. When it is MISSED, nextDue must point at
+// the initial window (Type=="initial", Deadline==refDate+3) — not nil — so the
+// "next due" column still flags the L1 clients who most need a visit. When the
+// initial is MADE, nextDue is nil. Mirrors tools/parity_ref.py compute_check_ins.
+func TestCheckIns_L1_NextDueOnMissedInitial(t *testing.T) {
+	// Missed: referral 1/1, no check-ins, effEnd (track 5/30) past the 3-day deadline.
+	c := mkClient("1", "1/1/2026", "")
+	r := ComputeCheckIns(c, track)
+	if r.NextDue == nil {
+		t.Fatalf("L1 missed: NextDue=nil want initial window")
+	}
+	if r.NextDue.Type != "initial" {
+		t.Fatalf("L1 missed: NextDue.Type=%q want \"initial\"", r.NextDue.Type)
+	}
+	if want := addDays(c.RefD, 3); !r.NextDue.Deadline.Equal(want) {
+		t.Fatalf("L1 missed: NextDue.Deadline=%v want %v (refDate+3)", r.NextDue.Deadline, want)
+	}
+
+	// Made: both an in-person AND a phone contact inside the initial window → nextDue nil.
+	c2 := mkClient("1", "1/1/2026", "")
+	c2.addCI("1/2/2026", "In Person")
+	c2.addCI("1/2/2026", "Phone")
+	r2 := ComputeCheckIns(c2, track)
+	if r2.NextDue != nil {
+		t.Fatalf("L1 made: NextDue=%v want nil", r2.NextDue)
+	}
+}
+
 // ── PTR fees: golden cases ────────────────────────────────────────────────────
 
 func TestPTR_L1Flat(t *testing.T) {
@@ -384,6 +412,101 @@ func dumpGPS(g GPSResult) string {
 	return "vendor=" + g.Vendor + " rate=" + i(g.DailyRate) + " days=" + i(g.DaysActive) +
 		" owed=" + f(g.TotalOwedDollars) + " surplus$=" + f(g.SurplusDollars) +
 		" surplusDays=" + i(g.SurplusDays)
+}
+
+// TestCheckInKind is the direct unit-test for the CheckInKind classifier (item
+// #30). The vocabulary is cross-checked against tools/parity_ref.py lines 136-144:
+// in-person = "office", "walkin", "in_person" variants; phone = "phone", "text",
+// "call", "virtual", "video", "tele" (incl. punctuated / prefixed forms);
+// neither = blank, "Court", "Note", unrecognised.
+func TestCheckInKind(t *testing.T) {
+	cases := []struct {
+		typ    string
+		wantIP bool
+		wantPh bool
+	}{
+		// ── in-person variants ──────────────────────────────────────────────
+		{"In Person", true, false},    // imported SharePoint value
+		{"In-person", true, false},    // app dropdown
+		{"in person", true, false},    // lowercase
+		{"IN PERSON", true, false},    // caps
+		{"office", true, false},       // keyword: office
+		{"Office Visit", true, false}, // prefixed
+		{"walkin", true, false},       // keyword: walkin
+		{"Walk-in", true, false},      // hyphenated
+		{"Walk In", true, false},      // two words
+
+		// ── phone / remote variants ─────────────────────────────────────────
+		{"Phone", false, true}, // imported
+		{"phone", false, true},
+		{"Phone Call", false, true},
+		{"Text", false, true},
+		{"Text Message", false, true},
+		{"Call", false, true},
+		{"Virtual", false, true},
+		{"virtual check-in", false, true},
+		{"Video", false, true},
+		{"Video Call", false, true},
+		{"Tele", false, true},
+		{"Teleconference", false, true},
+
+		// ── neither ─────────────────────────────────────────────────────────
+		{"", false, false},
+		{"Court", false, false},
+		{"Court Date", false, false},
+		{"Note", false, false},
+		{"xyz", false, false},
+		{"123", false, false},
+	}
+
+	for _, c := range cases {
+		ip, ph := CheckInKind(c.typ)
+		if ip != c.wantIP || ph != c.wantPh {
+			t.Errorf("CheckInKind(%q) = inPerson=%v phone=%v; want inPerson=%v phone=%v",
+				c.typ, ip, ph, c.wantIP, c.wantPh)
+		}
+	}
+}
+
+// ── Relief-switch boundary tests for compute.ComputeGPS (item #31) ──────────
+// The engines are already correct; these are regression guards for the
+// equal-date edge cases. Run with: go test -run Relief ./internal/compute/...
+
+// TestReliefGPSSwitchedDateEqualInstall: when the GPS switched (relief) date
+// equals the install date, billing freezes there: DaysActive = 1, owed = 1 * rate.
+// compute.go: ge(rd, start) && lt(rd, end) — equal to start satisfies ge.
+func TestReliefGPSSwitchedDateEqualInstall(t *testing.T) {
+	c := gpsClient("SCRAM", "1/1/2026")
+	c.GpSwitchedTo = "no gps"
+	c.GpSwitchedDate = "1/1/2026" // == install
+	g := ComputeGPS(c, Noon(2026, 1, 31), nil, "")
+	if !g.ReliefSwitch {
+		t.Fatalf("relief==install: ReliefSwitch=false want true")
+	}
+	if g.DaysActive == nil || *g.DaysActive != 1 {
+		t.Fatalf("relief==install: DaysActive=%v want 1", g.DaysActive)
+	}
+	if g.TotalOwedDollars == nil || *g.TotalOwedDollars != 15 {
+		t.Fatalf("relief==install: owed=%v want 15 (1 day * $15)", g.TotalOwedDollars)
+	}
+}
+
+// TestReliefGPSSwitchedDateEqualTrack: when the GPS switched (relief) date
+// equals the track date (end), the condition lt(rd, end) is false so the freeze
+// does NOT apply and billing runs to track normally.
+// SCRAM, 1/1/2026 install, track 1/31/2026 = 31 days * $15 = $465.
+func TestReliefGPSSwitchedDateEqualTrack(t *testing.T) {
+	c := gpsClient("SCRAM", "1/1/2026")
+	c.GpSwitchedTo = "no gps"
+	c.GpSwitchedDate = "1/31/2026" // == track (end)
+	g := ComputeGPS(c, Noon(2026, 1, 31), nil, "")
+	// relief date == track: freeze excluded; billing = 31 days * $15 = $465
+	if g.DaysActive == nil || *g.DaysActive != 31 {
+		t.Fatalf("relief==track: DaysActive=%v want 31 (freeze excluded)", g.DaysActive)
+	}
+	if g.TotalOwedDollars == nil || *g.TotalOwedDollars != 465 {
+		t.Fatalf("relief==track: owed=%v want 465", g.TotalOwedDollars)
+	}
 }
 
 func TestParseDateTime(t *testing.T) {

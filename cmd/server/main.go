@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -37,6 +38,11 @@ import (
 	"pretrial-knoxc/internal/handlers"
 	"pretrial-knoxc/internal/metrics"
 )
+
+// defaultPassword is the built-in dev/test APP_PASSWORD. It ships in the source,
+// so a deployment that leaves it in place (and doesn't set APP_SESSION_SECRET) has
+// a forgeable session key — the startup guard in main refuses to run in that state.
+const defaultPassword = "pretrialtestsite"
 
 func env(k, def string) string {
 	if v := os.Getenv(k); v != "" {
@@ -74,11 +80,27 @@ func envBool(k string) bool {
 func main() {
 	addr := env("LISTEN_ADDR", "127.0.0.1:8000")
 	dbPath := env("SQLITE_DB_PATH", "/opt/ptr-knoxc/db/pretrial_release.db")
-	password := env("APP_PASSWORD", "pretrialtestsite")
+	password := env("APP_PASSWORD", defaultPassword)
 	secret := os.Getenv("APP_SESSION_SECRET")
+	allowInsecure := envBool("ALLOW_INSECURE_DEFAULTS")
+	// Fail-fast on a forgeable session key in production. The cookie key is derived
+	// from the password when APP_SESSION_SECRET is unset; if the password is ALSO
+	// the built-in default, anyone who knows it (it ships in the source) can mint a
+	// valid session cookie. Refuse to start in that state unless explicitly opted
+	// out for local dev (ALLOW_INSECURE_DEFAULTS=1). A too-short explicit secret is
+	// also rejected. OPS: set APP_SESSION_SECRET in ptr1's EnvironmentFile.
+	if !allowInsecure {
+		if secret == "" && password == defaultPassword {
+			log.Fatal("refusing to start: APP_PASSWORD is the built-in default AND APP_SESSION_SECRET is unset — the session key would be forgeable. Set APP_SESSION_SECRET (openssl rand -hex 32) and a real APP_PASSWORD, or set ALLOW_INSECURE_DEFAULTS=1 for local dev only.")
+		}
+		if secret != "" && len(secret) < 32 {
+			log.Fatal("refusing to start: APP_SESSION_SECRET is shorter than 32 bytes — generate one with `openssl rand -hex 32`, or set ALLOW_INSECURE_DEFAULTS=1 for local dev only.")
+		}
+	}
 	if secret == "" {
 		// Derive from the password if unset (sessions reset on rotation) — same
-		// behavior as the Python app. Set it explicitly in production.
+		// behavior as the Python app. Dev-only: the guard above blocks this path in
+		// production. Set APP_SESSION_SECRET explicitly otherwise.
 		h := sha256.Sum256([]byte("kh-session::" + password))
 		secret = hex.EncodeToString(h[:])
 	}
@@ -105,6 +127,19 @@ func main() {
 	a := auth.New(password, secret, envList("ALLOWED_EMAILS"), envList("SUPERVISOR_EMAILS"), adminEmails)
 	if envBool("COOKIE_SECURE") {
 		a.SetCookieSecure(true) // browser↔Cloudflare hop is HTTPS; set Secure in prod
+	}
+	// Trust the Cf-Access-Authenticated-User-Email header only when explicitly kept
+	// on (default ON to preserve the two-gate flow). The header is forgeable by any
+	// client that can hit the listener directly, so it's only safe behind the
+	// loopback-bound cloudflared sidecar: refuse to start if trust is on while
+	// LISTEN_ADDR is reachable off-box. Set TRUST_CF_ACCESS_HEADER=0 to disable.
+	trustCf := true
+	if v := strings.TrimSpace(os.Getenv("TRUST_CF_ACCESS_HEADER")); v != "" {
+		trustCf = envBool("TRUST_CF_ACCESS_HEADER")
+	}
+	a.SetTrustCfAccess(trustCf)
+	if trustCf && !isLoopbackAddr(addr) {
+		log.Fatalf("refusing to start: TRUST_CF_ACCESS_HEADER is on but LISTEN_ADDR=%q is not loopback — the Cf-Access header would be spoofable off-box. Bind to 127.0.0.1 (behind cloudflared) or set TRUST_CF_ACCESS_HEADER=0.", addr)
 	}
 	// Roles & permissions: seed app_users on first run (no-op once the table has rows)
 	// from the EFFECTIVE allow-list (a.AllowedEmails/SupervisorEmails apply the
@@ -147,7 +182,7 @@ func main() {
 
 	// Static assets (public).
 	staticDir := filepath.Join(base, "static")
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	r.Handle("/static/*", staticCacheControl(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir)))))
 
 	// Auth-free. /metrics is localhost-only by virtue of the 127.0.0.1 listener
 	// (not added to the cloudflared ingress), so Netdata on the same box scrapes
@@ -215,7 +250,10 @@ func main() {
 
 	// Past-Due EM Fees report + memo generation (the show-cause letters).
 	r.Get("/reports/em-fees", srv.ReportEMFees)
-	r.Get("/reports/em-fees/memo", srv.EMFeeMemo) // one filled .docx (logged in letter_log)
+	// Single memo: a CSRF-guarded POST (it writes letter_log), with the old GET
+	// bookmark redirecting back to the report — state changes never ride a GET.
+	r.With(csrfGuard(a)).Post("/reports/em-fees/memo", srv.EMFeeMemo) // one filled .docx (logged in letter_log)
+	r.Get("/reports/em-fees/memo", redirectTo("/reports/em-fees"))
 	// Batch generation is a CSRF-guarded POST of the report's selection
 	// (checkboxes decide who gets a letter; every memo is logged). The old GET
 	// bookmark lands back on the report to pick a selection.
@@ -258,6 +296,7 @@ func main() {
 		ar.Post("/schedule/delete", srv.DeleteScheduledCheckIn)
 		ar.Post("/custody/add", srv.AddCustodyPeriod)       // GPS-off (in custody) span
 		ar.Post("/custody/delete", srv.DeleteCustodyPeriod) // remove a custody span
+		ar.Post("/gps/update", srv.UpdateGPS)               // edit vendor/install/switch/victim 48h
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)
@@ -301,6 +340,28 @@ func main() {
 		log.Printf("graceful shutdown timed out: %v", err)
 	}
 	log.Println("server stopped")
+}
+
+// isLoopbackAddr reports whether a LISTEN_ADDR ("host:port") binds only to the
+// loopback interface, where the Cf-Access header can be trusted (nothing but the
+// local cloudflared sidecar can connect). An empty host (":8000") binds all
+// interfaces and is treated as non-loopback.
+func isLoopbackAddr(addr string) bool {
+	host := addr
+	if i := strings.LastIndexByte(addr, ':'); i >= 0 {
+		host = addr[:i]
+	}
+	host = strings.Trim(strings.TrimSpace(host), "[]") // strip IPv6 brackets
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 // redirectTo returns a handler that 302s to a fixed console path — the landing
@@ -361,6 +422,36 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "SAMEORIGIN")
 		h.Set("Referrer-Policy", "same-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// staticCacheControl wraps a static file handler to set Cache-Control headers by
+// file extension. Immutable resources (content-addressed) are cached for 7 days;
+// hand-edited JSON/CSS/JS are cached for 1 day / 1 hour respectively.
+func staticCacheControl(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract the file extension from the request path.
+		path := r.URL.Path
+		ext := strings.ToLower(filepath.Ext(path))
+
+		// Determine Cache-Control by extension.
+		cc := ""
+		switch ext {
+		case ".png", ".ico", ".svg", ".webmanifest":
+			// Immutable content-addressed assets (7 days).
+			cc = "public, max-age=604800, immutable"
+		case ".json":
+			// Hand-edited configs/data (1 day).
+			cc = "public, max-age=86400"
+		case ".css", ".js":
+			// Hand-edited stylesheets and scripts (1 hour).
+			cc = "public, max-age=3600"
+		}
+
+		if cc != "" {
+			w.Header().Set("Cache-Control", cc)
+		}
 		next.ServeHTTP(w, r)
 	})
 }

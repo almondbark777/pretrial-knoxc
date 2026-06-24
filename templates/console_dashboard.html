@@ -18,7 +18,7 @@
   <a class="kpi" href="/console/clients?status=active"><div class="n">{{$d.KPIs.ActiveClients}}</div><div class="l">Active Clients</div></a>
   <a class="kpi" href="/console/clients?status=active&due=today"><div class="n">{{$d.KPIs.DueToday}}</div><div class="l">Check-ins Due Today</div></a>
   <a class="kpi" href="/console/calendar"><div class="n">{{$d.KPIs.CourtThisWeek}}</div><div class="l">Court Dates This Week</div></a>
-  <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OpenViolations}}</div><div class="l">Open Violations <span class="kpi-since">since {{.Epoch}}</span></div></a>
+  <a class="kpi risk" href="/console/compliance#violations"><div class="n">{{$d.KPIs.OpenViolations}}</div><div class="l">Violations <span class="kpi-since">since {{.Epoch}}</span></div></a>
   <a class="kpi risk" href="/console/compliance"><div class="n">{{$d.KPIs.OverdueCheckIns}}</div><div class="l">Missed Check-ins (this mo.)</div></a>
 </div>
 <div class="epoch-note">Roster counts are current as of the selected date. Activity tallies (violations) count from go-live · <b>{{.Epoch}}</b>.</div>

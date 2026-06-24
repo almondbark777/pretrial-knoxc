@@ -112,12 +112,14 @@ func (s *Server) ReportEMFees(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// EMFeeMemo streams one filled-in past-due memo (.docx) for ?idn= (& optional
-// ?case=) in the ?kind=open|closed list.
+// EMFeeMemo streams one filled-in past-due memo (.docx) for the posted idn (&
+// optional case) in the kind=open|closed list. This is a CSRF-guarded POST because
+// it writes letter_log — the per-row download is a small form on the report.
 func (s *Server) EMFeeMemo(w http.ResponseWriter, r *http.Request) {
-	idn := strings.TrimSpace(r.URL.Query().Get("idn"))
-	caseQ := strings.TrimSpace(r.URL.Query().Get("case"))
-	kind := strings.TrimSpace(r.URL.Query().Get("kind"))
+	_ = r.ParseForm()
+	idn := strings.TrimSpace(r.FormValue("idn"))
+	caseQ := strings.TrimSpace(r.FormValue("case"))
+	kind := strings.TrimSpace(r.FormValue("kind"))
 	res, err := db.EMFees(s.DB, emFeeAsOf())
 	if err != nil {
 		http.Error(w, err.Error(), 500)

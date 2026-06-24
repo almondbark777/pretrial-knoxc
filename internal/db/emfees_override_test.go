@@ -130,3 +130,153 @@ func TestEMFeesAppliesOverrides(t *testing.T) {
 		t.Fatalf("after C: name=%q type=%q owed=%v, want GAMMA, GREG/ALLIED/256", c.Name, c.Type, c.Owed)
 	}
 }
+
+// addDefendantGPS inserts an app-entered (added_defendants) person with a GPS install
+// date — the intake path that has no 48-hour row. EnsureSchema creates the table.
+func addDefendantGPS(t *testing.T, d *sql.DB, idn, name, caseNo, gpsType, install string) {
+	t.Helper()
+	if _, err := d.Exec(`INSERT INTO added_defendants
+		(idn, defendant, warrant_case_num, case_status, gps_type, gps_install_date, author, created_at)
+		VALUES (?, ?, ?, 'OPEN', ?, ?, 'officer@knoxsheriff.org', '2026-04-01')`,
+		idn, name, caseNo, gpsType, install); err != nil {
+		t.Fatalf("insert added_defendant: %v", err)
+	}
+}
+
+// TestEMFeesAppEnteredOpenGPSClient proves an app-entered OPEN GPS client (no 48-hour
+// row) reaches the arrears / show-cause list (item #2). Without the synthesize step
+// such a person silently misses a letter.
+func TestEMFeesAppEnteredOpenGPSClient(t *testing.T) {
+	d := freshEMFeesDB(t)
+	// ALLIED, installed 4/1, asOf 5/1 → 31 days × $8 = $248 on the OPEN list.
+	addDefendantGPS(t, d, "920000001", "NEWBY, NICK", "@N1", "ALLIED", "4/1/2026")
+	asOf := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	res, err := EMFees(d, asOf)
+	if err != nil {
+		t.Fatalf("EMFees: %v", err)
+	}
+	var got []emfees.Rec
+	for _, r := range res.Open {
+		if r.IDN == "920000001" {
+			got = append(got, r)
+		}
+	}
+	if len(got) != 1 {
+		t.Fatalf("app-entered OPEN GPS client should appear exactly once on Open; got %d: %+v", len(got), res.Open)
+	}
+	if r := got[0]; r.Name != "NEWBY, NICK" || r.Case != "@N1" || r.Type != "ALLIED" || r.Owed != 248 {
+		t.Fatalf("app-entered rec wrong: %+v, want NEWBY/@N1/ALLIED/248", r)
+	}
+}
+
+// TestEMFeesAppEnteredNoDoubleBill proves the once-only guard: when the importer later
+// ships a real 48-hour row for the same IDN, the synthetic added row is suppressed so
+// the person is billed exactly once (no double-billing on the legal letter).
+func TestEMFeesAppEnteredNoDoubleBill(t *testing.T) {
+	d := freshEMFeesDB(t)
+	// Same IDN in BOTH the 48-hour file and added_defendants.
+	addGPS48Open(t, d, "930000001", "DUP, DON", "@D1", "ALLIED", "4/1/2026")
+	addDefendantGPS(t, d, "930000001", "DUP, DON", "@D1", "ALLIED", "4/1/2026")
+	asOf := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	res, err := EMFees(d, asOf)
+	if err != nil {
+		t.Fatalf("EMFees: %v", err)
+	}
+	n := 0
+	for _, r := range res.Open {
+		if r.IDN == "930000001" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("IDN present in both 48-hour and added rows must be billed once; got %d Open recs", n)
+	}
+}
+
+// addGPS48Open inserts an OPEN GPS 48-hour row plus a minimal blue-book row (for the
+// name fallback). Left alone it bills from gps_install_date through asOf.
+func addGPS48Open(t *testing.T, d *sql.DB, idn, name, caseNo, gpsType, install string) {
+	t.Helper()
+	if _, err := d.Exec(`INSERT INTO raw_gps_48_hours
+		(idn, defendant, case_number, case_status, gps_type, gps_install_date)
+		VALUES (?, ?, ?, 'OPEN', ?, ?)`, idn, name, caseNo, gpsType, install); err != nil {
+		t.Fatalf("insert gps48 row: %v", err)
+	}
+	if _, err := d.Exec(`INSERT INTO raw_blue_book
+		(idn, defendant, warrant_case_num, case_status, gps_type, gps)
+		VALUES (?, ?, ?, 'OPEN', ?, 'True')`, idn, name, caseNo, gpsType); err != nil {
+		t.Fatalf("insert bb row: %v", err)
+	}
+}
+
+// TestEMFeesAppliesOverridesPass1 proves a supervisor override reaches the OPEN list,
+// which Pass 1 builds straight from the GPS 48-hour rows (item #1). Before the fix the
+// override only spliced into blue-book rows, so a SCRAM→ALLIED rate correction (and a
+// case_status / closed_date fix) was silently discarded for the entire Open list.
+func TestEMFeesAppliesOverridesPass1(t *testing.T) {
+	d := freshEMFeesDB(t)
+	// SCRAM, installed 4/1, asOf 5/1 → 31 days × $15 = $465 owed, $0 paid.
+	addGPS48Open(t, d, "910000001", "OPEN, OLLY", "@O1", "SCRAM", "4/1/2026")
+	asOf := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	openByIDN := func(res emfees.Result) map[string]emfees.Rec {
+		m := map[string]emfees.Rec{}
+		for _, r := range res.Open {
+			m[r.IDN] = r
+		}
+		return m
+	}
+
+	// --- baseline: bills at SCRAM $15/day = $465 on the OPEN list ---
+	base, err := EMFees(d, asOf)
+	if err != nil {
+		t.Fatalf("EMFees baseline: %v", err)
+	}
+	if r, ok := openByIDN(base)["910000001"]; !ok || r.Type != "SCRAM" || r.Rate != 15 || r.Owed != 465 {
+		t.Fatalf("baseline Pass-1: %+v (want SCRAM/15/465 on Open)", r)
+	}
+
+	// --- override gps_type SCRAM→ALLIED: the $8 rate must reach the Open record ---
+	if err := SetOverride(d, "910000001", "gps_type", "ALLIED", "sup@knoxsheriff.org"); err != nil {
+		t.Fatalf("override gps_type: %v", err)
+	}
+	after, err := EMFees(d, asOf)
+	if err != nil {
+		t.Fatalf("EMFees after override: %v", err)
+	}
+	r, ok := openByIDN(after)["910000001"]
+	if !ok || r.Type != "ALLIED" || r.Rate != 8 || r.Owed != 248 {
+		t.Fatalf("after Pass-1 gps_type override: %+v, want ALLIED/8/248 (31×$8); override ignored on the 48-hour rows", r)
+	}
+
+	// --- override case_status OPEN→CLOSED + closed_date: moves to the Closed list and
+	// shortens the billing window (end = closed_date), proving both fields splice. ---
+	if err := SetOverride(d, "910000001", "case_status", "CLOSED", "sup@knoxsheriff.org"); err != nil {
+		t.Fatalf("override case_status: %v", err)
+	}
+	if err := SetOverride(d, "910000001", "closed_date", "4/16/2026", "sup@knoxsheriff.org"); err != nil {
+		t.Fatalf("override closed_date: %v", err)
+	}
+	after2, err := EMFees(d, asOf)
+	if err != nil {
+		t.Fatalf("EMFees after status/date override: %v", err)
+	}
+	if _, ok := openByIDN(after2)["910000001"]; ok {
+		t.Fatalf("after status override: client should be off the Open list")
+	}
+	var closed *emfees.Rec
+	for i := range after2.Closed {
+		if after2.Closed[i].IDN == "910000001" {
+			closed = &after2.Closed[i]
+		}
+	}
+	if closed == nil {
+		t.Fatalf("after status override: client should be on the Closed list")
+	}
+	// 4/1 → 4/16 inclusive = 16 days × $8 = $128 (closed_date override shortened it).
+	if closed.Days != 16 || closed.Owed != 128 {
+		t.Fatalf("after closed_date override: days=%d owed=%v, want 16/128", closed.Days, closed.Owed)
+	}
+}

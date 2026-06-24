@@ -237,11 +237,25 @@ func TestImportApplyBadToken(t *testing.T) {
 // minimal CSV set against a fresh DB: rows insert, the run is idempotent, and
 // the import_meta freshness stamp is written. Skips when python is unavailable.
 func TestImportReconcileRealPython(t *testing.T) {
-	py, err := exec.LookPath("python3")
-	if err != nil {
-		if py, err = exec.LookPath("python"); err != nil {
-			t.Skip("no python on PATH")
+	py := ""
+	for _, cand := range []string{"python3", "python"} {
+		p, lookErr := exec.LookPath(cand)
+		if lookErr != nil {
+			continue
 		}
+		// On Windows, `python`/`python3` on PATH is often the Microsoft Store
+		// "App execution alias" redirector stub: LookPath finds it, but it
+		// can't actually run Python — it just prints a "not found" message and
+		// exits nonzero. Verify the interpreter really works before relying on
+		// it, otherwise the skip guard is defeated and the test hard-fails.
+		if err := exec.Command(p, "--version").Run(); err != nil {
+			continue
+		}
+		py = p
+		break
+	}
+	if py == "" {
+		t.Skip("no working python on PATH")
 	}
 	t.Setenv("PYTHON_BIN", py)
 	script, err := filepath.Abs(filepath.Join("..", "..", "webapp", "reconcile_import.py"))

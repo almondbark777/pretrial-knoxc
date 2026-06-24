@@ -239,13 +239,29 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 		}
 
 		gpRec := gpMap[idn]
-		gpsRaw := strings.ToLower(norm(r["gps"]))
-		gpsActive := gpsRaw == "true" || gpsRaw == "yes" || gpsRaw == "1" || gpRec != nil
-
-		gpsType := norm(r["gps_type"])
-		if gpsType == "" && gpRec != nil {
-			gpsType = norm(gpRec["gps_type"])
+		// gpsField reads a GPS/victim detail with app-override precedence: an app
+		// override wins, else the GPS 48-hour record, else the blue-book / added-
+		// defendant row. Lets officers fill in or correct vendor / install / switch /
+		// victim 48-hour values that the import left blank — importer-proof & audited.
+		gpsField := func(col string) string {
+			if v := norm(ovIdn[col]); v != "" {
+				return v
+			}
+			if gpRec != nil {
+				if v := norm(gpRec[col]); v != "" {
+					return v
+				}
+			}
+			return norm(r[col])
 		}
+
+		gpsType := gpsField("gps_type")
+		gpsRaw := strings.ToLower(norm(r["gps"]))
+		// On GPS if the flag says so, a GPS record exists, or an app override supplied
+		// a vendor / install date (so editing GPS details on an unflagged client lights
+		// up the GPS card).
+		gpsActive := gpsRaw == "true" || gpsRaw == "yes" || gpsRaw == "1" || gpRec != nil ||
+			gpsType != "" || gpsField("gps_install_date") != ""
 
 		c := &compute.Client{
 			IDN:       idn,
@@ -269,10 +285,20 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 			DMA:             norm(r["dma"]),
 			Birthdate:       norm(r["birthdate"]),
 		}
+		c.GpInstall = gpsField("gps_install_date")
+		c.GpSwitchedTo = gpsField("switched_to") // "" if column absent everywhere
+		c.GpSwitchedDate = gpsField("switched_gps_date")
+		c.GpDAEmailed = gpsField("da_emailed")
+		c.GpCourtOrder = gpsField("court_order")
+		c.VictimNotify48 = gpsField("victim_time_48")
+		c.VictimAcceptDeny = gpsField("victim_accept_deny_gps")
+		c.Victim = gpsField("victim")
+		c.VictimIDN = gpsField("victim_idn")
+		c.Victim2 = gpsField("victim_2")
+		c.Victim2IDN = gpsField("victim_2_idn")
+		c.Victim3 = gpsField("victim_3")
+		c.Victim3IDN = gpsField("victim_3_idn")
 		if gpRec != nil {
-			c.GpInstall = norm(gpRec["gps_install_date"])
-			c.GpSwitchedTo = norm(gpRec["switched_to"]) // "" if column absent
-			c.GpSwitchedDate = norm(gpRec["switched_gps_date"])
 			c.GpNotes = norm(gpRec["notes"])
 		}
 		// An app fee waiver lands in the GPS notes so the one true waiver check

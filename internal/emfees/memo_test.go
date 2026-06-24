@@ -73,6 +73,37 @@ func TestFillMemoEscapesXML(t *testing.T) {
 	}
 }
 
+// TestFillClustersValidatesRunCount (#19) proves the FORMTEXT mapping is validated:
+// a Word re-save that changes the placeholder-run count must error loudly instead of
+// silently misaligning every field (the dollar arrearage landing in the GPS blank).
+func TestFillClustersValidatesRunCount(t *testing.T) {
+	pr := placeholderRun
+	values := []string{"A", "B"} // 2 fields → require exactly 10 placeholder runs
+
+	// Happy path: exactly 5*len(values) runs, forming len(values) full clusters.
+	good := "<x>" + strings.Repeat(pr, 5) + "</x><y>" + strings.Repeat(pr, 5) + "</y>"
+	out, err := fillClusters(good, values)
+	if err != nil {
+		t.Fatalf("valid template errored: %v", err)
+	}
+	if !strings.Contains(out, `<w:t xml:space="preserve">A</w:t>`) ||
+		!strings.Contains(out, `<w:t xml:space="preserve">B</w:t>`) {
+		t.Fatalf("valid fill did not place values: %s", out)
+	}
+
+	// Corrupted count: one run dropped (9 instead of 10) → descriptive error, no fill.
+	bad := "<x>" + strings.Repeat(pr, 5) + "</x><y>" + strings.Repeat(pr, 4) + "</y>"
+	if _, err := fillClusters(bad, values); err == nil {
+		t.Fatal("corrupted placeholder count must error, but fillClusters succeeded")
+	}
+
+	// Extra run (11) is just as wrong — would shift the cluster boundaries.
+	extra := "<x>" + strings.Repeat(pr, 6) + "</x><y>" + strings.Repeat(pr, 5) + "</y>"
+	if _, err := fillClusters(extra, values); err == nil {
+		t.Fatal("extra placeholder run must error, but fillClusters succeeded")
+	}
+}
+
 func TestMemosZipLayout(t *testing.T) {
 	res := Result{
 		AsOf:   time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC),

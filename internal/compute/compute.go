@@ -317,6 +317,20 @@ type Client struct {
 	GpSwitchedDate string
 	GpNotes        string
 
+	// GPS / victim 48-hour detail — display only, not read by the billing math.
+	// Surfaced on the record's GPS card + victim panel; editable via the GPS
+	// details modal (stored as field overrides).
+	GpDAEmailed      string
+	GpCourtOrder     string
+	VictimNotify48   string // victim 48-hour notification timestamp
+	VictimAcceptDeny string
+	Victim           string
+	VictimIDN        string
+	Victim2          string
+	Victim2IDN       string
+	Victim3          string
+	Victim3IDN       string
+
 	// Imported case-info fields — display only, not read by the math. Shown on
 	// the profile's Case Info panel (blank non-critical fields are hidden).
 	ChargeType      string
@@ -530,7 +544,17 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 			LastPhone: lastPhone, NextDue: nextDue(windows, effEnd)}
 	}
 	if level == 1 {
-		return result(level)
+		// L1 has only the initial 3-day window. nextDue() would return nil once the
+		// window is missed, but the JS/parity reference keeps the initial window as
+		// "next due" until it is made — these are exactly the L1 clients who most need
+		// a visit. Mirror tools/parity_ref.py: nextDue = initial window unless made.
+		r := result(level)
+		if !initialMade {
+			r.NextDue = &windows[0]
+		} else {
+			r.NextDue = nil
+		}
+		return r
 	}
 
 	if level == 2 {
@@ -911,13 +935,35 @@ func ComputeGPS(c Client, track time.Time, sessionAdj *float64, caseFilter strin
 		adjDollars = adj * float64(*adjRate)
 	}
 
-	// Subtract the excluded custody days from the owed side at that rate.
-	if totalOwed != nil && custodyDays != nil && *custodyDays > 0 && adjRate != nil {
-		v := *totalOwed - float64(*custodyDays*(*adjRate))
-		if v < 0 {
-			v = 0
+	// Subtract the excluded custody days from the owed side at the rate in force on
+	// each excluded day. Across a vendor switch the pre-switch days were billed at
+	// rate1, the post-switch days at rate2, and the switch day itself the flat $23
+	// device-swap premium (mirroring the totalOwed switch math), so crediting the
+	// whole span at one rate over- or under-credits. Split the custody window into
+	// three: [start, switchD-1]@rate1, the switch day @ $23, [switchD+1, end]@rate2.
+	// The three sub-windows tile the span exactly once.
+	if totalOwed != nil && startOK && endOK {
+		var credit float64
+		if hasSwitch && dailyRate != nil && dailyRate2 != nil {
+			preDays := CustodyDaysInWindow(c.Custody, start, addDays(switchD, -1))
+			postDays := CustodyDaysInWindow(c.Custody, addDays(switchD, 1), end)
+			credit = float64(preDays*(*dailyRate)) + float64(postDays*(*dailyRate2))
+			// The switch day was billed the flat $23 premium, so credit it at $23 when
+			// it is itself a custody day (otherwise the client still owes $23−rate2 for
+			// a day they were in custody).
+			if CustodyDaysInWindow(c.Custody, switchD, switchD) > 0 {
+				credit += 23
+			}
+		} else if adjRate != nil && custodyDays != nil && *custodyDays > 0 {
+			credit = float64(*custodyDays * (*adjRate))
 		}
-		totalOwed = &v
+		if credit > 0 {
+			v := *totalOwed - credit
+			if v < 0 {
+				v = 0
+			}
+			totalOwed = &v
+		}
 	}
 
 	// daysCovered: dollars-paid divided by the current rate, plus the day

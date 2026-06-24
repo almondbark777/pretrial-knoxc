@@ -293,7 +293,9 @@ const blankDateSort = "9999-12-31"
 
 // consoleClientRows turns the shared defendantRows() output into rich rows with
 // chips + next-court/next-check-in, reusing the canonical compute per rep.
-func consoleClientRows(clients map[string][]*compute.Client, track time.Time, courtByIDN map[string]courtCell) []ConsoleClientRow {
+// It also returns the behind/missed IDN sets it builds so callers can derive
+// Stats via rosterStateCounts+len() without a second roster pass (#11 dedup).
+func consoleClientRows(clients map[string][]*compute.Client, track time.Time, courtByIDN map[string]courtCell) ([]ConsoleClientRow, map[string]bool, map[string]bool) {
 	// The roster needs only the Behind/Missed flags + next check-in — NOT the GPS
 	// vendor/surplus or PTR balance that defendantRows also computes. So build rows
 	// directly: behind/missed once each, then a single ComputeCheckIns per client
@@ -349,7 +351,7 @@ func consoleClientRows(clients map[string][]*compute.Client, track time.Time, co
 		}
 		return strings.ToUpper(rows[i].Name) < strings.ToUpper(rows[j].Name)
 	})
-	return rows
+	return rows, behind, missed
 }
 
 // rosterJSONRow is the compact, short-keyed encoding of one roster row for
@@ -395,6 +397,149 @@ func rosterRowsJSON(rows []ConsoleClientRow) template.JS {
 		return template.JS("[]")
 	}
 	return template.JS(b)
+}
+
+// ── Referrals worklist (every client, newest-referral-first) ──────────────────
+
+// refReferredKeys returns the referral date display string and a uniform ISO
+// "2006-01-02 15:04:05" sort key (date-only referrals get a 00:00:00 time so they
+// tile with timestamped ones). A missing referral yields "—" and an empty key, so
+// the newest-first sort drops undated clients to the bottom.
+func refReferredKeys(c *compute.Client) (display, sortKey string) {
+	switch {
+	case c.RefDTOK:
+		return c.RefDT.Format("Jan 2, 2006 3:04 PM"), c.RefDT.Format("2006-01-02 15:04:05")
+	case c.RefOK:
+		return c.RefD.Format("Jan 2, 2006"), c.RefD.Format("2006-01-02") + " 00:00:00"
+	default:
+		return "—", ""
+	}
+}
+
+// refWorklistRow is one client on the Referrals worklist — the referral-focused
+// columns only. Rendered client-side from refWorklistJSON, windowed the same way
+// as the Clients roster so the full ~3,300-client list stays light on weak PCs.
+type refWorklistRow struct {
+	IDN          string
+	Name         string
+	Initials     string
+	Officer      string
+	Level        int
+	Status       string
+	GpsActive    bool
+	Referred     string // display
+	ReferredSort string // ISO datetime key; "" when none (sorts last)
+	Search       string
+}
+
+// referralWorklist builds one row per client (open rep, falling back to any case
+// so closed-only clients still appear), sorted most-recently-referred first with
+// undated referrals last. Unlike consoleClientRows it skips the per-client
+// check-in compute — the worklist only needs referral metadata, so it stays cheap
+// across the whole roster.
+func referralWorklist(clients map[string][]*compute.Client) []refWorklistRow {
+	rows := make([]refWorklistRow, 0, len(clients))
+	for idn, cases := range clients {
+		c := openRep(cases)
+		if c == nil {
+			continue
+		}
+		lvl, _ := compute.ParseLevel(c.Level)
+		referred, referredSort := refReferredKeys(c)
+		row := refWorklistRow{
+			IDN: idn, Name: c.Name, Initials: Initials(c.Name),
+			Officer: dash(c.Officer), Level: lvl, Status: statusChip(c.Status).Label,
+			GpsActive: c.GpsActive, Referred: referred, ReferredSort: referredSort,
+		}
+		row.Search = strings.ToLower(c.Name + " " + idn + " " + c.CaseNo + " " + c.Officer)
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].ReferredSort != rows[j].ReferredSort {
+			return rows[i].ReferredSort > rows[j].ReferredSort // newest referral first
+		}
+		return strings.ToUpper(rows[i].Name) < strings.ToUpper(rows[j].Name)
+	})
+	return rows
+}
+
+// refWorklistJSON is the compact, short-keyed encoding of one worklist row for
+// client-side windowing (short keys trim the payload across thousands of rows).
+type refWorklistJSON struct {
+	I   string `json:"i"`   // idn
+	N   string `json:"n"`   // name
+	A   string `json:"a"`   // initials
+	O   string `json:"o"`   // officer
+	L   int    `json:"l"`   // level
+	St  string `json:"st"`  // status chip label
+	G   bool   `json:"g"`   // gps active
+	Rd  string `json:"rd"`  // referred (display)
+	Rds string `json:"rds"` // referred (ISO sort key; "" when none)
+	S   string `json:"s"`   // lowercase search blob
+}
+
+// referralWorklistJSON marshals the worklist as a compact JSON array embedded in
+// the page for client-side filter/sort/paging. Go's json.Marshal escapes <,>,& so
+// the blob is safe inside <script>.
+func referralWorklistJSON(rows []refWorklistRow) template.JS {
+	out := make([]refWorklistJSON, len(rows))
+	for i, r := range rows {
+		out[i] = refWorklistJSON{
+			I: r.IDN, N: r.Name, A: r.Initials, O: r.Officer, L: r.Level,
+			St: r.Status, G: r.GpsActive, Rd: r.Referred, Rds: r.ReferredSort, S: r.Search,
+		}
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return template.JS("[]")
+	}
+	return template.JS(b)
+}
+
+// referralExportRows builds the full per-client field set for the Referrals CSV —
+// one row per client, every captured field, sorted most-recently-referred first.
+// The header in ExportReferrals must stay aligned with the cell order here.
+func referralExportRows(clients map[string][]*compute.Client) [][]string {
+	type rec struct {
+		sortKey, name string
+		cells         []string
+	}
+	recs := make([]rec, 0, len(clients))
+	for idn, cases := range clients {
+		c := openRep(cases)
+		if c == nil {
+			continue
+		}
+		lvl, _ := compute.ParseLevel(c.Level)
+		referred, referredSort := refReferredKeys(c)
+		if referred == "—" {
+			referred = "" // blank in CSV rather than the on-screen dash
+		}
+		closed := ""
+		if c.ClosedOK {
+			closed = c.ClosedD.Format("Jan 2, 2006")
+		}
+		recs = append(recs, rec{
+			sortKey: referredSort, name: c.Name,
+			cells: []string{
+				c.Name, idn, c.CaseNo, levelLabel(lvl), statusChip(c.Status).Label, c.Officer,
+				referred, closed, yesNo(c.GpsActive), c.GpsType, c.GpInstall,
+				c.GpSwitchedTo, c.GpSwitchedDate, c.ChargeType, c.BondAmount,
+				c.SupervisionType, c.OrderFrom, c.DMA, c.Birthdate, c.GpNotes,
+			},
+		})
+	}
+	sort.Slice(recs, func(i, j int) bool {
+		if recs[i].sortKey != recs[j].sortKey {
+			return recs[i].sortKey > recs[j].sortKey // newest referral first
+		}
+		return strings.ToUpper(recs[i].name) < strings.ToUpper(recs[j].name)
+	})
+	out := make([][]string, len(recs))
+	for i, r := range recs {
+		out[i] = r.cells
+	}
+	return out
 }
 
 // ── Client record ─────────────────────────────────────────────────────────────
@@ -570,8 +715,35 @@ type ConsoleRecord struct {
 	Notes           []models.Note
 	Activity        []ConsoleTLItem
 
+	// GPS / victim 48-hour detail — display on the GPS card + victim panel, and
+	// raw values to pre-fill the "Edit GPS details" modal (selects/dates).
+	GpsVendorVal      string          // raw vendor (c.GpsType) for the vendor <select>
+	GpsInstallInput   string          // yyyy-mm-dd for the install date input
+	GpsSwitchedTo     string          // raw "switched to" vendor (display + select)
+	GpsSwitchedDate   string          // display
+	GpsSwitchedInput  string          // yyyy-mm-dd
+	GpsDAEmailed      string          // display
+	GpsDAEmailedInput string          // yyyy-mm-dd
+	GpsCourtOrder     string          // "Yes"/"No"/""
+	Victims           []ConsoleVictim // non-empty victims, for the panel
+	Victim48          string          // display of the 48-hour notification time
+	Victim48Input     string          // yyyy-mm-ddThh:mm for the datetime-local input
+	VictimAcceptDeny  string
+	VictimName        string // individual raw values for the edit form
+	VictimIDN         string
+	Victim2Name       string
+	Victim2IDN        string
+	Victim3Name       string
+	Victim3IDN        string
+
 	CI   compute.CheckInResult
 	AsOf string
+}
+
+// ConsoleVictim is one victim entry shown on the record's victim panel.
+type ConsoleVictim struct {
+	Name string
+	IDN  string
 }
 
 // ConsoleSchedCI is one booked check-in appointment on the record's Check-ins
@@ -610,6 +782,32 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 			rec.GpsInstall = dt.Format("Jan 2, 2006")
 		} else {
 			rec.GpsInstall = c.GpInstall
+		}
+	}
+
+	// GPS / victim 48-hour detail — display + raw values for the "Edit GPS details"
+	// modal. Officers fill vendor / install / device switch / victim 48-hour info
+	// the daily import frequently leaves blank (item: "where do we modify the
+	// vendor … the install date … the switch … the 48 hour time").
+	rec.GpsVendorVal = c.GpsType
+	rec.GpsInstallInput = isoDate(c.GpInstall)
+	rec.GpsSwitchedTo = c.GpSwitchedTo
+	rec.GpsSwitchedDate = prettyDate(c.GpSwitchedDate)
+	rec.GpsSwitchedInput = isoDate(c.GpSwitchedDate)
+	rec.GpsDAEmailed = prettyDate(c.GpDAEmailed)
+	rec.GpsDAEmailedInput = isoDate(c.GpDAEmailed)
+	rec.GpsCourtOrder = c.GpCourtOrder
+	rec.Victim48 = prettyStamp(c.VictimNotify48)
+	rec.Victim48Input = isoDateTime(c.VictimNotify48)
+	rec.VictimAcceptDeny = c.VictimAcceptDeny
+	rec.VictimName, rec.VictimIDN = c.Victim, c.VictimIDN
+	rec.Victim2Name, rec.Victim2IDN = c.Victim2, c.Victim2IDN
+	rec.Victim3Name, rec.Victim3IDN = c.Victim3, c.Victim3IDN
+	for _, v := range []ConsoleVictim{
+		{c.Victim, c.VictimIDN}, {c.Victim2, c.Victim2IDN}, {c.Victim3, c.Victim3IDN},
+	} {
+		if strings.TrimSpace(v.Name) != "" || strings.TrimSpace(v.IDN) != "" {
+			rec.Victims = append(rec.Victims, v)
 		}
 	}
 
@@ -1285,6 +1483,51 @@ func shortStamp(s string) string {
 
 func sameDay(a, b time.Time) bool {
 	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()
+}
+
+// isoDate returns s as a yyyy-mm-dd string for a <input type=date> value, or ""
+// when s is blank/unparseable (so an empty field stays empty in the edit form).
+func isoDate(s string) string {
+	if dt, ok := compute.ParseDay(s); ok {
+		return dt.Format("2006-01-02")
+	}
+	return ""
+}
+
+// isoDateTime returns s as yyyy-mm-ddThh:mm for a <input type=datetime-local>, or
+// "" when blank/unparseable.
+func isoDateTime(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	if dt, ok := compute.ParseDateTime(s); ok {
+		return dt.Format("2006-01-02T15:04")
+	}
+	return ""
+}
+
+// prettyDate formats a date for display ("Jan 2, 2006"), or "" when blank.
+func prettyDate(s string) string {
+	if dt, ok := compute.ParseDay(s); ok {
+		return dt.Format("Jan 2, 2006")
+	}
+	return ""
+}
+
+// prettyStamp formats a timestamp for display, including the clock time when the
+// source carried one ("Jan 2, 2006 · 3:04 PM"), else just the date; "" when blank.
+func prettyStamp(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	dt, ok := compute.ParseDateTime(s)
+	if !ok {
+		return ""
+	}
+	if strings.Contains(s, ":") {
+		return dt.Format("Jan 2, 2006 · 3:04 PM")
+	}
+	return dt.Format("Jan 2, 2006")
 }
 
 func reversed(ev []compute.Event) []compute.Event {

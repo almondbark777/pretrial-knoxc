@@ -75,8 +75,18 @@ func ChatMessagesSince(d *sql.DB, sinceID int64, limit int) ([]models.ChatMessag
 
 // PruneChatMessages deletes messages older than `before`. Returns the row count
 // removed. Called periodically to enforce the 7-day retention window.
+//
+// created_at is stored as RFC3339 with an offset (compute.NowET writes e.g.
+// "...-04:00" or "...-05:00" across the DST switch). A naive lexicographic
+// string compare against an offset-bearing cutoff would mis-order rows whose
+// offsets differ. Normalizing both sides to the same UTC "Z" form via strftime
+// makes the comparison instant-correct regardless of DST. strftime understands
+// the stored offset and converts to UTC; the cutoff is formatted as UTC Z.
 func PruneChatMessages(d *sql.DB, before time.Time) (int64, error) {
-	res, err := d.Exec(`DELETE FROM chat_messages WHERE created_at < ?`, before.Format(time.RFC3339))
+	cutoff := before.UTC().Format("2006-01-02T15:04:05Z")
+	res, err := d.Exec(
+		`DELETE FROM chat_messages
+		   WHERE strftime('%Y-%m-%dT%H:%M:%SZ', created_at) < ?`, cutoff)
 	if err != nil {
 		return 0, err
 	}

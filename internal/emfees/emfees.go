@@ -451,14 +451,34 @@ func ComputeWithCustody(gps48, payments, blueBook []map[string]string, custody m
 			effRate = switchRate
 		}
 		// In-custody days aren't billed (the "back on GPS" day is). Subtract them
-		// before the threshold test so custody can clear someone off the list.
+		// before the threshold test so custody can clear someone off the list. When a
+		// real device switch dual-bills across switchDate, the per-day credit must use
+		// the rate that day was BILLED at (computeOwed boundaries), or a $15-billed day
+		// is credited at $8 and the owed is overstated (#4, mirror of compute #3):
+		//   pre-switch  [install, switchDate-1] @ rt
+		//   switch day  switchDate              @ rt+switchRate (billed at both)
+		//   post-switch [switchDate+1, end]     @ switchRate
 		custodyDays := custodyDaysInWindow(custody[idn], install, end)
 		if custodyDays > 0 {
+			var credit int
+			if hasSwitch && !switchDate.Before(install) && !switchDate.After(end) {
+				preDays := custodyDaysInWindow(custody[idn], install, switchDate.AddDate(0, 0, -1))
+				switchDay := custodyDaysInWindow(custody[idn], switchDate, switchDate)
+				postDays := custodyDaysInWindow(custody[idn], switchDate.AddDate(0, 0, 1), end)
+				// Segments partition [install,end] at switchDate, so they sum to the
+				// flat custody count — guard the invariant the recipe requires.
+				if preDays+switchDay+postDays != custodyDays {
+					panic("emfees: custody switch segments must sum to custodyDays")
+				}
+				credit = preDays*rt + switchDay*(rt+switchRate) + postDays*switchRate
+			} else {
+				credit = custodyDays * effRate
+			}
 			days -= custodyDays
 			if days < 0 {
 				days = 0
 			}
-			owed -= float64(custodyDays * effRate)
+			owed -= float64(credit)
 			if owed < 0 {
 				owed = 0
 			}

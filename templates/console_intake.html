@@ -27,7 +27,7 @@
       <div class="wgrid">
         <label>Full name <span class="req">*</span><input type="text" name="defendant" data-req placeholder="LAST, FIRST"></label>
         <label>IDN <span class="req">*</span><input type="text" name="idn" data-req inputmode="numeric" placeholder="e.g. 1648023"></label>
-        <label>Date of birth<input type="date" name="birthdate"></label>
+        <label>Date of birth<input type="text" name="birthdate" id="dobInput" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY"><span class="muted" style="font-weight:400;font-size:11px">Type or paste — MM/DD/YYYY</span></label>
       </div>
       <div class="idnnote" id="idnNote" hidden></div>
       <p class="muted" style="padding:0;margin:12px 0 0;font-size:12px">Enter the IDN first — if we already have this person, their details fill in automatically.</p>
@@ -48,9 +48,15 @@
           <option value="">— choose —</option>
           <option>Misdemeanor</option><option>Felony</option><option>Violation</option><option>Other</option>
         </select></label>
-        <label>Order from<input type="text" name="order_from" placeholder="Magistrate"></label>
+        <label>Order from<select name="order_from">
+          <option value="">— choose —</option>
+          <option>Magistrate</option>
+          <option>Judge</option>
+          <option>Pretrial</option>
+        </select></label>
         <label>Supervision type<select name="supervision_type">
           <option value="">— choose —</option>
+          <option>Pretrial</option>
           <option>Bond Supervision</option>
           <option>Bond SCRAM</option>
           <option>Drug Screen</option>
@@ -61,7 +67,7 @@
         </select></label>
         <label>Court<input type="text" name="court" placeholder="General Sessions"></label>
         <label>Bond amount<input type="text" name="bond_amount" placeholder="$25,000"></label>
-        <label>Referral date<input type="date" name="referral_date" id="refDate"></label>
+        <label>Referral date &amp; time<input type="datetime-local" name="referral_date" id="refDate"></label>
         <label>DMA<input type="text" name="dma" placeholder="optional"></label>
         <div class="wfull wchecks">
           <span class="wchecks-lbl">Bond conditions <span class="muted" style="font-weight:400">(check all that apply)</span></span>
@@ -109,7 +115,7 @@
 
         <h4 class="wsub">Victim 48-hour notification</h4>
         <div class="wgrid">
-          <label>Victim 48-hour notified (date)<input type="date" name="victim_time_48"></label>
+          <label>Victim 48-hour notified (date &amp; time)<input type="datetime-local" name="victim_time_48"></label>
           <label>Victim accept / deny GPS<select name="victim_accept_deny_gps">
             <option value="">— choose —</option><option>Accept</option><option>Deny</option><option>Pending</option>
           </select></label>
@@ -218,8 +224,8 @@ document.addEventListener('DOMContentLoaded',function(){
   function cadenceText(){
     var l=form.pretrial_level.value;
     return l==='1'?'Initial check-in within 3 days of referral (Level 1).':
-           l==='2'?'One in-person check-in per calendar month (Level 2).':
-           l==='3'?'Weekly in-person check-in (Level 3).':'Pick a level to see the implied check-in cadence.';
+           l==='2'?'One in-person AND one phone/virtual contact per calendar month (Level 2).':
+           l==='3'?'One in-person AND one phone/virtual contact per week (Level 3).':'Pick a level to see the implied check-in cadence.';
   }
   function updateCadence(){document.getElementById('cadenceHint').textContent=cadenceText();}
   function syncGps(){document.getElementById('gpsBlock').hidden=!gpsOn();}
@@ -263,8 +269,20 @@ document.addEventListener('DOMContentLoaded',function(){
       if(form[k]!=null&&form[k].type!=='checkbox'&&form[k].type!=='radio')try{form[k].value=d[k]}catch(e){}
     });}
   }catch(e){}
-  // default referral date to today if blank (officer can change it)
-  if(!form.referral_date.value){try{form.referral_date.value=new Date().toISOString().slice(0,10)}catch(e){}}
+  // default referral date+time to now (local wall-clock) if blank — officer can change it
+  if(!form.referral_date.value){try{var n=new Date();n.setMinutes(n.getMinutes()-n.getTimezoneOffset());form.referral_date.value=n.toISOString().slice(0,16)}catch(e){}}
+
+  // DOB is a plain text field (so it can be copied/pasted, unlike a date picker).
+  // Normalize a pasted/typed value to MM/DD/YYYY on blur; the server parses either
+  // US or ISO. 2-digit years are left as typed (don't guess the century).
+  var dob=document.getElementById('dobInput');
+  if(dob){dob.addEventListener('blur',function(){
+    var v=dob.value.trim(); if(!v)return;
+    var m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); // ISO yyyy-mm-dd
+    if(m){dob.value=('0'+m[2]).slice(-2)+'/'+('0'+m[3]).slice(-2)+'/'+m[1];return;}
+    m=v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/); // m/d/yyyy, m.d.yyyy, m-d-yyyy
+    if(m){dob.value=('0'+m[1]).slice(-2)+'/'+('0'+m[2]).slice(-2)+'/'+m[3];}
+  });}
 
   // ── IDN autofill: if we already have this person, pre-fill what we know ──────
   var idnNote=document.getElementById('idnNote'), lastLookup='';
@@ -274,8 +292,9 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   function fillSelect(name,val){
     var el=form[name]; if(!el||val==null||val===''||(el.value||'').trim()!=='')return; // respect a chosen option
-    var v=String(val);
-    [].forEach.call(el.options,function(o){if(o.value===v||o.text===v)el.value=o.value});
+    var v=String(val),matched=false;
+    [].forEach.call(el.options,function(o){if(o.value===v||o.text===v){el.value=o.value;matched=true;}});
+    if(!matched){var o=document.createElement('option');o.value=v;o.text=v;el.add(o);el.value=v;} // keep an imported value not in the static list
   }
   function lookupIDN(){
     var idn=(form.idn.value||'').trim();
@@ -292,7 +311,7 @@ document.addEventListener('DOMContentLoaded',function(){
         fillSelect('charge_type',d.chargeType);
         fillSelect('supervision_type',d.supervisionType);
         fillEmpty('bond_amount',d.bondAmount);
-        fillEmpty('order_from',d.orderFrom);
+        fillSelect('order_from',d.orderFrom);
         fillEmpty('dma',d.dma);
         fillSelect('supervising_officer',d.officer);
         if(d.gps){

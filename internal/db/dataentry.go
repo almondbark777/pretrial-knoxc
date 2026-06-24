@@ -44,9 +44,10 @@ func normInputDate(s string) string {
 }
 
 var (
-	errExistingIDN = adminErr("a client with that IDN already exists — open their profile to add a case, payment, or check-in")
-	errEmptyName   = adminErr("defendant name is required")
-	errBadAmount   = adminErr("payment amount must be a positive number (e.g. 50 or 50.00)")
+	errExistingIDN   = adminErr("a client with that IDN already exists — open their profile to add a case, payment, or check-in")
+	errTombstonedIDN = adminErr("this IDN belongs to a deleted person — go to /admin/deleted to Restore them first")
+	errEmptyName     = adminErr("defendant name is required")
+	errBadAmount     = adminErr("payment amount must be a positive number (e.g. 50 or 50.00)")
 )
 
 // parsePosAmount cleans a money string ("$50.00", "1,200") and reports whether it
@@ -116,6 +117,15 @@ func AddDefendant(d *sql.DB, nd NewDefendant, by string) error {
 	}
 	if nd.Name == "" {
 		return errEmptyName
+	}
+	// Check tombstone BEFORE the dup check: a tombstoned IDN must be explicitly
+	// Restored via /admin/deleted rather than silently re-added as an invisible row.
+	ts, err := loadTombstones(d)
+	if err != nil {
+		return err
+	}
+	if ts.whole[nd.IDN] {
+		return errTombstonedIDN
 	}
 	if IDNExistsInRoster(d, nd.IDN) {
 		return errExistingIDN

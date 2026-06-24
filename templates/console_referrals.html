@@ -2,67 +2,184 @@
 <div class="phead">
   <div>
     <h1>Referrals</h1>
-    <div class="sub">Every referral entered through the app's New&nbsp;Referral wizard, with all captured fields — like a SharePoint list or spreadsheet. Bulk SharePoint-imported clients live on the <a href="/console/clients">Clients</a> roster.</div>
+    <div class="sub">Every client, ordered from the most recently referred to the oldest. Click a name to open the record.</div>
   </div>
-  <div class="right">
-    <a class="btn newref" href="/console/clients/new" title="Start a new referral">+ New Referral</a>
-    <a class="btn ghost sm" href="/export/referrals.csv" style="margin-left:8px" title="Download all referral data as a CSV (opens in Excel)">Export CSV ⤓</a>
-  </div>
+  <div class="right"><span class="asof">{{.Count}} client{{if ne .Count 1}}s{{end}}</span></div>
 </div>
 
-<div class="filters" style="margin-bottom:14px">
-  <input type="text" id="rfilter" placeholder="Filter referrals by name, IDN, officer, case #, any field…" aria-label="Filter referrals">
-  <span class="count" id="rcount">{{.Count}}</span>
+<div class="filters">
+  <input type="text" id="f-name" placeholder="Filter by name, IDN, case #, officer…">
+  <select id="f-status"><option value="">All statuses</option><option value="active">Active</option><option value="closed">Closed</option></select>
+  <select id="f-level"><option value="">All levels</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="0">Unknown</option></select>
+  <select id="f-officer"><option value="">All officers</option><option value="mine">My caseload</option>{{range .Officers}}<option>{{.}}</option>{{end}}</select>
+  <span class="count" id="f-count"></span>
+  <span style="flex:1"></span>
+  <a class="btn ghost" href="/export/referrals.csv" title="Download all clients with every captured field as CSV (opens in Excel)">Export CSV ⤓</a>
+  <a class="btn" href="/console/clients/new">+ New Referral</a>
 </div>
 
-{{if .Rows}}
-<div class="panel">
-  <div class="refscroll cv-auto">
-    <table class="data refgrid">
-      <thead><tr>{{range .Cols}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
-      <tbody>
-      {{range .Rows}}{{$row := .}}<tr>
-        {{range $i, $cell := .Cells}}{{if eq $i 0}}<td class="nmcell"><a href="/console/clients/{{$row.IDN}}">{{if $cell}}{{$cell}}{{else}}(no name){{end}}</a></td>{{else}}<td>{{if $cell}}{{$cell}}{{else}}<span class="muted">—</span>{{end}}</td>{{end}}{{end}}
-      </tr>{{end}}
-      </tbody>
+<div class="tablewrap">
+  <div class="tscroll">
+    <table class="data" id="rtable">
+      <thead><tr>
+        <th data-col="1" data-type="text" scope="col" tabindex="0" aria-sort="none">Client <span class="arr">↕</span></th>
+        <th data-col="2" data-type="text" scope="col" tabindex="0" aria-sort="none">IDN <span class="arr">↕</span></th>
+        <th data-col="3" data-type="text" scope="col" tabindex="0" aria-sort="descending" class="sorted">Referred <span class="arr">▼</span></th>
+        <th data-col="4" data-type="text" scope="col" tabindex="0" aria-sort="none">Officer <span class="arr">↕</span></th>
+        <th data-col="5" data-type="num" scope="col" tabindex="0" aria-sort="none">Level <span class="arr">↕</span></th>
+        <th data-col="6" data-type="text" scope="col" tabindex="0" aria-sort="none">Status <span class="arr">↕</span></th>
+      </tr></thead>
+      {{/* Rows are windowed: only the visible page is rendered into the DOM by JS
+            from the compact ROWS array below, so the full ~3,300-client list stays
+            light on low-end office PCs. */}}
+      <tbody id="rtbody"></tbody>
     </table>
   </div>
 </div>
-<p class="muted" style="padding:0;margin-top:12px;font-size:12.5px">Showing {{.Count}} app-entered referral{{if ne .Count 1}}s{{end}}. These rows merge into every view by IDN (Clients roster, client record, EM-fee letters). Supervisor-deleted referrals are filtered out here too.</p>
-{{else}}
-<div class="panel"><div class="emptybox"><div class="big">▤</div>No referrals have been entered in the app yet.<div class="m" style="margin-top:6px">Use <b>+ New Referral</b> to add one — it will appear here with every field, and on the Clients roster.</div></div></div>
-{{end}}
+
+<div class="pager" id="pager">
+  <button type="button" class="btn ghost sm" id="pgPrev">‹ Prev</button>
+  <span id="pgInfo" class="muted"></span>
+  <button type="button" class="btn ghost sm" id="pgNext">Next ›</button>
+</div>
 
 <style>
-/* Wide spreadsheet-style grid: horizontal scroll, sticky header + first column,
-   no cell wrap so columns stay aligned the way a SharePoint list / Excel sheet would. */
-.refscroll{overflow:auto;max-height:calc(100vh - 240px)}
-.refgrid{min-width:100%;border-collapse:separate;border-spacing:0}
-.refgrid th,.refgrid td{white-space:nowrap;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px}
-.refgrid thead th{position:sticky;top:0;z-index:3;background:var(--panel-2,var(--panel));text-align:left}
-.refgrid td.nmcell,.refgrid th:first-child{position:sticky;left:0;z-index:2;background:var(--panel)}
-.refgrid thead th:first-child{z-index:4}
-.refgrid td.nmcell a{font-weight:600;color:var(--accent-ink,var(--ink))}
-.refgrid tbody tr:hover td{background:var(--panel-3)}
-.refgrid tbody tr:hover td.nmcell{background:var(--panel-3)}
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:14px 0 4px}
+.pager #pgInfo{font-size:12.5px}
+.pager .btn[disabled]{opacity:.4;cursor:not-allowed}
+.empty-row td{padding:0}
+.empty-row:hover{background:transparent;cursor:default}
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:12px;padding:56px 20px;color:var(--muted);text-align:center;font-size:14px}
+.empty-state .es-ic{font-size:30px;opacity:.45;line-height:1}
 </style>
-
 <script>
-/* Client-side filter across every field (app-entered referrals are a small set —
-   no windowing needed). Hides non-matching rows and updates the count badge. */
+/* ── Windowed referrals worklist ──────────────────────────────────────────────
+   The full client list ships once as a compact JSON array; filter/sort/paging all
+   run in memory and ONLY the current 50-row page is materialized into the DOM, so
+   the node count stays flat regardless of caseload size. Default order is newest
+   referral first (the sort key is an ISO datetime; undated referrals sort last). */
+const ROWS = {{.RowsJSON}};
+const F = {q:{{.Fq}}};
+const USERNAME = ({{.UserName}}||'').toLowerCase();
+
 document.addEventListener('DOMContentLoaded',function(){
-  var inp=document.getElementById('rfilter'),badge=document.getElementById('rcount');
-  if(!inp)return;
-  var rows=[].slice.call(document.querySelectorAll('.refgrid tbody tr')).map(function(tr){
-    return {tr:tr,txt:tr.textContent.toLowerCase()};
-  });
-  var base=rows.length,t=null;
-  function apply(){
-    var q=inp.value.trim().toLowerCase(),n=0;
-    rows.forEach(function(r){var hit=!q||r.txt.indexOf(q)>=0;r.tr.style.display=hit?'':'none';if(hit)n++;});
-    badge.textContent=q?(n+' of '+base):base;
+  var PAGE=50, page=0, view=ROWS.slice();
+  var sortCol=3, sortDir=-1; // default: Referred, newest first
+
+  var tbody=document.getElementById('rtbody');
+  var fName=document.getElementById('f-name'),fStatus=document.getElementById('f-status'),
+      fLevel=document.getElementById('f-level'),fOff=document.getElementById('f-officer'),
+      count=document.getElementById('f-count');
+  var pgPrev=document.getElementById('pgPrev'),pgNext=document.getElementById('pgNext'),
+      pgInfo=document.getElementById('pgInfo'),pager=document.getElementById('pager');
+
+  /* ── render helpers ──────────────────────────────────────────────────────── */
+  function esc(s){return (''+(s==null?'':s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function chip(tone,icon,label){return '<span class="chip '+tone+'">'+(icon?'<span class="g">'+icon+'</span>':'')+esc(label)+'</span>'}
+  function lvlChip(l,g){return g?chip('gps','','GPS'):l===1?chip('ok','','Level 1'):l===2?chip('warn','','Level 2'):l===3?chip('risk','','Level 3'):chip('neutral','','Level —')}
+  function statusChip(label){return chip(label==='Active'?'info':'neutral','',label||'Unknown')}
+  function statusKey(label){return label==='Active'?'active':(label==='Closed'?'closed':'other')}
+
+  function rowHTML(r){
+    return '<tr data-idn="'+esc(r.i)+'" data-href="/console/clients/'+esc(r.i)+'" tabindex="0">'
+      +'<td><div class="namecell"><span class="av">'+esc(r.a)+'</span><span class="nm">'+esc(r.n)+'</span></div></td>'
+      +'<td>'+esc(r.i)+'</td>'
+      +'<td>'+esc(r.rd)+'</td>'
+      +'<td>'+esc(r.o)+'</td>'
+      +'<td>'+lvlChip(r.l,r.g)+'</td>'
+      +'<td>'+statusChip(r.st)+'</td>'
+      +'</tr>';
   }
-  inp.addEventListener('input',function(){clearTimeout(t);t=setTimeout(apply,120);});
+
+  /* ── filter + sort (operate on the data, not the DOM) ────────────────────── */
+  function reflow(){
+    var q=fName.value.trim().toLowerCase(), st=fStatus.value, lv=fLevel.value,
+        off=fOff.value, mine=off==='mine';
+    view=ROWS.filter(function(r){
+      if(q && r.s.indexOf(q)<0)return false;
+      if(st && statusKey(r.st)!==st)return false;
+      if(lv!=='' && String(r.l)!==lv)return false;
+      if(mine && (r.o||'').toLowerCase()!==USERNAME)return false;
+      if(off && !mine && r.o!==off)return false;
+      return true;
+    });
+    applySort(); page=0; renderPage();
+  }
+  function colGet(col){
+    switch(col){case 1:return function(r){return r.n};case 2:return function(r){return r.i};
+      case 3:return function(r){return r.rds};case 4:return function(r){return r.o};
+      case 5:return function(r){return r.l};case 6:return function(r){return r.st};
+      default:return function(r){return r.rds}}
+  }
+  function applySort(){
+    var g=colGet(sortCol), num=(sortCol===5);
+    view.sort(function(a,b){
+      var x=g(a),y=g(b);
+      if(num)return (parseFloat(x||0)-parseFloat(y||0))*sortDir;
+      x=(''+x).toLowerCase(); y=(''+y).toLowerCase();
+      var c=(x<y?-1:x>y?1:0)*sortDir;
+      return c!==0?c:(a.s<b.s?-1:a.s>b.s?1:0); // stable tiebreak: name A→Z
+    });
+  }
+
+  /* ── render the current page ─────────────────────────────────────────────── */
+  function renderPage(){
+    var n=view.length, pages=Math.max(1,Math.ceil(n/PAGE));
+    if(page>=pages)page=pages-1; if(page<0)page=0;
+    var start=page*PAGE, end=Math.min(start+PAGE,n);
+    if(n===0){
+      tbody.innerHTML='<tr class="empty-row"><td colspan="6"><div class="empty-state"><div class="es-ic">🔍</div><div>No clients match your filters.</div><button type="button" class="btn ghost sm es-clear">Clear all filters</button></div></td></tr>';
+    }else{
+      var html=''; for(var i=start;i<end;i++)html+=rowHTML(view[i]);
+      tbody.innerHTML=html;
+    }
+    count.textContent=n+' of '+ROWS.length+' shown';
+    pgInfo.textContent=n?('Showing '+(start+1)+'–'+end+' of '+n):'No matches';
+    pgPrev.disabled=(page===0); pgNext.disabled=(page>=pages-1);
+    pager.style.display=(n>PAGE)?'flex':'none';
+  }
+
+  /* ── event delegation on the tbody (one set of listeners, not 50×N) ──────── */
+  tbody.addEventListener('click',function(e){
+    if(e.target.closest('.es-clear')){clearAll();return;}
+    var tr=e.target.closest('tr[data-idn]'); if(!tr)return;
+    location.href=tr.dataset.href;
+  });
+  tbody.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){var tr=e.target.closest('tr[data-idn]');if(tr)location.href=tr.dataset.href}
+  });
+
+  /* ── filters ─────────────────────────────────────────────────────────────── */
+  [fName,fStatus,fLevel,fOff].forEach(function(el){el.addEventListener('input',reflow)});
+  function clearAll(){fName.value='';fStatus.value='';fLevel.value='';fOff.value='';reflow();}
+
+  /* ── paging ──────────────────────────────────────────────────────────────── */
+  pgPrev.addEventListener('click',function(){page--;renderPage();window.scrollTo(0,0)});
+  pgNext.addEventListener('click',function(){page++;renderPage();window.scrollTo(0,0)});
+
+  /* ── sorting (reorder the data, re-page) ─────────────────────────────────── */
+  document.querySelectorAll('#rtable th[data-col]').forEach(function(th){
+    function doSort(){
+      var col=+th.dataset.col;
+      sortDir=(sortCol===col)?-sortDir:1; sortCol=col;
+      document.querySelectorAll('#rtable th[data-col]').forEach(function(x){
+        x.classList.remove('sorted'); x.setAttribute('aria-sort','none');
+        var a=x.querySelector('.arr'); if(a)a.textContent='↕';
+      });
+      th.classList.add('sorted');
+      th.setAttribute('aria-sort',sortDir===1?'ascending':'descending');
+      var arr=th.querySelector('.arr'); if(arr)arr.textContent=(sortDir===1?'▲':'▼');
+      applySort(); page=0; renderPage();
+    }
+    th.addEventListener('click',doSort);
+    th.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();doSort();}
+    });
+  });
+
+  /* ── seed from URL ?q= (shareable search), then render ────────────────────── */
+  if(F.q)fName.value=F.q;
+  reflow();
 });
 </script>
 {{template "c_bot" .}}

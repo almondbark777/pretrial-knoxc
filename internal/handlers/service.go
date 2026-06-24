@@ -327,8 +327,14 @@ func vendorLabel(v string) string {
 // analyticsData summarizes the ACTIVE (open) roster — distributions by level,
 // GPS vendor, and officer caseload, plus owed/paid totals. Closed cases are
 // frozen and excluded (consistent with the open-only rosters).
+// Behind/missed sets are built once here so Stats can be assembled from
+// rosterStateCounts+len() without a second full-roster pass (#14 dedup).
 func analyticsData(clients map[string][]*compute.Client, track time.Time) models.Analytics {
-	a := models.Analytics{Stats: computeStats(clients, track)}
+	behind, missed := behindMissedSets(clients, track)
+	st := rosterStateCounts(clients)
+	st.BehindGPS = len(behind)
+	st.MissedMonth = len(missed)
+	a := models.Analytics{Stats: st}
 	lvlCount := map[int]int{}
 	vendorCount := map[string]int{}
 	officerCount := map[string]int{}

@@ -104,10 +104,10 @@ func (s *Server) Console(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	track := s.trackFrom(r)
-	courtDates, _ := db.ListAllCourtDates(s.DB)
-	violations, _ := db.ListAllViolations(s.DB)
+	courtDates, _ := db.ListAllCourtDatesLive(s.DB)
+	violations, _ := db.ListAllViolationsLive(s.DB)
 	violations = violationsSinceEpoch(violations) // aggregate tallies count from go-live
-	scheds, _ := db.ListAllScheduledCheckIns(s.DB)
+	scheds, _ := db.ListAllScheduledCheckInsLive(s.DB)
 
 	data := s.consoleBase(r, "dashboard", track)
 	data["D"] = consoleDashboard(clients, track, courtDates, violations, scheds, compute.FmtOfficer(auth.User(r)))
@@ -129,10 +129,15 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	courtByIDN := nextCourtByIDN(s.DB, track)
 
 	data := s.consoleBase(r, "clients", track)
-	rows := consoleClientRows(clients, track, courtByIDN)
+	// consoleClientRows builds the behind/missed sets internally; reuse them to
+	// assemble Stats without a second full-roster pass (#11 dedup).
+	rows, behind, missed := consoleClientRows(clients, track, courtByIDN)
 	data["RowsJSON"] = rosterRowsJSON(rows) // client-side windowing: only the visible page hits the DOM
 	data["RowCount"] = len(rows)
-	data["Stats"] = computeStats(clients, track)
+	st := rosterStateCounts(clients)
+	st.BehindGPS = len(behind)
+	st.MissedMonth = len(missed)
+	data["Stats"] = st
 	data["Officers"] = distinctOfficers(clients) // officer filter: pick any officer's caseload
 	// Initial filter state from URL params (shareable/bookmarkable — Build-Spec
 	// §5.2). The client-side filter applies these on load; KPI/alert cards and
@@ -152,25 +157,26 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	s.renderConsole(w, "console_clients.html", data)
 }
 
-// ── /console/referrals — app-entered referral data (SharePoint-list style) ────
+// ── /console/referrals — every client, most-recently-referred first ───────────
 
-// ConsoleReferrals renders every referral keyed in through the app
-// (added_defendants) as a wide, spreadsheet-style table — all captured fields
-// visible, the way a SharePoint list or Excel sheet shows them. Bulk
-// SharePoint-imported clients live on the Clients roster; this is specifically
-// the data officers entered via the New Referral wizard.
+// ConsoleReferrals lists EVERY client (bulk SharePoint-imported + app-entered),
+// sorted from the most recently referred to the oldest, as a compact, windowed
+// worklist (only the visible page hits the DOM, so the full ~3,300-client list
+// stays light on weak office PCs). The full per-client field dump is one click
+// away via Export CSV (/export/referrals.csv).
 func (s *Server) ConsoleReferrals(w http.ResponseWriter, r *http.Request) {
-	entries, err := db.ReferralEntries(s.DB)
+	clients, err := s.clients()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 	track := s.trackFrom(r)
+	rows := referralWorklist(clients)
 	data := s.consoleBase(r, "referrals", track)
-	labels, rows := referralView(entries)
-	data["Cols"] = labels
-	data["Rows"] = rows
+	data["RowsJSON"] = referralWorklistJSON(rows) // client-side windowing
 	data["Count"] = len(rows)
+	data["Officers"] = distinctOfficers(clients) // officer filter
+	data["Fq"] = r.URL.Query().Get("q")          // shareable ?q= search seed
 	s.renderConsole(w, "console_referrals.html", data)
 }
 
@@ -199,9 +205,38 @@ func (s *Server) ConsoleIntake(w http.ResponseWriter, r *http.Request) {
 	}
 	track := s.trackFrom(r)
 	data := s.consoleBase(r, "clients", track)
-	data["Officers"] = distinctOfficers(clients)
+	data["Officers"] = s.officerChoices(clients)
 	data["CSRF"] = s.Auth.CSRF(w, r) // final step creates a real client via /admin/add_defendant
 	s.renderConsole(w, "console_intake.html", data)
+}
+
+// officerChoices returns the assignable supervising officers for the intake
+// "assign" step: every staff member on the email allow-list (shown by name),
+// unioned with any officer already supervising someone in the data. This lets a
+// referral be assigned to a specific person by name even before that officer owns
+// any open client — every authorized officer is pickable (one name per person).
+func (s *Server) officerChoices(clients map[string][]*compute.Client) []string {
+	// Dedup case-insensitively so a data variant ("Carla kidwell") doesn't show
+	// alongside the allow-list's canonical casing ("Carla Kidwell"). Allow-list is
+	// iterated first, so its properly-cased name wins.
+	seen := map[string]bool{}
+	var out []string
+	add := func(name string) {
+		key := strings.ToLower(strings.TrimSpace(name))
+		if key == "" || seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, name)
+	}
+	for _, email := range s.Auth.AllowedEmails() {
+		add(compute.FmtOfficer(email))
+	}
+	for _, name := range distinctOfficers(clients) {
+		add(name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // distinctOfficers returns the sorted set of supervising-officer display names

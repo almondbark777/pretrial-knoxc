@@ -83,7 +83,11 @@ func fillTemplate(values []string) ([]byte, error) {
 			return nil, err
 		}
 		if f.Name == "word/document.xml" {
-			data = []byte(fillClusters(string(data), values))
+			filled, ferr := fillClusters(string(data), values)
+			if ferr != nil {
+				return nil, ferr
+			}
+			data = []byte(filled)
 		}
 		w, err := zw.CreateHeader(&zip.FileHeader{Name: f.Name, Method: zip.Deflate})
 		if err != nil {
@@ -103,7 +107,19 @@ func fillTemplate(values []string) ([]byte, error) {
 // next value: the first run gets the (XML-escaped) value, the other 4 are blanked.
 // A blank value leaves the whole cluster untouched (officer fills by hand). This is
 // a direct port of generate_memos.fill_clusters operating on the document XML.
-func fillClusters(xml string, values []string) string {
+//
+// #19 — The FORMTEXT mapping is positional: cluster N receives values[N]. If a Word
+// re-save changes the placeholder-run count (adds/removes a field, or splits a run),
+// the values silently misalign — the dollar arrearage could land in the GPS-type
+// blank. To make that loud instead of silent, the template MUST contain exactly
+// 5*len(values) placeholder runs forming exactly len(values) full 5-run clusters;
+// any deviation returns a descriptive error rather than a mis-filled memo. (Blank
+// values still consume their 5-run cluster, so the count check holds regardless.)
+func fillClusters(xml string, values []string) (string, error) {
+	if got := strings.Count(xml, placeholderRun); got != 5*len(values) {
+		return "", fmt.Errorf("memo template FORMTEXT mismatch: found %d placeholder runs, want %d (%d fields × 5); the template's form fields no longer align — re-export memo_template.docx",
+			got, 5*len(values), len(values))
+	}
 	var b strings.Builder
 	b.Grow(len(xml) + 256)
 	i := 0
@@ -138,7 +154,13 @@ func fillClusters(xml string, values []string) string {
 			cluster++
 		}
 	}
-	return b.String()
+	// Total-run count is exact (checked above) and clusters are whole multiples of 5,
+	// so exactly len(values) clusters are consumed. Assert it to fail loudly if the
+	// run-walk logic itself ever regresses.
+	if cluster != len(values) || posInCluster != 0 {
+		return "", fmt.Errorf("memo template FORMTEXT mismatch: consumed %d clusters (+%d partial), want %d full", cluster, posInCluster, len(values))
+	}
+	return b.String(), nil
 }
 
 func escapeXML(s string) string {

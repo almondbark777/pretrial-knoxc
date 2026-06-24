@@ -17,6 +17,14 @@ import (
 // exactly like the tracker's ci/pm feeds. Whole-person tombstones suppress it (a
 // deleted client never reaches the record page, but we filter defensively so a
 // stray row can't leak).
+//
+// Per-case tombstones (a single deleted case of a multi-case person) additionally
+// drop that case's PAYMENTS from the ledger (payments carry a reliable
+// case_number column, matched via tomb.caseSuppressed). Check-ins are NOT
+// case-filtered: they are person-scoped in the source data with no reliable case
+// column (raw check-ins share a person's whole history across cases), so a
+// per-case delete leaves all check-ins visible — only the whole-person tombstone
+// (handled above) removes them.
 
 // LedgerCheckIn is one check-in in the full history.
 type LedgerCheckIn struct {
@@ -107,6 +115,9 @@ func ClientLedger(d *sql.DB, idn string) (Ledger, error) {
 		return lg, err
 	}
 	for _, r := range rawPM {
+		if tomb.caseSuppressed(idn, r["case_number"]) {
+			continue // payment belongs to a per-case tombstoned case
+		}
 		disp, t, ok := fmtDay(r["payment_date"])
 		lg.Payments = append(lg.Payments, LedgerPayment{
 			Date: disp, Amount: r["payment_amount"], Type: r["payment_type"],
@@ -119,6 +130,9 @@ func ClientLedger(d *sql.DB, idn string) (Ledger, error) {
 		return lg, err
 	}
 	for _, r := range appPM {
+		if tomb.caseSuppressed(idn, r["case_number"]) {
+			continue // payment belongs to a per-case tombstoned case
+		}
 		disp, t, ok := fmtDay(r["payment_date"])
 		officer := norm(r["officer_that_collected_payment"])
 		if officer == "" {

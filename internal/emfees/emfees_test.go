@@ -338,3 +338,96 @@ func TestClosedExcludedWhenAnyOpen(t *testing.T) {
 		t.Fatalf("open-bearing idn must be excluded from closed: %+v", res.Closed)
 	}
 }
+
+// ── Relief-switch boundary tests (item #31) ────────────────────────────────
+// These test the equal-date edges of the relief-switch condition in the EM-fee
+// engine. The engines are already correct; these are regression guards only.
+// Run with: go test -run Relief ./internal/emfees/...
+
+// TestReliefEqualInstall: relief date == install date. The condition is
+// !reliefDate.Before(install) && reliefDate.Before(end) — with reliefDate==install
+// the first clause is satisfied (equal), so billing FREEZES at the install date.
+// The inclusive window [install, install] = 1 day. At SCRAM $15 the person owes
+// $15 = 1 day behind, which is below the 5-day threshold → drops off the list.
+// This confirms the freeze fires at the equal-install edge (engine skips correctly).
+func TestReliefEqualInstall(t *testing.T) {
+	// install 4/1, relief 4/1 (equal), asOf 5/1 → 1 day * $15 = $15 → below 5d threshold
+	gps := []map[string]string{
+		reliefRow("1", "EDGE, ONE", "@100", "OPEN", "SCRAM", "4/1/2026", "No GPS", "4/1/2026"),
+	}
+	res := Compute(gps, nil, nil, asOf("5/1/2026"))
+	// 1 day behind < 5-day threshold → excluded from the past-due list.
+	if len(res.Open) != 0 {
+		t.Fatalf("relief==install (1d behind, below threshold): open=%d want 0", len(res.Open))
+	}
+}
+
+// TestReliefEqualInstallLongWindow: same equal-install freeze, now with enough
+// days behind (> 5) carried from a prior paid run to push over the threshold.
+// Verify the freeze does apply: billing stops at install (not at asOf).
+// Use ALLIED $8 install 4/1, relief 4/1, asOf far ahead, no payments.
+// 1 day * $8 = $8 → still below threshold. Test the freeze via a second
+// reliefRow with a non-trivial back-debt: install 4/1, relief 4/8 (8 days),
+// asOf 5/1, SCRAM $15 → 8d*$15=$120 → 8d behind ≥ 5 → on list.
+// (This also covers the "freeze inside window" sub-case.)
+func TestReliefEqualInstallFreezeApplied(t *testing.T) {
+	// install 4/1, relief 4/8 (8 days in), asOf 5/1, SCRAM $15
+	// billing: [4/1..4/8] = 8 days * $15 = $120 → 8d behind (≥ 5d threshold)
+	// Without freeze: [4/1..5/1] = 31 days * $15 = $465 → very different.
+	gps := []map[string]string{
+		reliefRow("1", "EDGE, THREE", "@100", "OPEN", "SCRAM", "4/1/2026", "No GPS", "4/8/2026"),
+	}
+	res := Compute(gps, nil, nil, asOf("5/1/2026"))
+	if len(res.Open) != 1 {
+		t.Fatalf("relief mid-window: open=%d want 1", len(res.Open))
+	}
+	r := res.Open[0]
+	if r.Days != 8 || r.Owed != 120 {
+		t.Fatalf("relief mid-window freeze: days=%d owed=%v want 8/120", r.Days, r.Owed)
+	}
+	if !r.End.Equal(d("4/8/2026")) {
+		t.Fatalf("relief mid-window freeze: end=%v want 4/8/2026", r.End)
+	}
+}
+
+// TestReliefEqualAsOf: relief date == asOf. The condition requires
+// reliefDate.Before(end) — when reliefDate==asOf this is false, so the freeze
+// does NOT apply and billing runs to asOf normally.
+// 4/1 install, ALLIED $8, asOf 5/1 = 31 days * $8 = $248.
+func TestReliefEqualAsOf(t *testing.T) {
+	gps := []map[string]string{
+		reliefRow("1", "EDGE, TWO", "@200", "OPEN", "ALLIED", "4/1/2026", "No GPS", "5/1/2026"),
+	}
+	res := Compute(gps, nil, nil, asOf("5/1/2026"))
+	if len(res.Open) != 1 {
+		t.Fatalf("relief==asOf: open=%d want 1", len(res.Open))
+	}
+	r := res.Open[0]
+	// relief date == asOf: freeze excluded, billing = 31 days * $8 = $248
+	if r.Days != 31 || r.Owed != 248 {
+		t.Fatalf("relief==asOf: days=%d owed=%v want 31/248 (freeze excluded)", r.Days, r.Owed)
+	}
+}
+
+// TestComputeOwedSwitchEqualInstall: switch date == install date.
+// computeOwed: valid=true (switchDate==start → !Before && !After both pass).
+// preDays=0, switchDay charged at r+switchRate, postDays runs to end.
+// ALLIED $8 → SCRAM $15, install=4/1, switch=4/1, end=5/1 (31 days total):
+// pre=0*8=0, switch=8+15=23, post=30*15=450 → total=473 / 31 days.
+func TestComputeOwedSwitchEqualInstall(t *testing.T) {
+	days, owed := computeOwed(d("4/1/2026"), d("5/1/2026"), 8, 15, d("4/1/2026"), true)
+	if days != 31 || owed != 473 {
+		t.Fatalf("switch==install: days=%d owed=%v want 31/473", days, owed)
+	}
+}
+
+// TestComputeOwedSwitchEqualEnd: switch date == end date.
+// computeOwed: valid=true (switchDate==end → !After passes).
+// preDays = daysBetween(4/1, 5/1)=30, switch day=8+15=23, postDays=0.
+// 30*8 + 23 + 0 = 263 / 31 days.
+func TestComputeOwedSwitchEqualEnd(t *testing.T) {
+	days, owed := computeOwed(d("4/1/2026"), d("5/1/2026"), 8, 15, d("5/1/2026"), true)
+	if days != 31 || owed != 263 {
+		t.Fatalf("switch==end: days=%d owed=%v want 31/263", days, owed)
+	}
+}
