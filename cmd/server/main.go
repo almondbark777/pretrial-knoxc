@@ -211,7 +211,8 @@ func main() {
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
 	r.Get("/console/help", srv.ConsoleHelp)
-	r.Get("/console/import", srv.ImportPage) // stop-gap SharePoint CSV upload (supervisor)
+	r.Get("/console/ptr-check", srv.ConsolePtrCheck) // check the daily PTR export .txt vs live Blue Book (browser-side)
+	r.Get("/console/import", srv.ImportPage)         // stop-gap SharePoint CSV upload (supervisor)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
 
 	// Group chat: SSE stream (live messages + presence) + a CSRF-guarded send.
@@ -297,6 +298,10 @@ func main() {
 		ar.Post("/custody/add", srv.AddCustodyPeriod)       // GPS-off (in custody) span
 		ar.Post("/custody/delete", srv.DeleteCustodyPeriod) // remove a custody span
 		ar.Post("/gps/update", srv.UpdateGPS)               // edit vendor/install/switch/victim 48h
+		ar.Post("/case/update", srv.UpdateCaseInfo)         // edit imported case info + single date fields
+		ar.Post("/case/status", srv.ToggleCaseStatus)       // mark a case open / closed
+		ar.Post("/date/add", srv.AddClientDate)             // attach an additional labeled date
+		ar.Post("/date/delete", srv.DeleteClientDate)       // remove an additional date
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)

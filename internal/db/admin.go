@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS court_dates (
 );
 CREATE INDEX IF NOT EXISTS idx_courtd_idn ON court_dates(idn);
 
+CREATE TABLE IF NOT EXISTS client_dates (
+    client_date_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn            TEXT NOT NULL,
+    label          TEXT NOT NULL,
+    date_value     TEXT NOT NULL,
+    note           TEXT NULL,
+    author         TEXT NULL,
+    created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_client_dates_idn ON client_dates(idn);
+
 CREATE TABLE IF NOT EXISTS violations (
     violation_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     idn            INTEGER NOT NULL,
@@ -488,6 +499,14 @@ var overridableFields = map[string]bool{
 	"day_adjustment":      true,
 	"supervising_officer": true,
 	"defendant":           true,
+	// Imported case-info fields — editable from the record's "Edit case info"
+	// modal (officer-accessible), spliced onto the blue-book row in BuildClients.
+	"charge_type":      true,
+	"bond_amount":      true,
+	"supervision_type": true,
+	"order_from":       true,
+	"dma":              true,
+	"birthdate":        true,
 	// GPS / victim-48-hour detail — editable from the record's "Edit GPS details"
 	// modal (officer-accessible), overlaid onto the GPS record in BuildClients.
 	"gps_install_date":       true,
@@ -524,6 +543,19 @@ func IsGPSDetailField(field string) bool {
 	}
 	return false
 }
+
+// caseInfoFields is the subset of overridable fields the "Edit case info" editor
+// writes (officer-accessible) — the imported case detail plus the single-value
+// date fields. Each is spliced onto the blue-book row in BuildClients, so a set
+// value shows everywhere, survives the daily import, and is audited & reversible.
+var caseInfoFields = []string{
+	"defendant", "pretrial_level", "case_status", "supervising_officer",
+	"charge_type", "bond_amount", "supervision_type", "order_from", "dma",
+	"birthdate", "referral_date", "closed_date",
+}
+
+// CaseInfoFields returns the case-info fields the editor writes (stable order).
+func CaseInfoFields() []string { return append([]string(nil), caseInfoFields...) }
 
 // FieldOption is one overridable field for the override form's dropdown.
 type FieldOption struct {
@@ -852,6 +884,24 @@ func SetOverride(d *sql.DB, idn, field, value, by string) error {
 // Officer-accessible — these are operational monitoring details the import often
 // leaves blank, not sensitive corrections.
 func SetGPSDetails(d *sql.DB, idn string, vals map[string]string, by string) error {
+	return setOverrideFields(d, idn, gpsDetailFields, vals, by, "gps_detail_set", "gps_detail_clear")
+}
+
+// SetCaseInfo records the record-level "Edit case info" form: the imported case
+// detail (charges, bond, level, supervision/order, officer, name, DMA) plus the
+// single-value date fields (referral, closed, DOB). Stored as field overrides —
+// importer-proof, audited, reversible — and merged back into every view by
+// BuildClients. Officer-accessible (audited), matching the GPS-details editor.
+func SetCaseInfo(d *sql.DB, idn string, vals map[string]string, by string) error {
+	return setOverrideFields(d, idn, caseInfoFields, vals, by, "case_info_set", "case_info_clear")
+}
+
+// setOverrideFields upserts a map of field→value into the overrides table within
+// one transaction, restricted to the given allow-list. It writes only CHANGED
+// fields (a blank clears via DELETE, an absent key is left untouched, an
+// unchanged value is skipped so the audit log stays quiet), recording each write
+// under setAction / clearAction. Shared by SetGPSDetails and SetCaseInfo.
+func setOverrideFields(d *sql.DB, idn string, fields []string, vals map[string]string, by, setAction, clearAction string) error {
 	idn = strings.TrimSpace(idn)
 	if idn == "" {
 		return errEmptyIDN
@@ -863,7 +913,7 @@ func SetGPSDetails(d *sql.DB, idn string, vals map[string]string, by string) err
 	defer tx.Rollback()
 
 	now := compute.NowET().Format("2006-01-02 15:04:05 MST")
-	for _, field := range gpsDetailFields {
+	for _, field := range fields {
 		val, ok := vals[field]
 		if !ok {
 			continue // field not on the form this submit — leave it untouched
@@ -882,7 +932,7 @@ func SetGPSDetails(d *sql.DB, idn string, vals map[string]string, by string) err
 				return err
 			}
 			if err := WriteAudit(tx, AuditEvent{
-				User: by, Action: "gps_detail_clear", Table: "overrides", RowID: idn, Col: field, OldValue: old.String,
+				User: by, Action: clearAction, Table: "overrides", RowID: idn, Col: field, OldValue: old.String,
 			}); err != nil {
 				return err
 			}
@@ -898,7 +948,7 @@ func SetGPSDetails(d *sql.DB, idn string, vals map[string]string, by string) err
 			return err
 		}
 		if err := WriteAudit(tx, AuditEvent{
-			User: by, Action: "gps_detail_set", Table: "overrides", RowID: idn, Col: field,
+			User: by, Action: setAction, Table: "overrides", RowID: idn, Col: field,
 			OldValue: old.String, NewValue: val,
 		}); err != nil {
 			return err

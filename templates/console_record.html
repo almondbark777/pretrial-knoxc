@@ -11,6 +11,13 @@
   <div>
     <h1>{{$r.Name}}</h1>
     <div class="meta">Case {{$r.CaseNo}}{{if $r.DOB}} · DOB {{$r.DOB}}{{end}} · IDN {{$r.IDN}} · Officer: {{$r.Officer}}</div>
+    {{if gt (len $r.Cases) 1}}<div class="caseswitch" style="margin-top:6px;display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)">
+      <label for="caseSel">Viewing case</label>
+      <select id="caseSel" style="background:var(--panel-2);border:1px solid var(--line-2);color:var(--ink);border-radius:var(--r-sm);padding:4px 7px;font-size:12.5px" onchange="location.href='/console/clients/{{$r.IDN}}'+(this.value?('?case='+encodeURIComponent(this.value)):'')">
+        <option value="">All cases ({{len $r.Cases}})</option>
+        {{range $r.Cases}}<option value="{{.}}"{{if eq . $r.CaseSel}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>{{end}}
     <div class="badges">
       {{template "chip" $r.LevelChip}}
       {{template "chip" $r.StatusChip}}
@@ -21,13 +28,21 @@
     </div>
   </div>
   <div class="acts">
+    <button class="btn ghost" onclick="cmOpen('editCaseModal')" title="Edit case information">✎ Edit</button>
+    <form method="post" action="/admin/case/status" style="margin:0;display:inline">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <input type="hidden" name="status" value="{{if eq $r.EditStatus "Open"}}Closed{{else}}Open{{end}}">
+      <button class="btn ghost" type="submit" title="Mark this case {{if eq $r.EditStatus "Open"}}closed{{else}}open{{end}}">{{if eq $r.EditStatus "Open"}}Mark closed{{else}}Mark open{{end}}</button>
+    </form>
     <button class="btn ghost" onclick="cmOpen('noteModal')">+ Note</button>
-    <button class="btn ghost" onclick="cmOpen('reminderModal')">Log Reminder</button>
     <button class="btn" onclick="cmOpen('checkinModal')">Log Check-in</button>
     <div class="recmenu">
       <button class="btn ghost" id="ovbtn" aria-label="More actions">⋯</button>
       <div class="pop" id="ovpop">
         <a href="/console/calendar?idn={{$r.IDN}}" style="display:block;padding:9px 11px;border-radius:var(--r-sm);color:var(--ink);font-size:13px">View calendar</a>
+        <button type="button" onclick="cmOpen('editCaseModal')">Edit case info</button>
+        <button type="button" onclick="cmOpen('addDateModal')">Add date</button>
+        <button type="button" onclick="cmOpen('reminderModal')">Log reminder</button>
         <button type="button" onclick="cmOpen('paymentModal')">Record payment</button>
         <button type="button" onclick="cmOpen('gpsModal')">Edit GPS details</button>
         <button type="button" onclick="cmOpen('custodyModal')">Add custody dates</button>
@@ -71,6 +86,16 @@
     {{range $r.Summary}}
     <div class="field"><div class="k">{{.K}}</div><div class="v{{if .Tone}} {{.Tone}}{{end}}">{{.V}}{{if .Missing}}<span class="missing">⚠ MISSING</span>{{end}}</div></div>
     {{end}}
+  </div>
+  <div class="panel" style="margin-top:18px">
+    <div class="h"><h2>Additional dates</h2><span class="grow"></span>{{if $r.ExtraDates}}<span class="count">{{len $r.ExtraDates}}</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('addDateModal')">+ Add date</button></div>
+    <div class="body">
+      {{range $r.ExtraDates}}<div class="frow"><span class="rail info">·</span><div class="grow"><div class="t" style="font-weight:600;white-space:normal">{{.Label}}: {{.Date}}</div>{{if .Note}}<div class="t" style="white-space:normal;font-weight:400">{{.Note}}</div>{{end}}<div class="m">{{.Author}}{{if .When}} · added {{.When}}{{end}}</div></div>
+      <form method="post" action="/admin/date/delete" style="margin:0;align-self:center" onsubmit="return confirm('Remove this date?');">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <button type="submit" class="btn ghost sm" aria-label="Delete date">×</button>
+      </form></div>{{else}}<div class="emptybox" style="padding:22px"><div class="big">·</div>No additional dates yet. Use <b>+ Add date</b> to log more than one date for any field.</div>{{end}}
+    </div>
   </div>
   <div class="panel" style="margin-top:18px">
     <div class="h"><h2>Notes</h2><span class="grow"></span>{{if $r.Notes}}<span class="count">{{len $r.Notes}}</span>{{end}}<button class="btn ghost sm" style="margin-left:10px" onclick="cmOpen('noteModal')">+ Note</button></div>
@@ -544,6 +569,46 @@
       <div class="fld"><label>Victim 3 IDN</label><input type="text" name="victim_3_idn" value="{{$r.Victim3IDN}}" inputmode="numeric"></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('gpsModal')">Cancel</button><button type="submit" class="btn">Save GPS details</button></div>
+  </form>
+</div></div>
+
+{{/* ── Edit case info (any officer — imported case detail + single date fields).
+      Saves ONLY changed fields as importer-proof, audited overrides. ── */}}
+<div class="backdrop" id="editCaseModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/case/update">
+    <div class="mh"><h3>Edit Case Info</h3><button type="button" class="x" onclick="cmClose('editCaseModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">Only the fields you change are saved — each as an importer-proof, audited field override that shows everywhere and survives the daily import. Blank a field to revert it to the imported value.</p>
+      <div class="fld"><label>Name</label><input type="text" name="defendant" value="{{$r.Name}}" placeholder="LAST, FIRST"></div>
+      <div class="fld"><label>Supervising officer</label><input type="text" name="supervising_officer" value="{{$r.EditOfficer}}" list="officerList"><datalist id="officerList">{{range .Officers}}<option value="{{.}}"></option>{{end}}</datalist></div>
+      <div class="fld"><label>Pretrial level</label><select name="pretrial_level"><option value="">— choose —</option><option{{if eq $r.EditLevel "1"}} selected{{end}}>1</option><option{{if eq $r.EditLevel "2"}} selected{{end}}>2</option><option{{if eq $r.EditLevel "3"}} selected{{end}}>3</option></select></div>
+      <div class="fld"><label>Case status</label><select name="case_status"><option value="">— choose —</option><option{{if eq $r.EditStatus "Open"}} selected{{end}}>Open</option><option{{if eq $r.EditStatus "Closed"}} selected{{end}}>Closed</option></select></div>
+      <div class="fld"><label>Charges</label><input type="text" name="charge_type" value="{{$r.EditCharge}}"></div>
+      <div class="fld"><label>Bond</label><input type="text" name="bond_amount" value="{{$r.EditBond}}"></div>
+      <div class="fld"><label>Supervision type</label><input type="text" name="supervision_type" value="{{$r.EditSupervision}}" list="supList"><datalist id="supList"><option value="Pretrial"></option><option value="GPS"></option><option value="Bond Supervision"></option><option value="Bond SCRAM"></option><option value="Plea SCRAM"></option><option value="Drug Screen"></option><option value="Remote Breath / IID"></option></datalist></div>
+      <div class="fld"><label>Order from</label><select name="order_from"><option value="">— choose —</option><option{{if eq $r.EditOrderFrom "Magistrate"}} selected{{end}}>Magistrate</option><option{{if eq $r.EditOrderFrom "Judge"}} selected{{end}}>Judge</option><option{{if eq $r.EditOrderFrom "Pretrial"}} selected{{end}}>Pretrial</option></select></div>
+      <div class="fld"><label>DMA</label><input type="text" name="dma" value="{{$r.EditDMA}}"></div>
+      <div class="fld"><label>Date of birth</label><input type="text" name="birthdate" value="{{$r.EditBirthdate}}" placeholder="MM/DD/YYYY"></div>
+      <div class="fld"><label>Referral date</label><input type="date" name="referral_date" value="{{$r.RefDateInput}}"></div>
+      <div class="fld"><label>Closed date</label><input type="date" name="closed_date" value="{{$r.ClosedDateInput}}"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('editCaseModal')">Cancel</button><button type="submit" class="btn">Save case info</button></div>
+  </form>
+</div></div>
+
+{{/* ── Add an additional date (any officer — a labeled date list per profile) ── */}}
+<div class="backdrop" id="addDateModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/date/add">
+    <div class="mh"><h3>Add Date</h3><button type="button" class="x" onclick="cmClose('addDateModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">Attach an additional date under any label — keeps a running list beyond the single date fields above. Audited.</p>
+      <div class="fld"><label>Label / field</label><input type="text" name="label" required list="dateLabels" placeholder="e.g. Referral, GPS install, Court"><datalist id="dateLabels"><option value="Referral"></option><option value="GPS install"></option><option value="Device switch"></option><option value="DA emailed"></option><option value="Court"></option><option value="Custody start"></option><option value="Custody end"></option><option value="Closed"></option><option value="Bond"></option><option value="Sentencing"></option></datalist></div>
+      <div class="fld"><label>Date</label><input type="date" name="date_value" required></div>
+      <div class="fld"><label>Note <span class="muted" style="font-weight:400">(optional)</span></label><input type="text" name="note" placeholder="Optional detail"></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('addDateModal')">Cancel</button><button type="submit" class="btn">Add date</button></div>
   </form>
 </div></div>
 

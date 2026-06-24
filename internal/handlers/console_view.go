@@ -52,6 +52,23 @@ func levelChip(level int) Chip {
 	}
 }
 
+// canonStatus maps an imported case status to the editor's canonical Open/Closed
+// (or "" / the raw value when it's neither), so the edit form's status select and
+// the open/closed toggle agree on what "current" is.
+func canonStatus(s string) string {
+	s = strings.TrimSpace(s)
+	switch {
+	case s == "":
+		return ""
+	case reOpen.MatchString(s):
+		return "Open"
+	case strings.HasPrefix(strings.ToLower(s), "closed"):
+		return "Closed"
+	default:
+		return s
+	}
+}
+
 func statusChip(status string) Chip {
 	s := strings.ToLower(strings.TrimSpace(status))
 	switch {
@@ -710,6 +727,7 @@ type ConsoleRecord struct {
 	GpsBillableDays int // GPS days active minus custody days
 	PTR             compute.PTRResult
 	GPS             compute.GPSResult
+	GpsActive       bool // on GPS — drives the "vendor not set" banner on the GPS card
 	GpsWaived       bool
 	GpsInstall      string
 	Notes           []models.Note
@@ -736,8 +754,36 @@ type ConsoleRecord struct {
 	Victim3Name       string
 	Victim3IDN        string
 
+	// "Edit case info" modal prefill — current effective values so the form opens
+	// populated and saving writes overrides only for what actually changed.
+	EditLevel       string // "1"/"2"/"3"/""
+	EditStatus      string // "Open"/"Closed"/"" (canonical) for the status select
+	EditOfficer     string
+	EditCharge      string
+	EditBond        string
+	EditSupervision string
+	EditOrderFrom   string
+	EditDMA         string
+	EditBirthdate   string
+	RefDateInput    string // yyyy-mm-dd for the referral date input
+	ClosedDateInput string // yyyy-mm-dd for the closed date input
+
+	// Additional dates list (app-entered) + the multi-case switcher.
+	ExtraDates []ConsoleExtraDate
+	CaseSel    string // currently-selected case token (from ?case=); "" = default
+
 	CI   compute.CheckInResult
 	AsOf string
+}
+
+// ConsoleExtraDate is one app-entered additional date on the profile.
+type ConsoleExtraDate struct {
+	ID     int64
+	Label  string
+	Date   string // pretty display
+	Note   string
+	Author string
+	When   string // created-at, short
 }
 
 // ConsoleVictim is one victim entry shown on the record's victim panel.
@@ -760,19 +806,43 @@ type ConsoleSchedCI struct {
 
 func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Time,
 	ci compute.CheckInResult, ptr compute.PTRResult, gps compute.GPSResult,
-	extras models.DefendantExtras, lg db.Ledger) ConsoleRecord {
+	extras models.DefendantExtras, lg db.Ledger, extraDates []db.ClientDate, caseSel string) ConsoleRecord {
 
 	level, _ := compute.ParseLevel(c.Level)
 	rec := ConsoleRecord{
 		IDN: c.IDN, Name: c.Name, Initials: Initials(c.Name), CaseNo: dash(c.CaseNo),
 		Cases: caseOptions(allCases), DOB: dash(c.Birthdate), Officer: dash(c.Officer),
 		LevelChip: levelChip(level), StatusChip: statusChip(c.Status),
-		GpsWaived: compute.IsFeesWaived(c.GpNotes), CI: ci, PTR: ptr, GPS: gps,
+		GpsActive: c.GpsActive, GpsWaived: compute.IsFeesWaived(c.GpNotes), CI: ci, PTR: ptr, GPS: gps,
 		Notes: extras.Notes, Tags: extras.Tags, AsOf: track.Format("January 2, 2006"),
 	}
 	if c.ClosedOK {
 		rec.Closed = true
 		rec.ClosedDate = c.ClosedD.Format("Jan 2, 2006")
+	}
+
+	// "Edit case info" prefill — current effective values (override-or-imported).
+	rec.EditLevel = c.Level
+	rec.EditStatus = canonStatus(c.Status)
+	rec.EditOfficer = c.Officer
+	rec.EditCharge = c.ChargeType
+	rec.EditBond = c.BondAmount
+	rec.EditSupervision = c.SupervisionType
+	rec.EditOrderFrom = c.OrderFrom
+	rec.EditDMA = c.DMA
+	rec.EditBirthdate = c.Birthdate
+	if c.RefOK {
+		rec.RefDateInput = c.RefD.Format("2006-01-02")
+	}
+	if c.ClosedOK {
+		rec.ClosedDateInput = c.ClosedD.Format("2006-01-02")
+	}
+	rec.CaseSel = strings.TrimSpace(caseSel)
+	for _, d := range extraDates {
+		rec.ExtraDates = append(rec.ExtraDates, ConsoleExtraDate{
+			ID: d.ID, Label: d.Label, Date: shortStamp(d.Date), Note: d.Note,
+			Author: compute.FmtOfficer(d.Author), When: shortStamp(d.CreatedAt),
+		})
 	}
 
 	// GPS install date — already in the data (we flag it when missing); the

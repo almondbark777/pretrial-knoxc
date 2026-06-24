@@ -289,9 +289,11 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	data["R"] = consoleRecord(c, cases, track, ci, ptr, gps, extras, ledger)
+	extraDates, _ := db.ListClientDates(s.DB, idn) // app-entered additional profile dates
+	data["R"] = consoleRecord(c, cases, track, ci, ptr, gps, extras, ledger, extraDates, caseFilter)
 	data["CSRF"] = s.Auth.CSRF(w, r)
 	data["OverridableFields"] = db.OverridableFields() // for the supervisor "Correct field" modal
+	data["Officers"] = s.officerChoices(clients)       // for the "Edit case info" officer select
 	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)
 	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn) // Waive-fees vs Remove-waiver on the ⋯ menu
 	s.renderConsole(w, "console_record.html", data)

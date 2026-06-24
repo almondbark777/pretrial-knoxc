@@ -1,0 +1,481 @@
+{{template "c_top" .}}
+<div class="ptrck">
+  <div class="pchead">
+    <div>
+      <h1>PTR Export Check</h1>
+      <div class="sub">Drop the daily PTR export <b>.txt</b> (the pipe-delimited Clients pull, e.g. <code>PTR_24jun26…txt</code>). It's matched — entirely in your browser, nothing is uploaded — against the <b>live Blue Book data in this system</b> by IDN or any shared case&nbsp;#. Surfaces anyone on the export but missing from the system, anyone in the system but absent from the export, and field mismatches.</div>
+    </div>
+    <div class="loadinfo" id="bbinfo"></div>
+  </div>
+
+  <div class="drop" id="dropPtr">
+    <b>Drop PTR export (.txt) here</b>
+    <div class="hint">Pipe-delimited daily pull. Click to choose a file, or drag it on.</div>
+    <div class="stat" id="statPtr"></div>
+    <input type="file" id="filePtr" accept=".txt,text/plain" hidden>
+  </div>
+
+  <div class="controls" id="controls" style="display:none">
+    <div class="ctl">
+      <label>Search name / IDN / case #</label>
+      <input type="search" id="q" placeholder="Type to filter…">
+    </div>
+    <div class="ctl">
+      <label>Reference date/time ("now")</label>
+      <input type="datetime-local" id="ref">
+    </div>
+    <div class="ctl">
+      <label>Supervision type</label>
+      <select id="fSup"><option value="">All</option></select>
+    </div>
+    <div class="ctl">
+      <label>Level</label>
+      <select id="fLvl"><option value="">All</option><option>1</option><option>2</option><option>3</option></select>
+    </div>
+    <div class="ctl">
+      <label>In custody</label>
+      <select id="fCust"><option value="">All</option><option value="T">In custody</option><option value="F">Not in custody</option></select>
+    </div>
+    <div class="ctl">
+      <label>&nbsp;</label>
+      <button class="mini" id="dl">⬇ Export current view (CSV)</button>
+    </div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="tabs">
+      <div class="tab" data-tab="24">Last 24 Hours</div>
+      <div class="tab active" data-tab="72">Last 72 Hours</div>
+      <div class="tab" data-tab="all">Everything</div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+    <div class="count" id="count"></div>
+
+    <div class="tablewrap">
+      <table id="tbl">
+        <thead><tr id="hrow"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <b>Presence:</b>
+      <span class="badge b-both">Both</span> on the export and in the system &nbsp;·&nbsp;
+      <span class="badge b-ptr">PTR only</span> on the export, missing from the system &nbsp;·&nbsp;
+      <span class="badge b-bb">System only</span> in the system, not on today's export.
+      &nbsp; A <span class="pill-mismatch">≠</span> marks a field whose value differs between the two; amber values are the differing ones.
+      An <span class="pill-mismatch">IDN≠</span> tag means the two used different IDNs but were matched on a shared case&nbsp;#.
+      Click a KPI card to filter; click any column header to sort.
+    </div>
+  </div>
+</div>
+
+<style>
+.ptrck{max-width:1500px}
+.ptrck .pchead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.ptrck h1{margin:0 0 4px;font-size:20px;font-weight:680;color:var(--ink)}
+.ptrck .sub{color:var(--muted);font-size:12.5px;max-width:920px;line-height:1.55}
+.ptrck code{background:var(--panel-3);padding:1px 5px;border-radius:5px;font-size:12px}
+.ptrck .loadinfo{color:var(--muted);font-size:12px;white-space:nowrap;padding-top:4px}
+.ptrck .loadinfo b{color:var(--ink)}
+
+.ptrck .drop{border:2px dashed var(--line-2);border-radius:var(--r-lg);padding:22px;text-align:center;
+      background:var(--panel);transition:var(--t);cursor:pointer;margin-bottom:16px}
+.ptrck .drop:hover{border-color:var(--accent)}
+.ptrck .drop.over{border-color:var(--accent);background:var(--panel-2)}
+.ptrck .drop.loaded{border-style:solid;border-color:var(--ok)}
+.ptrck .drop b{display:block;font-size:14px;color:var(--ink)}
+.ptrck .drop .hint{color:var(--muted);font-size:12.5px;margin-top:5px}
+.ptrck .drop .stat{margin-top:9px;font-size:12.5px;color:var(--ok-ink);font-weight:600;min-height:16px}
+
+.ptrck .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;
+          background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+.ptrck .ctl label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.ptrck input,.ptrck select{background:var(--panel-2);border:1px solid var(--line-2);color:var(--ink);
+      border-radius:var(--r-sm);padding:7px 9px;font-size:13px;outline:none}
+.ptrck input:focus,.ptrck select:focus{border-color:var(--accent);box-shadow:var(--ring)}
+.ptrck input[type=search]{min-width:230px}
+
+.ptrck .tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.ptrck .tab{padding:9px 16px;border-radius:var(--r-sm);background:var(--panel);border:1px solid var(--line);
+     cursor:pointer;font-weight:600;font-size:13px;color:var(--ink)}
+.ptrck .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.ptrck .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.ptrck .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:13px 15px;cursor:pointer;transition:var(--t);box-shadow:var(--shadow-sm)}
+.ptrck .kpi:hover{border-color:var(--accent)}
+.ptrck .kpi.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.ptrck .kpi .n{font-size:26px;font-weight:720;line-height:1;color:var(--ink)}
+.ptrck .kpi .l{color:var(--muted);font-size:12px;margin-top:6px}
+.ptrck .kpi.g .n{color:var(--ok-ink)} .ptrck .kpi.a .n{color:var(--warn-ink)} .ptrck .kpi.r .n{color:var(--risk-ink)}
+.ptrck .kpi.p .n{color:var(--info-ink)} .ptrck .kpi.b .n{color:var(--accent)}
+
+.ptrck .tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:auto;max-height:64vh;box-shadow:var(--shadow-sm)}
+.ptrck table{border-collapse:collapse;width:100%;font-size:12.5px}
+.ptrck th,.ptrck td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top;color:var(--ink)}
+.ptrck th{position:sticky;top:0;background:var(--panel-3);z-index:2;cursor:pointer;font-weight:650;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.ptrck th:hover{color:var(--accent)}
+.ptrck tbody tr:hover{background:var(--panel-2)}
+.ptrck td.name{white-space:normal;min-width:170px;font-weight:600}
+
+.ptrck .badge{display:inline-block;padding:2px 8px;border-radius:var(--r-pill);font-size:11px;font-weight:700;line-height:1.5}
+.ptrck .b-both{background:var(--ok-bg);color:var(--ok-ink)}
+.ptrck .b-ptr{background:var(--warn-bg);color:var(--warn-ink)}
+.ptrck .b-bb{background:var(--info-bg);color:var(--info-ink)}
+.ptrck .cust{background:var(--risk-bg);color:var(--risk-ink);font-size:10.5px;padding:1px 6px;border-radius:5px;font-weight:700}
+.ptrck .diff{color:var(--warn-ink);font-weight:700}
+.ptrck .dual{display:flex;flex-direction:column;gap:1px}
+.ptrck .dual .s{font-size:10px;color:var(--muted)}
+.ptrck .digi{color:var(--accent);font-weight:700}
+.ptrck .muted{color:var(--muted)}
+.ptrck .empty{padding:40px;text-align:center;color:var(--muted)}
+.ptrck .pill-mismatch{margin-left:6px;background:var(--risk-bg);color:var(--risk-ink);padding:1px 7px;border-radius:var(--r-pill);font-size:10px;font-weight:700}
+.ptrck .legend{font-size:11.5px;color:var(--muted);margin:10px 2px 0;line-height:1.7}
+.ptrck .legend b{color:var(--ink)}
+.ptrck .count{color:var(--muted);font-size:12px;margin:0 0 8px 2px}
+.ptrck button.mini{background:var(--panel-2);border:1px solid var(--line-2);color:var(--ink);border-radius:var(--r-sm);padding:7px 11px;cursor:pointer;font-size:12.5px}
+.ptrck button.mini:hover{border-color:var(--accent)}
+</style>
+
+<script>
+/* PTR Export Check — live Blue Book embedded from the server; the PTR export
+   .txt is parsed + matched in the browser (nothing uploaded). Comparison logic
+   mirrors the standalone "Clients vs BB" tool. */
+(function(){
+/* ---------- live Blue Book data (server-embedded) ---------- */
+const BB_RAW = {{.BBJson}};
+
+/* ---------- code maps ---------- */
+const SUP={PTR:"Pre-Trial",G:"GPS",B:"Bond Supervision",BS:"Bond SCRAM",PS:"Plea SCRAM",DS:"Drug Screen",R:"Remote Breath / IID","":""};
+const ORD={M:"Magistrate",J:"Judge",P:"Pretrial","":""};
+function canonSup(s){
+  s=(s||"").trim().toLowerCase();
+  if(s.startsWith("pre-trial")||s==="pretrial"||s==="ptr")return "Pre-Trial";
+  if(s.startsWith("gps"))return "GPS";
+  if(s.startsWith("bond su"))return "Bond Supervision";
+  if(s.startsWith("bond sc"))return "Bond SCRAM";
+  if(s.startsWith("plea"))return "Plea SCRAM";
+  if(s.startsWith("drug"))return "Drug Screen";
+  if(s.startsWith("remote"))return "Remote Breath / IID";
+  return s?s:"";
+}
+function canonOrd(s){
+  s=(s||"").trim().toLowerCase();
+  if(s.startsWith("mag"))return "Magistrate";
+  if(s.startsWith("jud"))return "Judge";
+  if(s.startsWith("pre"))return "Pretrial";
+  return s?s:"";
+}
+
+/* ---------- date parsing ---------- */
+function parseDate(s){
+  if(!s)return null;
+  s=s.trim(); if(!s)return null;
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(!m)return null;
+  const d=new Date(+m[3],+m[1]-1,+m[2],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  return isNaN(d)?null:d;
+}
+function fmt(d){
+  if(!d)return "";
+  const p=n=>String(n).padStart(2,"0");
+  return `${p(d.getMonth()+1)}/${p(d.getDate())}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* ---------- state ---------- */
+let PTR=[], BB=[], people=new Map(), tab="72", kpiFilter="", sortCol="ref", sortDir=-1;
+
+function parsePTR(text){
+  const out=[];
+  text.split(/\r?\n/).forEach(line=>{
+    if(!line.trim())return;
+    const p=line.split("|");
+    if(p.length<11)return;
+    out.push({
+      cases:p[0].split(",").map(s=>s.trim()).filter(Boolean),
+      idn:p[1].trim(),
+      custody:p[2].trim(),
+      name:p[3].trim(),
+      aliases:p[4].trim(),
+      ref:parseDate(p[5]),
+      refRaw:p[5].trim(),
+      division:p[6].trim(),
+      sup:SUP[p[7].trim()]!==undefined?SUP[p[7].trim()]:p[7].trim(),
+      supCode:p[7].trim(),
+      level:p[8].trim(),
+      order:ORD[p[9].trim()]!==undefined?ORD[p[9].trim()]:p[9].trim(),
+      digital:p[10].trim()==="*"
+    });
+  });
+  return out;
+}
+/* Some live columns arrive as a stringified list, e.g. supervision type as
+   ["Bond Supervison"] rather than a bare label. Unwrap a single-element list (and
+   any surrounding quotes) so canonSup/canonOrd see the real value — otherwise
+   every matched person reads as a false mismatch. */
+function unwrap(s){
+  s=(s||"").trim();
+  const m=s.match(/^\[\s*['"]?(.*?)['"]?\s*\]$/);
+  return m?m[1].trim():s;
+}
+/* transform server Blue Book rows into the same internal shape parseBB produced */
+function loadBB(){
+  BB=(BB_RAW||[]).map(o=>({
+    cases:(o.cases||"").split(/[,\s]+/).map(s=>unwrap(s)).filter(Boolean),
+    idn:(o.idn||"").trim(), name:(o.name||"").trim(), level:unwrap(o.level),
+    ref:parseDate(o.ref), refRaw:(o.ref||"").trim(),
+    order:canonOrd(unwrap(o.order)), sup:canonSup(unwrap(o.sup)), supRaw:unwrap(o.sup),
+    status:(o.status||"").toUpperCase()
+  }));
+}
+
+/* ---------- merge by IDN + case number (union-find) ---------- */
+function deAt(s){ return String(s).replace(/^@+/,"").trim(); }
+function build(){
+  const recs=[...PTR.map(r=>({src:"ptr",r})),...BB.map(r=>({src:"bb",r}))];
+  const parent=recs.map((_,i)=>i);
+  const find=x=>{ while(parent[x]!==x){parent[x]=parent[parent[x]];x=parent[x];} return x; };
+  const uni=(a,b)=>{ const ra=find(a),rb=find(b); if(ra!==rb)parent[ra]=rb; };
+  const keyMap=new Map();
+  recs.forEach((o,i)=>{
+    const keys=[];
+    if(o.r.idn)keys.push("I:"+o.r.idn);
+    (o.r.cases||[]).forEach(c=>{ const k=deAt(c); if(k)keys.push("C:"+k); });
+    keys.forEach(k=>{ if(keyMap.has(k))uni(i,keyMap.get(k)); else keyMap.set(k,i); });
+  });
+  const clusters=new Map();
+  recs.forEach((o,i)=>{
+    const root=find(i);
+    if(!clusters.has(root))clusters.set(root,{ptr:[],bb:[],idnSet:new Set()});
+    const c=clusters.get(root);
+    c[o.src].push(o.r);
+    if(o.r.idn)c.idnSet.add(o.r.idn);
+  });
+  people=new Map(); let g=0;
+  clusters.forEach(c=>{
+    const idns=[...c.idnSet];
+    people.set(idns[0]||("g"+(g++)), {idns, idn:idns.join(", "), ptr:c.ptr, bb:c.bb});
+  });
+
+  people.forEach(p=>{
+    p.idnDiff = p.idns.length>1;
+    const recent=a=>a.slice().sort((x,y)=>(y.ref?+y.ref:0)-(x.ref?+x.ref:0))[0]||null;
+    p.pRow=recent(p.ptr); p.bRow=recent(p.bb);
+    p.inPtr=p.ptr.length>0; p.inBb=p.bb.length>0;
+    p.presence = p.inPtr&&p.inBb ? "both" : (p.inPtr?"ptr":"bb");
+    p.name = (p.pRow&&p.pRow.name) || (p.bRow&&p.bRow.name) || "";
+    p.custody = p.pRow?p.pRow.custody:"";
+    const dates=[...p.ptr,...p.bb].map(r=>r.ref).filter(Boolean).map(d=>+d);
+    p.newest = dates.length?new Date(Math.max(...dates)):null;
+    const pv=p.pRow,bv=p.bRow;
+    p.cmp={
+      level:{p:pv?pv.level:"",b:bv?bv.level:"",diff:p.presence==="both"&&pv&&bv&&pv.level!==bv.level&&!!(pv.level||bv.level)},
+      sup:{p:pv?pv.sup:"",b:bv?bv.sup:"",diff:p.presence==="both"&&pv&&bv&&pv.sup!==bv.sup&&!!(pv.sup||bv.sup)},
+      order:{p:pv?pv.order:"",b:bv?bv.order:"",diff:p.presence==="both"&&pv&&bv&&pv.order!==bv.order&&!!(pv.order||bv.order)},
+      ref:{p:pv?pv.ref:null,b:bv?bv.ref:null}
+    };
+    p.hasMismatch = p.cmp.level.diff||p.cmp.sup.diff||p.cmp.order.diff;
+  });
+}
+
+/* ---------- rendering ---------- */
+const els={};
+["dropPtr","filePtr","statPtr","bbinfo","controls","app","kpis","count","tbody","hrow","q","ref","fSup","fLvl","fCust","dl"]
+  .forEach(id=>els[id]=document.getElementById(id));
+
+function refDate(){ const v=els.ref.value; return v?new Date(v):new Date(); }
+function winHours(){ return tab==="24"?24 : tab==="72"?72 : Infinity; }
+function inWindow(p){
+  if(tab==="all")return true;
+  if(!p.newest)return false;
+  const ms=(+refDate())-(+p.newest);
+  return ms>=0 && ms<= winHours()*3600*1000;
+}
+
+const COLS=[
+  {k:"idn",t:"IDN"},{k:"name",t:"Name"},{k:"cases",t:"Case #s"},
+  {k:"presence",t:"Presence"},{k:"ref",t:"Referral date (PTR / System)"},
+  {k:"level",t:"Level"},{k:"sup",t:"Supervision"},{k:"order",t:"Order from"},
+  {k:"division",t:"Division (PTR)"},{k:"status",t:"Status (System)"},
+  {k:"digital",t:"Digital order (PTR)"},{k:"custody",t:"In custody"}
+];
+
+function rows(){
+  let list=[...people.values()];
+  if(tab!=="all") list=list.filter(inWindow);
+  const q=els.q.value.trim().toLowerCase();
+  if(q) list=list.filter(p=>{
+    return p.name.toLowerCase().includes(q)||p.idn.toLowerCase().includes(q)||
+      [...p.ptr,...p.bb].some(r=>r.cases.join(",").toLowerCase().includes(q));
+  });
+  if(kpiFilter==="ptr") list=list.filter(p=>p.presence==="ptr");
+  else if(kpiFilter==="bb") list=list.filter(p=>p.presence==="bb");
+  else if(kpiFilter==="both") list=list.filter(p=>p.presence==="both");
+  else if(kpiFilter==="mismatch") list=list.filter(p=>p.hasMismatch);
+  const sup=els.fSup.value, lvl=els.fLvl.value, cust=els.fCust.value;
+  if(sup) list=list.filter(p=>(p.pRow&&p.pRow.sup===sup)||(p.bRow&&p.bRow.sup===sup));
+  if(lvl) list=list.filter(p=>(p.pRow&&p.pRow.level===lvl)||(p.bRow&&p.bRow.level===lvl));
+  if(cust) list=list.filter(p=>p.custody===cust);
+
+  const dir=sortDir, key=sortCol;
+  list.sort((a,b)=>{
+    let av,bv;
+    if(key==="ref"){av=a.newest?+a.newest:0;bv=b.newest?+b.newest:0;}
+    else if(key==="presence"){av=a.presence;bv=b.presence;}
+    else if(key==="level"){av=(a.pRow&&a.pRow.level)||(a.bRow&&a.bRow.level)||"";bv=(b.pRow&&b.pRow.level)||(b.bRow&&b.bRow.level)||"";}
+    else if(key==="sup"){av=(a.pRow&&a.pRow.sup)||(a.bRow&&a.bRow.sup)||"";bv=(b.pRow&&b.pRow.sup)||(b.bRow&&b.bRow.sup)||"";}
+    else {av=a[key]||"";bv=b[key]||"";}
+    if(av<bv)return -1*dir; if(av>bv)return 1*dir; return 0;
+  });
+  return list;
+}
+
+function dualCell(c){
+  if(!c.diff){
+    const v=c.p||c.b||"";
+    return `<span>${esc(v)||'<span class="muted">—</span>'}</span>`;
+  }
+  return `<div class="dual"><span class="diff">${esc(c.p)||'—'}<span class="s">PTR</span></span>
+          <span class="diff">${esc(c.b)||'—'}<span class="s">System</span></span></div>`;
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
+
+function render(){
+  els.hrow.innerHTML=COLS.map(c=>{
+    const arrow=sortCol===c.k?(sortDir<0?" ▾":" ▴"):"";
+    return `<th data-k="${c.k}">${c.t}${arrow}</th>`;
+  }).join("");
+  els.hrow.querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k;
+    if(sortCol===k)sortDir*=-1; else {sortCol=k;sortDir=k==="ref"?-1:1;}
+    render();
+  });
+
+  const list=rows();
+  els.count.textContent=`${list.length} ${list.length===1?"person":"people"} shown`+
+     (tab!=="all"?` · referrals within ${winHours()}h of ${fmt(refDate())}`:"");
+
+  if(!list.length){ els.tbody.innerHTML=`<tr><td colspan="${COLS.length}" class="empty">No records match.</td></tr>`; return; }
+
+  els.tbody.innerHTML=list.map(p=>{
+    const bcls={both:"b-both",ptr:"b-ptr",bb:"b-bb"}[p.presence];
+    const blabel={both:"Both",ptr:"PTR only",bb:"System only"}[p.presence];
+    const refCell=()=>{
+      const pd=p.cmp.ref.p,bd=p.cmp.ref.b;
+      const same=pd&&bd&&Math.abs(+pd-+bd)<60000;
+      if(p.presence!=="both"){ const d=pd||bd; return d?fmt(d):'<span class="muted">—</span>'; }
+      if(same) return fmt(pd);
+      return `<div class="dual"><span class="${pd&&bd?'diff':''}">${pd?fmt(pd):'—'}<span class="s">PTR</span></span>
+              <span class="${pd&&bd?'diff':''}">${bd?fmt(bd):'—'}<span class="s">System</span></span></div>`;
+    };
+    return `<tr>
+      <td>${esc(p.idn)}${p.idnDiff?'<span class="pill-mismatch" title="IDNs differ between files — matched on a shared case #">IDN≠</span>':''}</td>
+      <td class="name">${esc(p.name)}</td>
+      <td class="muted">${esc([...new Set([...(p.pRow?p.pRow.cases:[]),...(p.bRow?p.bRow.cases:[])])].slice(0,6).join(", "))}</td>
+      <td><span class="badge ${bcls}">${blabel}</span>${p.hasMismatch?'<span class="pill-mismatch">≠</span>':''}</td>
+      <td>${refCell()}</td>
+      <td>${dualCell(p.cmp.level)}</td>
+      <td>${dualCell(p.cmp.sup)}</td>
+      <td>${dualCell(p.cmp.order)}</td>
+      <td>${esc(p.pRow?p.pRow.division:"")||'<span class="muted">—</span>'}</td>
+      <td>${esc(p.bRow?p.bRow.status:"")||'<span class="muted">—</span>'}</td>
+      <td>${p.pRow&&p.pRow.digital?'<span class="digi">Yes</span>':'<span class="muted">No</span>'}</td>
+      <td>${p.custody==="T"?'<span class="cust">IN CUSTODY</span>':'<span class="muted">No</span>'}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderKpis(){
+  const all=[...people.values()];
+  const scope = tab!=="all"? all.filter(inWindow) : all;
+  const c={both:0,ptr:0,bb:0,mismatch:0};
+  scope.forEach(p=>{c[p.presence]++; if(p.hasMismatch)c.mismatch++;});
+  const cards=[
+    {k:"",cls:"b",n:scope.length,l:tab!=="all"?"In window (people)":"Total people"},
+    {k:"both",cls:"g",n:c.both,l:"In both"},
+    {k:"ptr",cls:"a",n:c.ptr,l:"On PTR export only (not in system)"},
+    {k:"bb",cls:"p",n:c.bb,l:"In system only (not on export)"},
+    {k:"mismatch",cls:"r",n:c.mismatch,l:"Field mismatches"}
+  ];
+  els.kpis.innerHTML=cards.map(c=>`<div class="kpi ${c.cls} ${kpiFilter===c.k?'sel':''}" data-k="${c.k}">
+     <div class="n">${c.n}</div><div class="l">${c.l}</div></div>`).join("");
+  els.kpis.querySelectorAll(".kpi").forEach(el=>el.onclick=()=>{
+    kpiFilter = kpiFilter===el.dataset.k ? "" : el.dataset.k; renderKpis(); render();
+  });
+}
+
+function refreshSupFilter(){
+  const s=new Set();
+  people.forEach(p=>{ if(p.pRow&&p.pRow.sup)s.add(p.pRow.sup); if(p.bRow&&p.bRow.sup)s.add(p.bRow.sup); });
+  els.fSup.innerHTML='<option value="">All</option>'+[...s].sort().map(v=>`<option>${esc(v)}</option>`).join("");
+}
+
+function refreshAll(){ renderKpis(); render(); }
+
+/* ---------- export ---------- */
+els.dl.onclick=()=>{
+  const list=rows();
+  const head=["IDN","Name","Cases","Presence","Mismatch","Referral PTR","Referral System","Level PTR","Level System","Sup PTR","Sup System","Order PTR","Order System","Division","Status System","Digital","In Custody"];
+  const lines=[head];
+  list.forEach(p=>lines.push([
+    p.idn,p.name,
+    [...new Set([...(p.pRow?p.pRow.cases:[]),...(p.bRow?p.bRow.cases:[])])].join(" "),
+    {both:"Both",ptr:"PTR only",bb:"System only"}[p.presence],p.hasMismatch?"YES":"",
+    p.cmp.ref.p?fmt(p.cmp.ref.p):"",p.cmp.ref.b?fmt(p.cmp.ref.b):"",
+    p.cmp.level.p,p.cmp.level.b,p.cmp.sup.p,p.cmp.sup.b,p.cmp.order.p,p.cmp.order.b,
+    p.pRow?p.pRow.division:"",p.bRow?p.bRow.status:"",p.pRow&&p.pRow.digital?"Yes":"No",
+    p.custody==="T"?"Yes":"No"
+  ]));
+  const csv=lines.map(r=>r.map(c=>`"${String(c==null?"":c).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`ptr_check_${tab}.csv`;
+  a.click();
+};
+
+/* ---------- file wiring ---------- */
+els.dropPtr.onclick=()=>els.filePtr.click();
+els.dropPtr.ondragover=e=>{e.preventDefault();els.dropPtr.classList.add("over");};
+els.dropPtr.ondragleave=()=>els.dropPtr.classList.remove("over");
+els.dropPtr.ondrop=e=>{e.preventDefault();els.dropPtr.classList.remove("over"); if(e.dataTransfer.files[0])load(e.dataTransfer.files[0]);};
+els.filePtr.onchange=()=>{ if(els.filePtr.files[0])load(els.filePtr.files[0]); };
+
+function load(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      PTR=parsePTR(fr.result);
+      els.statPtr.textContent=`✓ ${file.name} — ${PTR.length} rows`;
+      els.dropPtr.classList.add("loaded");
+      ready();
+    }catch(err){ els.statPtr.style.color="var(--risk-ink)"; els.statPtr.textContent="Error: "+err.message; }
+  };
+  fr.readAsText(file);
+}
+function ready(){
+  build();
+  if(!els.ref.value){
+    const n=new Date(); n.setMinutes(n.getMinutes()-n.getTimezoneOffset());
+    els.ref.value=n.toISOString().slice(0,16);
+  }
+  refreshSupFilter();
+  els.controls.style.display="flex";
+  els.app.style.display="block";
+  refreshAll();
+}
+
+document.querySelectorAll(".ptrck .tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".ptrck .tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active"); tab=t.dataset.tab; refreshAll();
+});
+["q","ref","fSup","fLvl","fCust"].forEach(id=>{
+  if(els[id]) els[id].addEventListener("input",()=>refreshAll());
+});
+
+/* init: load the live Blue Book side now; the table appears once a PTR file is dropped */
+loadBB();
+els.bbinfo.innerHTML=`<b>${BB.length.toLocaleString()}</b> system records loaded`;
+})();
+</script>
+{{template "c_bot" .}}

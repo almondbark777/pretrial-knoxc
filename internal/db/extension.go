@@ -140,6 +140,58 @@ func DeleteCourtDate(d *sql.DB, id int64, by string) error {
 	return txDeleteByID(d, "court_dates", "court_date_id", id, by, "courtdate_delete")
 }
 
+// ── Client dates (additional dates per profile) ─────────────────────────────
+
+// ClientDate is one app-entered extra date attached to a client's profile under
+// a free-text label (e.g. "Referral", "GPS install"). It lets officers keep more
+// than one date for any field on the record — importer-proof and audited.
+type ClientDate struct {
+	ID        int64
+	IDN       string
+	Label     string
+	Date      string
+	Note      string
+	Author    string
+	CreatedAt string
+}
+
+// ListClientDates returns a client's additional dates, newest date first.
+func ListClientDates(d *sql.DB, idn string) ([]ClientDate, error) {
+	rows, err := d.Query(
+		`SELECT client_date_id, IFNULL(idn,''), label, date_value, IFNULL(note,''),
+		        IFNULL(author,''), IFNULL(created_at,'')
+		   FROM client_dates WHERE idn = ? ORDER BY date_value DESC, client_date_id DESC`, idn)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ClientDate
+	for rows.Next() {
+		var c ClientDate
+		if err := rows.Scan(&c.ID, &c.IDN, &c.Label, &c.Date, &c.Note, &c.Author, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// AddClientDate attaches a labeled date to a client's profile.
+func AddClientDate(d *sql.DB, idn, label, dateValue, note, author string) error {
+	idn, label, dateValue = strings.TrimSpace(idn), strings.TrimSpace(label), strings.TrimSpace(dateValue)
+	if idn == "" || label == "" || dateValue == "" {
+		return errEmptyField
+	}
+	return txAddWithAudit(d, AuditEvent{User: author, Action: "client_date_add", Table: "client_dates", RowID: idn, Col: label, NewValue: dateValue},
+		`INSERT INTO client_dates (idn, label, date_value, note, author) VALUES (?, ?, ?, ?, ?)`,
+		idn, label, dateValue, nz(note), nz(author))
+}
+
+// DeleteClientDate removes an app-entered profile date.
+func DeleteClientDate(d *sql.DB, id int64, by string) error {
+	return txDeleteByID(d, "client_dates", "client_date_id", id, by, "client_date_delete")
+}
+
 // ── Reminders ─────────────────────────────────────────────────────────────
 
 func ListReminders(d *sql.DB, idn string) ([]models.Reminder, error) {

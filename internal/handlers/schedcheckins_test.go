@@ -67,7 +67,7 @@ func TestConsoleRecordScheduledStates(t *testing.T) {
 		{ID: 3, For: "2026-06-20"},                    // future → neither
 	}}
 	rec := consoleRecord(c, []*compute.Client{c}, track,
-		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras, db.Ledger{})
+		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras, db.Ledger{}, nil, "")
 
 	if len(rec.Scheduled) != 3 {
 		t.Fatalf("Scheduled rows = %d, want 3", len(rec.Scheduled))
@@ -106,7 +106,7 @@ func TestConsoleRecordRowIDs(t *testing.T) {
 			CreatedAt: "2026-06-08 09:00:00 EDT"}},
 	}
 	rec := consoleRecord(c, []*compute.Client{c}, track,
-		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras, db.Ledger{})
+		compute.CheckInResult{}, compute.PTRResult{}, compute.GPSResult{}, extras, db.Ledger{}, nil, "")
 
 	if len(rec.LoggedCheckIns) != 1 || rec.LoggedCheckIns[0].ID != 41 {
 		t.Errorf("LoggedCheckIns ID = %+v, want 41", rec.LoggedCheckIns)

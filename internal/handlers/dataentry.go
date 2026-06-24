@@ -141,6 +141,98 @@ func (s *Server) UpdateGPS(w http.ResponseWriter, r *http.Request) {
 	s.afterWrite(w, r, back, err, "GPS details updated.")
 }
 
+// repClient returns a representative cached client row for an idn (open case
+// preferred), or nil. Used by the case-info editor to read the current effective
+// values so it overrides ONLY the fields the officer actually changed.
+func (s *Server) repClient(idn string) *compute.Client {
+	clients, err := s.clients()
+	if err != nil {
+		return nil
+	}
+	cs := clients[strings.TrimSpace(idn)]
+	if len(cs) == 0 {
+		return nil
+	}
+	return openRep(cs)
+}
+
+// UpdateCaseInfo records the record-level "Edit case info" form: the imported
+// case detail (charges, bond, level, supervision/order, officer, name, DMA) plus
+// the single-value date fields (referral, closed, DOB). Only fields that changed
+// from the current value are written — each as an importer-proof, audited field
+// override — so saving the form never blankets the record in overrides.
+// Officer-accessible. POST /admin/case/update
+func (s *Server) UpdateCaseInfo(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	idn, back := profileBack(r)
+	cur := s.repClient(idn)
+	vals := map[string]string{}
+	changed := func(field, submitted, effective string) {
+		if strings.TrimSpace(submitted) != strings.TrimSpace(effective) {
+			vals[field] = submitted
+		}
+	}
+	var name, level, status, officer, charge, bond, sup, order, dma, dob, refIso, closedIso string
+	if cur != nil {
+		name, level = cur.Name, cur.Level
+		status = canonStatus(cur.Status)
+		officer = cur.Officer
+		charge, bond, sup = cur.ChargeType, cur.BondAmount, cur.SupervisionType
+		order, dma, dob = cur.OrderFrom, cur.DMA, cur.Birthdate
+		if cur.RefOK {
+			refIso = cur.RefD.Format("2006-01-02")
+		}
+		if cur.ClosedOK {
+			closedIso = cur.ClosedD.Format("2006-01-02")
+		}
+	}
+	changed("defendant", r.FormValue("defendant"), name)
+	changed("pretrial_level", r.FormValue("pretrial_level"), level)
+	changed("case_status", r.FormValue("case_status"), status)
+	changed("supervising_officer", r.FormValue("supervising_officer"), officer)
+	changed("charge_type", r.FormValue("charge_type"), charge)
+	changed("bond_amount", r.FormValue("bond_amount"), bond)
+	changed("supervision_type", r.FormValue("supervision_type"), sup)
+	changed("order_from", r.FormValue("order_from"), order)
+	changed("dma", r.FormValue("dma"), dma)
+	changed("birthdate", r.FormValue("birthdate"), dob)
+	changed("referral_date", r.FormValue("referral_date"), refIso)
+	changed("closed_date", r.FormValue("closed_date"), closedIso)
+	err := db.SetCaseInfo(s.DB, idn, vals, auth.User(r))
+	s.afterWrite(w, r, back, err, "Case info updated.")
+}
+
+// ToggleCaseStatus flips a case open/closed in one click — the target status is
+// posted and written as a case_status override (importer-proof, audited).
+// Officer-accessible. POST /admin/case/status
+func (s *Server) ToggleCaseStatus(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	idn, back := profileBack(r)
+	status := strings.TrimSpace(r.FormValue("status"))
+	if status != "Open" && status != "Closed" {
+		redirectMsg(w, r, back, "Invalid status.")
+		return
+	}
+	err := db.SetOverride(s.DB, idn, "case_status", status, auth.User(r))
+	s.afterWrite(w, r, back, err, "Case marked "+strings.ToLower(status)+".")
+}
+
+// AddClientDate attaches a labeled date to the profile's "additional dates" list
+// — lets officers keep more than one date for any field. POST /admin/date/add
+func (s *Server) AddClientDate(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	idn, back := profileBack(r)
+	err := db.AddClientDate(s.DB, idn, r.FormValue("label"), r.FormValue("date_value"), r.FormValue("note"), auth.User(r))
+	s.afterWrite(w, r, back, err, "Date added.")
+}
+
+// DeleteClientDate removes an app-entered profile date. POST /admin/date/delete
+func (s *Server) DeleteClientDate(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	_, back := profileBack(r)
+	s.afterWrite(w, r, back, db.DeleteClientDate(s.DB, formID(r), auth.User(r)), "Date removed.")
+}
+
 // AddPayment records a payment on an existing client's profile.
 // POST /admin/payment/add
 func (s *Server) AddPayment(w http.ResponseWriter, r *http.Request) {
