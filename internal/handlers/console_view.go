@@ -152,7 +152,7 @@ type ConsoleDashboard struct {
 // app's extension data (may be empty on a fresh DB — that's a real zero).
 func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 	courtDates []models.CourtDate, violations []models.Violation,
-	scheds []models.ScheduledCheckIn, officer string) ConsoleDashboard {
+	scheds []models.ScheduledCheckIn, officer string, reopened map[string]time.Time) ConsoleDashboard {
 
 	d := ConsoleDashboard{AsOf: track.Format("Monday, January 2, 2006")}
 	officerLC := strings.ToLower(strings.TrimSpace(officer))
@@ -238,7 +238,15 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 	cutoff := track.AddDate(0, 0, -2) // 48h window (referral dates are day-granular)
 	for _, cases := range clients {
 		c := openRep(cases)
-		if c == nil || !c.RefOK || c.RefD.Before(cutoff) || c.RefD.After(track) {
+		if c == nil {
+			continue
+		}
+		fresh := c.RefOK && !c.RefD.Before(cutoff) && !c.RefD.After(track)
+		reopenAt, wasReopened := reopened[c.IDN]
+		// Show a client in the feed if it was referred within the window OR was
+		// manually reopened within it — a reopen is fresh activity worth surfacing
+		// even though the referral date is old.
+		if !fresh && !wasReopened {
 			continue
 		}
 		lvl, _ := compute.ParseLevel(c.Level)
@@ -256,10 +264,16 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 				refDisp = c.RefDT.Format("Jan 2, 3:04 PM")
 			}
 		}
+		context, icon := "Referred "+refDisp+" · "+officer, "＋"
+		// A recently reopened case (not also a brand-new referral) shows as reopened
+		// activity, sorted by when it was reopened.
+		if wasReopened && !fresh {
+			context, icon, sortKey = "Reopened "+reopenAt.Format("Jan 2")+" · "+officer, "↻", reopenAt
+		}
 		d.Referrals = append(d.Referrals, ConsoleReferral{
 			IDN: c.IDN, Name: c.Name,
-			Context: "Referred " + refDisp + " · " + officer,
-			Chip:    levelChip(lvl), Icon: "＋",
+			Context: context,
+			Chip:    levelChip(lvl), Icon: icon,
 			Mine: mine(c.Officer), ref: sortKey, GpsActive: c.GpsActive,
 		})
 	}

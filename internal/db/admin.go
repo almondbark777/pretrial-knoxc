@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"strconv"
 	"strings"
+	"time"
 
 	"pretrial-knoxc/internal/compute"
 )
@@ -579,6 +580,53 @@ func OverridableFields() []FieldOption {
 
 // IsOverridable reports whether field is on the override allow-list.
 func IsOverridable(field string) bool { return overridableFields[strings.TrimSpace(field)] }
+
+// ReopenedSince returns idn → reopen-time for case_status overrides set to an
+// open value on/after cutoff — i.e. cases an officer manually reopened recently.
+// The dashboard's new-referrals feed folds these in so a reopened case surfaces
+// as fresh activity even though its referral date is old.
+func ReopenedSince(d *sql.DB, cutoff time.Time) (map[string]time.Time, error) {
+	out := map[string]time.Time{}
+	if !tableExists(d, "overrides") {
+		return out, nil
+	}
+	rows, err := d.Query(`SELECT idn, value, IFNULL(updated_at, '') FROM overrides WHERE field = 'case_status'`)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var idn, value, updated string
+		if err := rows.Scan(&idn, &value, &updated); err != nil {
+			return out, err
+		}
+		idn = strings.TrimSpace(idn)
+		if idn == "" || !strings.Contains(strings.ToLower(value), "open") {
+			continue // only "Open"-ish statuses count as a reopen ("Closed" has no "open")
+		}
+		t, ok := parseStamp(updated)
+		if !ok || t.Before(cutoff) {
+			continue
+		}
+		out[idn] = t
+	}
+	return out, rows.Err()
+}
+
+// parseStamp reads an overrides.updated_at stamp ("2006-01-02 15:04:05 MST",
+// written by SetOverride), falling back to a date-only parse.
+func parseStamp(s string) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) >= 19 {
+		if t, err := time.Parse("2006-01-02 15:04:05", s[:19]); err == nil {
+			return t, true
+		}
+	}
+	if dt, ok := compute.ParseDay(s); ok {
+		return dt, true
+	}
+	return time.Time{}, false
+}
 
 // ── Audit log ───────────────────────────────────────────────────────────────
 

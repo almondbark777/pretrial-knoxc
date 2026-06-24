@@ -30,7 +30,7 @@ func TestConsoleDashboardScheduledCheckIn(t *testing.T) {
 		return nil
 	}
 
-	d := consoleDashboard(clients, track, nil, nil, scheds, "Alice Smith")
+	d := consoleDashboard(clients, track, nil, nil, scheds, "Alice Smith", nil)
 	it := schedItem(d)
 	if it == nil {
 		t.Fatal("expected today's booking on the schedule")
@@ -47,7 +47,7 @@ func TestConsoleDashboardScheduledCheckIn(t *testing.T) {
 	if scheduled != 1 {
 		t.Errorf("scheduled items on dashboard = %d, want 1 (tomorrow's must not show)", scheduled)
 	}
-	if it2 := schedItem(consoleDashboard(clients, track, nil, nil, scheds, "Bob Jones")); it2 == nil || it2.Mine {
+	if it2 := schedItem(consoleDashboard(clients, track, nil, nil, scheds, "Bob Jones", nil)); it2 == nil || it2.Mine {
 		t.Errorf("booking should not be Mine for a different officer, got %+v", it2)
 	}
 }

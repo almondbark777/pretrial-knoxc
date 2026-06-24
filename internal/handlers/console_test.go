@@ -26,7 +26,7 @@ func TestConsoleDashboardParity(t *testing.T) {
 		t.Fatalf("BuildClients: %v", err)
 	}
 	stats := computeStats(clients, adminTrack)
-	dash := consoleDashboard(clients, adminTrack, nil, nil, nil, "")
+	dash := consoleDashboard(clients, adminTrack, nil, nil, nil, "", nil)
 
 	if dash.KPIs.ActiveClients != stats.Open {
 		t.Errorf("ActiveClients = %d, want Open %d", dash.KPIs.ActiveClients, stats.Open)
@@ -74,7 +74,7 @@ func TestConsoleDashboardCourtMine(t *testing.T) {
 	}
 
 	// Signed in as the supervising officer → the court item is "mine".
-	mineCi := courtItem(consoleDashboard(clients, track, courts, nil, nil, "Alice Smith"))
+	mineCi := courtItem(consoleDashboard(clients, track, courts, nil, nil, "Alice Smith", nil))
 	if mineCi == nil {
 		t.Fatal("expected a court schedule item")
 	}
@@ -82,7 +82,7 @@ func TestConsoleDashboardCourtMine(t *testing.T) {
 		t.Error("court item should be Mine for the supervising officer")
 	}
 	// Signed in as a different officer → not mine.
-	otherCi := courtItem(consoleDashboard(clients, track, courts, nil, nil, "Bob Jones"))
+	otherCi := courtItem(consoleDashboard(clients, track, courts, nil, nil, "Bob Jones", nil))
 	if otherCi == nil {
 		t.Fatal("expected a court schedule item")
 	}
@@ -107,10 +107,10 @@ func TestConsoleDashboardReferralMine(t *testing.T) {
 		}
 		return nil
 	}
-	if a := refRow(consoleDashboard(clients, track, nil, nil, nil, "Alice Smith")); a == nil || !a.Mine {
+	if a := refRow(consoleDashboard(clients, track, nil, nil, nil, "Alice Smith", nil)); a == nil || !a.Mine {
 		t.Errorf("referral should be Mine for the supervising officer, got %+v", a)
 	}
-	if a := refRow(consoleDashboard(clients, track, nil, nil, nil, "Bob Jones")); a == nil || a.Mine {
+	if a := refRow(consoleDashboard(clients, track, nil, nil, nil, "Bob Jones", nil)); a == nil || a.Mine {
 		t.Errorf("referral should not be Mine for a different officer, got %+v", a)
 	}
 	// A referral older than 24 hours (in day terms) must NOT appear in the feed.
@@ -118,7 +118,7 @@ func TestConsoleDashboardReferralMine(t *testing.T) {
 		"2": {{IDN: "2", Name: "Old Referral", Status: "Open", Officer: "Alice Smith",
 			Level: "2", RefD: compute.Noon(2026, 5, 1), RefOK: true}},
 	}
-	if d := consoleDashboard(stale, track, nil, nil, nil, ""); len(d.Referrals) != 0 {
+	if d := consoleDashboard(stale, track, nil, nil, nil, "", nil); len(d.Referrals) != 0 {
 		t.Errorf("stale referral leaked into the 24h feed: %d rows", len(d.Referrals))
 	}
 }
@@ -349,7 +349,7 @@ func TestConsoleDashboardReferralCap(t *testing.T) {
 		clients[idn] = []*compute.Client{{IDN: idn, Name: "Client " + idn, Status: "Open",
 			Level: "1", RefD: track, RefOK: true}} // all referred today
 	}
-	d := consoleDashboard(clients, track, nil, nil, nil, "")
+	d := consoleDashboard(clients, track, nil, nil, nil, "", nil)
 	if len(d.Referrals) != 40 {
 		t.Errorf("referrals shown = %d, want capped at 40", len(d.Referrals))
 	}
