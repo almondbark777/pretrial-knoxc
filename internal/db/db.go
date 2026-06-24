@@ -109,7 +109,45 @@ func toNum(s string) float64 {
 	return f
 }
 
-func norm(s string) string { return strings.TrimSpace(s) }
+// norm trims an imported value and strips the stringified-list wrapper some
+// SharePoint / Power Automate multi-choice columns arrive in — e.g.
+// `["Pre-Trial"]` → `Pre-Trial`, `["#4 SCRAM","#7 Supervision"]` →
+// `#4 SCRAM, #7 Supervision`. A plain value (the common case) is returned as-is.
+func norm(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && s[0] == '[' && s[len(s)-1] == ']' {
+		s = unwrapList(s)
+	}
+	return s
+}
+
+// unwrapList flattens a `["a","b"]`-style import artifact into `a, b` (quotes
+// stripped, empties dropped). Splitting on comma is safe because the parts are
+// re-joined with ", ", so a comma inside a value reproduces the same display.
+func unwrapList(s string) string {
+	inner := strings.TrimSpace(s[1 : len(s)-1])
+	if inner == "" {
+		return ""
+	}
+	var out []string
+	for _, p := range strings.Split(inner, ",") {
+		if p = strings.Trim(strings.TrimSpace(p), `"'`); strings.TrimSpace(p) != "" {
+			out = append(out, strings.TrimSpace(p))
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+// canonSupervisionType folds the legacy "Pre-Trial" / "Pre Trial" import spelling
+// to the app's "Pretrial" (the supervision-type dropdown value), so existing data
+// matches what officers pick. Any other value passes through unchanged.
+func canonSupervisionType(s string) string {
+	flat := strings.ToLower(strings.NewReplacer("-", "", " ", "").Replace(strings.TrimSpace(s)))
+	if flat == "pretrial" {
+		return "Pretrial"
+	}
+	return s
+}
 
 // BuildClients joins the four raw_* tables into compute.Client objects, grouped
 // by IDN. Mirrors the canonical buildClients(): one client object PER blue_book
@@ -280,7 +318,7 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 
 			ChargeType:      norm(r["charge_type"]),
 			BondAmount:      norm(r["bond_amount"]),
-			SupervisionType: norm(r["supervision_type"]),
+			SupervisionType: canonSupervisionType(norm(r["supervision_type"])),
 			OrderFrom:       norm(r["order_from"]),
 			DMA:             norm(r["dma"]),
 			Birthdate:       norm(r["birthdate"]),
