@@ -277,12 +277,27 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
           <div class="fld"><label>48-hour notification (date &amp; time)</label><input type="datetime-local" name="victim_time_48" value="{{$r.Victim48Input}}"></div>
           <div class="fld"><label>Victim accept / deny GPS</label><select name="victim_accept_deny_gps"><option value="">— choose —</option><option{{if eq $r.VictimAcceptDeny "Accept"}} selected{{end}}>Accept</option><option{{if eq $r.VictimAcceptDeny "Deny"}} selected{{end}}>Deny</option><option{{if eq $r.VictimAcceptDeny "Pending"}} selected{{end}}>Pending</option></select></div>
-          <div class="fld"><label>Victim</label><input type="text" name="victim" value="{{$r.VictimName}}" placeholder="LAST, FIRST"></div>
-          <div class="fld"><label>Victim IDN</label><input type="text" name="victim_idn" value="{{$r.VictimIDN}}" inputmode="numeric"></div>
-          <div class="fld"><label>Victim 2</label><input type="text" name="victim_2" value="{{$r.Victim2Name}}" placeholder="LAST, FIRST"></div>
-          <div class="fld"><label>Victim 2 IDN</label><input type="text" name="victim_2_idn" value="{{$r.Victim2IDN}}" inputmode="numeric"></div>
-          <div class="fld"><label>Victim 3</label><input type="text" name="victim_3" value="{{$r.Victim3Name}}" placeholder="LAST, FIRST"></div>
-          <div class="fld"><label>Victim 3 IDN</label><input type="text" name="victim_3_idn" value="{{$r.Victim3IDN}}" inputmode="numeric"></div>
+        </div>
+        <div style="margin-top:14px">
+          <label style="display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Victims <span style="text-transform:none;font-weight:400">— add or remove as needed (up to 3)</span></label>
+          <div id="victimRows">
+            <div class="victim-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <input class="v-name" type="text" name="victim" value="{{$r.VictimName}}" placeholder="Victim — LAST, FIRST" style="flex:2;min-width:0">
+              <input class="v-idn" type="text" name="victim_idn" value="{{$r.VictimIDN}}" placeholder="IDN" inputmode="numeric" style="flex:1;min-width:0">
+              <button type="button" class="btn ghost sm v-remove" aria-label="Remove victim" title="Remove this victim">×</button>
+            </div>
+            <div class="victim-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <input class="v-name" type="text" name="victim_2" value="{{$r.Victim2Name}}" placeholder="Victim — LAST, FIRST" style="flex:2;min-width:0">
+              <input class="v-idn" type="text" name="victim_2_idn" value="{{$r.Victim2IDN}}" placeholder="IDN" inputmode="numeric" style="flex:1;min-width:0">
+              <button type="button" class="btn ghost sm v-remove" aria-label="Remove victim" title="Remove this victim">×</button>
+            </div>
+            <div class="victim-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <input class="v-name" type="text" name="victim_3" value="{{$r.Victim3Name}}" placeholder="Victim — LAST, FIRST" style="flex:2;min-width:0">
+              <input class="v-idn" type="text" name="victim_3_idn" value="{{$r.Victim3IDN}}" placeholder="IDN" inputmode="numeric" style="flex:1;min-width:0">
+              <button type="button" class="btn ghost sm v-remove" aria-label="Remove victim" title="Remove this victim">×</button>
+            </div>
+          </div>
+          <button type="button" class="btn ghost sm" id="addVictimBtn">+ Add victim</button>
         </div>
         <div style="margin-top:16px"><button type="submit" class="btn">Save GPS details</button></div>
       </form>
@@ -689,6 +704,31 @@ document.addEventListener('DOMContentLoaded',function(){
   if(ob){ob.addEventListener('click',function(e){e.stopPropagation();op.classList.toggle('show')});
     document.addEventListener('click',function(){op.classList.remove('show')});
     op.addEventListener('click',function(e){e.stopPropagation();op.classList.remove('show')});}
+
+  // GPS victims — dynamic add/remove over the 3 fixed slots. All three name/idn
+  // pairs always submit (blank when unused), so removing one clears that slot.
+  // Removing compacts the values up so there are no gaps.
+  (function(){
+    var wrap=document.getElementById('victimRows'); if(!wrap)return;
+    var rows=[].slice.call(wrap.querySelectorAll('.victim-row'));
+    var addBtn=document.getElementById('addVictimBtn');
+    function filled(r){return (r.querySelector('.v-name').value.trim()||r.querySelector('.v-idn').value.trim())!=='';}
+    function getVals(){return rows.map(function(r){return {n:r.querySelector('.v-name').value,d:r.querySelector('.v-idn').value};});}
+    function setVals(a){rows.forEach(function(r,k){r.querySelector('.v-name').value=a[k]?a[k].n:'';r.querySelector('.v-idn').value=a[k]?a[k].d:'';});}
+    var shown=1; rows.forEach(function(r,i){if(filled(r))shown=i+1;});
+    function render(){
+      rows.forEach(function(r,i){r.style.display=i<shown?'flex':'none';});
+      if(addBtn)addBtn.style.display=shown<rows.length?'':'none';
+    }
+    rows.forEach(function(r,i){
+      r.querySelector('.v-remove').addEventListener('click',function(){
+        var a=getVals(); a.splice(i,1); a.push({n:'',d:''}); setVals(a);
+        shown=Math.max(1,shown-1); render();
+      });
+    });
+    if(addBtn)addBtn.addEventListener('click',function(){shown=Math.min(rows.length,shown+1);render();});
+    render();
+  })();
 });
 </script>
 {{end}}
