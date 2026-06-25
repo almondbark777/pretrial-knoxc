@@ -84,15 +84,18 @@ type Rec struct {
 	Closed      bool // false = Open list, true = Closed list
 }
 
-// CustodyRange is one raw in-custody span (date strings as stored). The days from
-// Start through the day before End are excluded from GPS billing; End is the "back
-// on GPS" day and is billed. Empty End = still in custody (excluded through the
-// billing-period end). Parsed with the same parseDate the rest of the engine uses.
+// CustodyRange is one raw in-custody span (date strings as stored). Only the full
+// days strictly between Start and End are excluded from GPS billing; BOTH the
+// take-off day (Start) and the "back on GPS" day (End) are billed (the vendor
+// charges for the removal and reinstall days). Empty End = still in custody
+// (excluded through the billing-period end). Parsed with the same parseDate the
+// rest of the engine uses.
 type CustodyRange struct{ Start, End string }
 
 // custodyDaysInWindow returns how many days of [winStart, winEnd] (inclusive) fall
-// in a custody span and so must not be billed. Each span excludes [Start, End)
-// (End/reinstall billed); an empty End runs through winEnd. Overlaps are merged.
+// in a custody span and so must not be billed. Each span excludes the OPEN interval
+// (Start, End) — both the take-off and reinstall days are billed; an empty End runs
+// through winEnd. Overlaps are merged.
 func custodyDaysInWindow(ranges []CustodyRange, winStart, winEnd time.Time) int {
 	if len(ranges) == 0 || winEnd.Before(winStart) {
 		return 0
@@ -105,6 +108,9 @@ func custodyDaysInWindow(ranges []CustodyRange, winStart, winEnd time.Time) int 
 		if !ok {
 			continue
 		}
+		// Exclude the OPEN interval (Start, End): the take-off day is billed (the
+		// vendor charges for the removal day), so exclusion begins the day AFTER it.
+		s = s.AddDate(0, 0, 1)
 		if s.Before(winStart) {
 			s = winStart
 		}

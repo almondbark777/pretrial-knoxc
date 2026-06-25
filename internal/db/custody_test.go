@@ -41,7 +41,8 @@ func TestCustodyFlowsIntoGPSBilling(t *testing.T) {
 		t.Fatalf("baseline owed = %v, want 256", got)
 	}
 
-	// In custody Jan 10 → back Jan 20 = 10 days off → 22 × $8 = $176.
+	// In custody Jan 10 → back Jan 20: both endpoints billed, only Jan 11..19 (9
+	// days) off → 23 × $8 = $184.
 	if err := AddCustodyPeriod(d, idn, "2026-01-10", "2026-01-20", "booked", "by"); err != nil {
 		t.Fatalf("AddCustodyPeriod: %v", err)
 	}
@@ -49,8 +50,8 @@ func TestCustodyFlowsIntoGPSBilling(t *testing.T) {
 	if err != nil || len(periods) != 1 {
 		t.Fatalf("ListCustodyPeriods = %v (%d)", err, len(periods))
 	}
-	if got := owedAt(); got != 176 {
-		t.Fatalf("owed with custody = %v, want 176", got)
+	if got := owedAt(); got != 184 {
+		t.Fatalf("owed with custody = %v, want 184", got)
 	}
 
 	// Remove it → back to full billing.

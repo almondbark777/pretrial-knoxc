@@ -15,26 +15,30 @@ func TestCustodyDaysInWindow(t *testing.T) {
 	win := func() (time.Time, time.Time) { return Noon(2026, 1, 1), Noon(2026, 1, 31) }
 	ws, we := win()
 
-	// In custody Jan 5 → back on GPS Jan 10: days 5,6,7,8,9 excluded (10 is billed) = 5.
-	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2026-01-05", "2026-01-10")}, ws, we); got != 5 {
-		t.Fatalf("basic = %d, want 5", got)
+	// In custody Jan 5 → back on GPS Jan 10: BOTH endpoints billed, only the full
+	// days between (6,7,8,9) are excluded = 4.
+	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2026-01-05", "2026-01-10")}, ws, we); got != 4 {
+		t.Fatalf("basic = %d, want 4", got)
 	}
-	// Open-ended (still in custody) from Jan 20: Jan 20..31 inclusive = 12 days.
-	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2026-01-20", "")}, ws, we); got != 12 {
-		t.Fatalf("open-ended = %d, want 12", got)
+	// Open-ended (still in custody) from Jan 20: take-off day Jan 20 billed, Jan
+	// 21..31 inclusive excluded = 11 days.
+	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2026-01-20", "")}, ws, we); got != 11 {
+		t.Fatalf("open-ended = %d, want 11", got)
 	}
-	// Reinstalled the same day as release: end == start+1 → 1 day excluded, release billed.
-	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2026-01-05", "2026-01-06")}, ws, we); got != 1 {
-		t.Fatalf("one night = %d, want 1", got)
+	// Reinstalled the day after release (end == start+1): both days billed, nothing
+	// in between → 0 excluded.
+	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2026-01-05", "2026-01-06")}, ws, we); got != 0 {
+		t.Fatalf("one night = %d, want 0", got)
 	}
-	// Clamped to the window: starts before Jan 1.
+	// Clamped to the window: take-off day Dec 20 is outside the window, so exclusion
+	// starts at the window edge → Jan1..5 = 5 (Jan 6 reinstall billed).
 	if got := CustodyDaysInWindow([]CustodyPeriod{cp("2025-12-20", "2026-01-06")}, ws, we); got != 5 {
 		t.Fatalf("clamp-start = %d, want 5 (Jan1..5)", got)
 	}
 	// Overlapping periods are merged, not double-counted.
 	overlap := []CustodyPeriod{cp("2026-01-05", "2026-01-10"), cp("2026-01-08", "2026-01-12")}
-	if got := CustodyDaysInWindow(overlap, ws, we); got != 7 { // Jan5..11 = 7
-		t.Fatalf("overlap = %d, want 7", got)
+	if got := CustodyDaysInWindow(overlap, ws, we); got != 6 { // Jan6..11 = 6
+		t.Fatalf("overlap = %d, want 6", got)
 	}
 	// None.
 	if got := CustodyDaysInWindow(nil, ws, we); got != 0 {
@@ -55,18 +59,19 @@ func TestComputeGPSCustodyReducesOwed(t *testing.T) {
 		t.Fatalf("baseline owed = %v, want 256", g0.TotalOwedDollars)
 	}
 
-	// In custody Jan 10 → back Jan 20 = 10 days excluded → 22 billable × $8 = $176.
+	// In custody Jan 10 → back Jan 20: both endpoints billed, only Jan 11..19 (9
+	// days) excluded → 23 billable × $8 = $184.
 	c := base
 	c.Custody = []CustodyPeriod{cp("2026-01-10", "2026-01-20")}
 	g := ComputeGPS(c, track, nil, "")
-	if g.CustodyDays == nil || *g.CustodyDays != 10 {
-		t.Fatalf("custodyDays = %v, want 10", g.CustodyDays)
+	if g.CustodyDays == nil || *g.CustodyDays != 9 {
+		t.Fatalf("custodyDays = %v, want 9", g.CustodyDays)
 	}
-	if g.BillableDays == nil || *g.BillableDays != 22 {
-		t.Fatalf("billableDays = %v, want 22", g.BillableDays)
+	if g.BillableDays == nil || *g.BillableDays != 23 {
+		t.Fatalf("billableDays = %v, want 23", g.BillableDays)
 	}
-	if g.TotalOwedDollars == nil || *g.TotalOwedDollars != 176 {
-		t.Fatalf("owed with custody = %v, want 176", g.TotalOwedDollars)
+	if g.TotalOwedDollars == nil || *g.TotalOwedDollars != 184 {
+		t.Fatalf("owed with custody = %v, want 184", g.TotalOwedDollars)
 	}
 }
 
@@ -90,42 +95,42 @@ func TestComputeGPSCustodyRateSplitAcrossSwitch(t *testing.T) {
 		t.Fatalf("baseline owed = %v hasSwitch=%v want 361/true", g0.TotalOwedDollars, g0.HasSwitch)
 	}
 
-	// Custody entirely BEFORE the switch: Jan 5→10 excludes 5,6,7,8,9 (5 days), all
-	// pre-switch → credited at $15 → 361 − 5*15 = 286.
+	// Custody entirely BEFORE the switch: Jan 5→10 excludes only 6,7,8,9 (4 days,
+	// both endpoints billed), all pre-switch → credited at $15 → 361 − 4*15 = 301.
 	cb := base
 	cb.Custody = []CustodyPeriod{cp("2026-01-05", "2026-01-10")}
 	gb := ComputeGPS(cb, track, nil, "")
-	if gb.CustodyDays == nil || *gb.CustodyDays != 5 {
-		t.Fatalf("before-switch custodyDays = %v want 5", gb.CustodyDays)
+	if gb.CustodyDays == nil || *gb.CustodyDays != 4 {
+		t.Fatalf("before-switch custodyDays = %v want 4", gb.CustodyDays)
 	}
-	if gb.TotalOwedDollars == nil || *gb.TotalOwedDollars != 286 {
-		t.Fatalf("before-switch owed = %v want 286 (361 − 5*15)", gb.TotalOwedDollars)
+	if gb.TotalOwedDollars == nil || *gb.TotalOwedDollars != 301 {
+		t.Fatalf("before-switch owed = %v want 301 (361 − 4*15)", gb.TotalOwedDollars)
 	}
 
-	// Custody entirely AFTER the switch: Jan 20→25 excludes 20..24 (5 days), all
-	// post-switch → credited at $8 → 361 − 5*8 = 321.
+	// Custody entirely AFTER the switch: Jan 20→25 excludes only 21..24 (4 days),
+	// all post-switch → credited at $8 → 361 − 4*8 = 329.
 	ca := base
 	ca.Custody = []CustodyPeriod{cp("2026-01-20", "2026-01-25")}
 	ga := ComputeGPS(ca, track, nil, "")
-	if ga.CustodyDays == nil || *ga.CustodyDays != 5 {
-		t.Fatalf("after-switch custodyDays = %v want 5", ga.CustodyDays)
+	if ga.CustodyDays == nil || *ga.CustodyDays != 4 {
+		t.Fatalf("after-switch custodyDays = %v want 4", ga.CustodyDays)
 	}
-	if ga.TotalOwedDollars == nil || *ga.TotalOwedDollars != 321 {
-		t.Fatalf("after-switch owed = %v want 321 (361 − 5*8)", ga.TotalOwedDollars)
+	if ga.TotalOwedDollars == nil || *ga.TotalOwedDollars != 329 {
+		t.Fatalf("after-switch owed = %v want 329 (361 − 4*8)", ga.TotalOwedDollars)
 	}
 
-	// Custody SPANNING the switch: Jan 12→18 excludes 12..17 (6 days). The three
-	// sub-windows tile the span exactly once: pre [Jan1, Jan14] = 12,13,14 (3 days @
-	// $15); the switch day Jan 15 was billed the flat $23 premium so it's credited
-	// $23; post [Jan16, Jan31] = 16,17 (2 days @ $8).
-	// Credit = 3*15 + 23 + 2*8 = 45 + 23 + 16 = 84 → 361 − 84 = 277.
+	// Custody SPANNING the switch: Jan 12→18 excludes 13..17 (5 days; take-off Jan
+	// 12 is billed). The three sub-windows tile the span exactly once: pre [Jan1,
+	// Jan14] = 13,14 (2 days @ $15); the switch day Jan 15 was billed the flat $23
+	// premium and is itself a custody day so it's credited $23; post [Jan16, Jan31]
+	// = 16,17 (2 days @ $8). Credit = 2*15 + 23 + 2*8 = 30 + 23 + 16 = 69 → 361 − 69 = 292.
 	cs := base
 	cs.Custody = []CustodyPeriod{cp("2026-01-12", "2026-01-18")}
 	gs := ComputeGPS(cs, track, nil, "")
-	if gs.CustodyDays == nil || *gs.CustodyDays != 6 {
-		t.Fatalf("spanning custodyDays = %v want 6", gs.CustodyDays)
+	if gs.CustodyDays == nil || *gs.CustodyDays != 5 {
+		t.Fatalf("spanning custodyDays = %v want 5", gs.CustodyDays)
 	}
-	if gs.TotalOwedDollars == nil || *gs.TotalOwedDollars != 277 {
-		t.Fatalf("spanning owed = %v want 277 (361 − (3*15 + 23 + 2*8))", gs.TotalOwedDollars)
+	if gs.TotalOwedDollars == nil || *gs.TotalOwedDollars != 292 {
+		t.Fatalf("spanning owed = %v want 292 (361 − (2*15 + 23 + 2*8))", gs.TotalOwedDollars)
 	}
 }

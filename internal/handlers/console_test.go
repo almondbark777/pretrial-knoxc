@@ -56,6 +56,89 @@ func TestConsoleDashboardParity(t *testing.T) {
 // A court appearance on the dashboard's Today's Schedule must be attributed to the
 // client's supervising officer, so it survives the "My caseload" filter (which
 // hides rows with Mine=false). Regression for the hardcoded Mine:false bug.
+// Bug #7 (2026-06-25): once a hearing date passes and an outcome + next date are
+// logged, the Case Summary's "Next Court Date" must show the rescheduled future
+// date — not "—". nextUpcomingCourtLabel picks the soonest today-or-later date
+// across both the scheduled date and the logged NextDate.
+func TestNextUpcomingCourtLabel(t *testing.T) {
+	track := compute.Noon(2026, 6, 25)
+
+	// A past hearing whose outcome logged a future next date → that next date shows.
+	got := nextUpcomingCourtLabel([]models.CourtDate{
+		{IDN: "1", CourtDate: "2026-06-10", Court: "Room 1", Outcome: "Reset / rescheduled", NextDate: "2026-07-15"},
+	}, track)
+	if got != "Jul 15, 2026 — Room 1" {
+		t.Errorf("rescheduled next date = %q, want %q", got, "Jul 15, 2026 — Room 1")
+	}
+
+	// Earliest qualifying date wins across rows and across CourtDate vs NextDate.
+	got = nextUpcomingCourtLabel([]models.CourtDate{
+		{IDN: "1", CourtDate: "2026-06-10", NextDate: "2026-08-01"}, // past hearing, far next date
+		{IDN: "1", CourtDate: "2026-06-28", Court: "Room 2"},        // sooner upcoming hearing
+	}, track)
+	if got != "Jun 28, 2026 — Room 2" {
+		t.Errorf("earliest upcoming = %q, want %q", got, "Jun 28, 2026 — Room 2")
+	}
+
+	// Nothing upcoming → em dash.
+	if got := nextUpcomingCourtLabel([]models.CourtDate{{CourtDate: "2026-01-01"}}, track); got != "—" {
+		t.Errorf("all past = %q, want em dash", got)
+	}
+}
+
+// Bug #5 (2026-06-25): the "My caseload" toggle must re-headline the KPI cards, so
+// consoleDashboard computes a per-officer MyKPIs alongside the division-wide KPIs.
+func TestConsoleDashboardMyKPIs(t *testing.T) {
+	track := compute.Noon(2026, 6, 1)
+	clients := map[string][]*compute.Client{
+		"1": {{IDN: "1", Name: "Client One", Status: "Open", Officer: "Alice Smith",
+			Level: "2", RefD: compute.Noon(2026, 1, 1), RefOK: true}},
+		"2": {{IDN: "2", Name: "Client Two", Status: "Open", Officer: "Bob Jones",
+			Level: "2", RefD: compute.Noon(2026, 1, 1), RefOK: true}},
+	}
+	courts := []models.CourtDate{
+		{IDN: "1", CourtDate: "2026-06-03", Court: "Room 1"}, // Alice's, this week
+		{IDN: "2", CourtDate: "2026-06-03", Court: "Room 2"}, // Bob's, this week
+	}
+	violations := []models.Violation{{IDN: "1", ViolationDate: "2026-06-01", Category: "x", Severity: "minor"}}
+
+	d := consoleDashboard(clients, track, courts, violations, nil, "Alice Smith", nil)
+
+	// Division-wide counts everyone.
+	if d.KPIs.ActiveClients != 2 || d.KPIs.CourtThisWeek != 2 || d.KPIs.OpenViolations != 1 {
+		t.Errorf("KPIs = %+v, want Active 2 / Court 2 / Violations 1", d.KPIs)
+	}
+	// Alice's caseload only.
+	if d.MyKPIs.ActiveClients != 1 || d.MyKPIs.CourtThisWeek != 1 || d.MyKPIs.OpenViolations != 1 {
+		t.Errorf("MyKPIs = %+v, want Active 1 / Court 1 / Violations 1", d.MyKPIs)
+	}
+}
+
+// Revised 2026-06-25: any check-in satisfies the periodic windows, but an in-person
+// visit is required each calendar month. So an all-phone client is still flagged on
+// the missed roster, while one who logged at least one in-person visit this month
+// is not (even if they also phone).
+func TestMissedRosterRequiresMonthlyInPerson(t *testing.T) {
+	track := compute.Noon(2026, 6, 25)
+	mk := func(typ string, d int) compute.CheckIn {
+		return compute.CheckIn{D: compute.Noon(2026, 6, d), DOK: true, Type: typ}
+	}
+	base := func(cis ...compute.CheckIn) map[string][]*compute.Client {
+		return map[string][]*compute.Client{
+			"1": {{IDN: "1", Name: "Test", Status: "Open", Level: "3",
+				RefD: compute.Noon(2026, 1, 1), RefOK: true, CheckIns: cis}},
+		}
+	}
+	// All phone this month, no in-person → flagged.
+	if rows := missedCheckInsRoster(base(mk("Phone", 3), mk("Phone", 10), mk("Phone", 17)), track); len(rows) != 1 {
+		t.Fatalf("all-phone: missed roster len=%d want 1", len(rows))
+	}
+	// At least one in-person this month → not flagged.
+	if rows := missedCheckInsRoster(base(mk("Phone", 3), mk("In Person", 12)), track); len(rows) != 0 {
+		t.Fatalf("has in-person: missed roster len=%d want 0", len(rows))
+	}
+}
+
 func TestConsoleDashboardCourtMine(t *testing.T) {
 	track := compute.Noon(2026, 6, 1)
 	clients := map[string][]*compute.Client{

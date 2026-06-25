@@ -58,15 +58,16 @@ func TestGoldenAgainstRealDB(t *testing.T) {
 	if r := compute.ComputePTRFees(get("1704942"), track, ""); r.TotalOwed != 20 {
 		t.Errorf("JONES L1 PTR owed=%d want 20", r.TotalOwed)
 	}
-	// REASONOVER — L2: 5 windows, 4 missed, $100. (Was 3 missed under the old
-	// "any check-in satisfies" rule; the in-person-only April window is now missed
-	// because a window requires BOTH an in-person and a phone check-in.)
+	// REASONOVER — L2: 5 windows, 3 missed, $100. The in-person-only April window is
+	// satisfied (policy revised 2026-06-25: any check-in — in-person OR phone —
+	// satisfies a window; the in-person requirement is enforced monthly, not
+	// per-window). Only initial/Feb/Mar (no contact at all) are missed.
 	{
 		c := get("1426070")
 		ci := compute.ComputeCheckIns(c, track)
 		ptr := compute.ComputePTRFees(c, track, "")
-		if len(ci.Windows) != 5 || len(ci.Missed) != 4 || ptr.TotalOwed != 100 {
-			t.Errorf("REASONOVER windows=%d missed=%d owed=%d want 5/4/100",
+		if len(ci.Windows) != 5 || len(ci.Missed) != 3 || ptr.TotalOwed != 100 {
+			t.Errorf("REASONOVER windows=%d missed=%d owed=%d want 5/3/100",
 				len(ci.Windows), len(ci.Missed), ptr.TotalOwed)
 		}
 	}

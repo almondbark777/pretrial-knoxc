@@ -484,7 +484,7 @@
     <div class="mh"><h3>Add Custody Dates</h3><button type="button" class="x" onclick="cmClose('custodyModal')" aria-label="Close">×</button></div>
     <div class="mb">
       <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
-      <div class="note-hint">Days in custody aren't billed for GPS. The <b>Back on GPS</b> date is the reinstall day and <b>is</b> billed — so a same-day re-fit counts. Leave it blank if they're still in custody.</div>
+      <div class="note-hint">Only the full days <b>between</b> these dates are dropped from GPS billing. Both the <b>In custody from</b> (take-off) day and the <b>Back on GPS</b> (reinstall) day <b>are</b> billed — the vendor charges for the removal and reinstall days. Leave Back on GPS blank if they're still in custody.</div>
       <div class="fld"><label>In custody from</label><input type="date" name="start_date" required></div>
       <div class="fld"><label>Back on GPS <span class="muted" style="font-weight:400">(reinstall date — leave blank if still in custody)</span></label><input type="date" name="end_date"></div>
       <div class="fld"><label>Note <span class="muted" style="font-weight:400">(optional)</span></label><input type="text" name="note" placeholder="e.g. booked into jail; GPS removed"></div>

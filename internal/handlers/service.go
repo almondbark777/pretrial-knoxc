@@ -173,9 +173,11 @@ func missedCheckInsRoster(clients map[string][]*compute.Client, track time.Time)
 		if !c.RefOK {
 			continue
 		}
-		// Both an in-person AND a phone check-in are required this calendar month
-		// (office policy: clients must do both at their level's cadence). A phone
-		// call alone no longer counts as "checked in".
+		// Any check-in (in-person OR phone) satisfies the periodic windows, but an
+		// IN-PERSON visit is required each calendar month (policy revised 2026-06-25):
+		// a client who checks in every week is not flagged just for alternating
+		// types, while one who only ever phones is still caught. Flag when there's no
+		// in-person visit this month.
 		hasIP, hasPh := false, false
 		for _, ci := range c.CheckIns {
 			if ci.DOK && !ci.D.Before(monthStart) && !ci.D.After(monthEnd) {
@@ -186,8 +188,8 @@ func missedCheckInsRoster(clients map[string][]*compute.Client, track time.Time)
 				}
 			}
 		}
-		if hasIP && hasPh {
-			continue
+		if hasIP {
+			continue // in-person requirement met for the month
 		}
 		// 3-day grace: if still inside grace and grace ends at/after month start, skip.
 		graceEnd := c.RefD.AddDate(0, 0, 3)
@@ -195,12 +197,9 @@ func missedCheckInsRoster(clients map[string][]*compute.Client, track time.Time)
 			continue
 		}
 		mo := track.Format("January 2006")
-		detail := "no in-person or phone check-in in " + mo
-		switch {
-		case hasIP && !hasPh:
-			detail = "no phone check-in in " + mo
-		case !hasIP && hasPh:
-			detail = "no in-person check-in in " + mo
+		detail := "no in-person check-in in " + mo
+		if !hasPh {
+			detail = "no check-in at all in " + mo
 		}
 		rows = append(rows, models.RosterRow{
 			IDN: c.IDN, Name: c.Name, Officer: c.Officer, Level: lvl,

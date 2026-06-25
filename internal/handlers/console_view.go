@@ -140,7 +140,8 @@ type ConsoleSched struct {
 // must say so honestly when there are more.
 type ConsoleDashboard struct {
 	AsOf          string
-	KPIs          ConsoleKPIs
+	KPIs          ConsoleKPIs // division-wide ("All")
+	MyKPIs        ConsoleKPIs // just the signed-in officer's caseload ("My caseload")
 	Referrals     []ConsoleReferral
 	ReferralTotal int
 	Schedule      []ConsoleSched
@@ -168,15 +169,32 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 	d.KPIs.ActiveClients = rosterStateCounts(clients).Open
 	d.KPIs.OverdueCheckIns = len(missed)
 
+	// Per-officer ("My caseload") tallies so the dashboard scope toggle can
+	// re-headline the KPI cards with just the signed-in officer's numbers, not only
+	// hide feed rows (officer report 2026-06-25: "the banners at the top should
+	// change to my caseload"). Same math, attributed to the supervising officer.
+	for _, r := range missed {
+		if mine(officerForIDN(clients, r.IDN)) {
+			d.MyKPIs.OverdueCheckIns++
+		}
+	}
+
 	// Due today: a client whose next required check-in window's deadline is today.
 	for _, cases := range clients {
 		c := openRep(cases)
 		if c == nil || !reOpen.MatchString(c.Status) {
 			continue
 		}
+		isMine := mine(c.Officer)
+		if isMine {
+			d.MyKPIs.ActiveClients++
+		}
 		ci := compute.ComputeCheckIns(*c, track)
 		if ci.NextDue != nil && sameDay(ci.NextDue.Deadline, track) {
 			d.KPIs.DueToday++
+			if isMine {
+				d.MyKPIs.DueToday++
+			}
 			d.Schedule = append(d.Schedule, ConsoleSched{
 				IDN: c.IDN, Time: "Check-in", Title: c.Name,
 				Sub:  "Check-in due today · " + ci.NextDue.Label,
@@ -196,6 +214,9 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 		}
 		if !dt.Before(track) && !dt.After(weekEnd) {
 			d.KPIs.CourtThisWeek++
+			if mine(officerForIDN(clients, cd.IDN)) {
+				d.MyKPIs.CourtThisWeek++
+			}
 		}
 		if sameDay(dt, track) {
 			d.Schedule = append(d.Schedule, ConsoleSched{
@@ -229,6 +250,11 @@ func consoleDashboard(clients map[string][]*compute.Client, track time.Time,
 	}
 
 	d.KPIs.OpenViolations = len(violations)
+	for _, v := range violations {
+		if mine(officerForIDN(clients, v.IDN)) {
+			d.MyKPIs.OpenViolations++
+		}
+	}
 
 	// ── New-referrals feed ── clients referred within the past 24 hours (in
 	// day terms: yesterday or today), newest first. This replaces the old
@@ -936,14 +962,7 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		}
 	}
 
-	// Next court (soonest future) from the extension court dates.
-	nextCourt := "—"
-	for _, cd := range extras.CourtDates {
-		if dt, ok := compute.ParseDay(cd.CourtDate); ok && !dt.Before(track) {
-			nextCourt = dt.Format("Jan 2, 2006") + appendIf(" — ", cd.Court)
-			break
-		}
-	}
+	nextCourt := nextUpcomingCourtLabel(extras.CourtDates, track)
 
 	// Next check-in (with overdue tone).
 	nextCI, nextTone := "—", ""
@@ -1302,8 +1321,10 @@ func consoleConditions(c *compute.Client, level int, ci compute.CheckInResult,
 	ptr compute.PTRResult, gps compute.GPSResult) []ConsoleCondition {
 	var out []ConsoleCondition
 
-	// 1) Check-in cadence — tracked as TWO conditions (in-person + phone), each
-	// satisfied only by its own type, at the level's cadence.
+	// 1) Check-in compliance (policy revised 2026-06-25): a periodic window is met by
+	// ANY check-in, so the cadence is "behind" only when a closed window had NO
+	// contact at all. The in-person requirement is tracked separately as a monthly
+	// condition (so an all-phone client is flagged, an alternating one is not).
 	cadence := "Weekly"
 	switch level {
 	case 1:
@@ -1311,19 +1332,32 @@ func consoleConditions(c *compute.Client, level int, ci compute.CheckInResult,
 	case 2:
 		cadence = "Monthly"
 	}
-	// A type is "behind" if any closed window is missing that type.
-	ipBehind, phBehind := false, false
+	contactBehind := false
 	for _, w := range ci.Windows {
-		if w.Missed {
-			if !w.SatisfiedInPerson {
-				ipBehind = true
-			}
-			if !w.SatisfiedPhone {
-				phBehind = true
+		if w.Missed { // Missed now means "no in-person OR phone in a closed window"
+			contactBehind = true
+			break
+		}
+	}
+	// In-person required monthly: behind if no in-person visit in the current month
+	// (3-day grace for brand-new referrals, mirroring missedCheckInsRoster).
+	monthStart := compute.Noon(ci.Today.Year(), ci.Today.Month(), 1)
+	ipThisMonth := false
+	for _, x := range c.CheckIns {
+		if x.DOK && !x.D.Before(monthStart) && !x.D.After(ci.Today) {
+			if ip, _ := compute.CheckInKind(x.Type); ip {
+				ipThisMonth = true
+				break
 			}
 		}
 	}
-	typeChip := func(behind bool) Chip {
+	ipMonthBehind := ci.Error == "" && !ipThisMonth
+	if c.RefOK {
+		if graceEnd := c.RefD.AddDate(0, 0, 3); !graceEnd.Before(ci.Today) && !graceEnd.Before(monthStart) {
+			ipMonthBehind = false
+		}
+	}
+	chipFor := func(behind bool) Chip {
 		switch {
 		case ci.Error != "":
 			return Chip{Tone: "neutral", Icon: "◯", Label: "No referral"}
@@ -1340,8 +1374,8 @@ func consoleConditions(c *compute.Client, level int, ci compute.CheckInResult,
 		return "last " + t.Format("Jan 2, 2006")
 	}
 	out = append(out,
-		ConsoleCondition{Name: cadence + " in-person check-in", Detail: lastDetail(ci.LastInPerson), Chip: typeChip(ipBehind)},
-		ConsoleCondition{Name: cadence + " phone check-in", Detail: lastDetail(ci.LastPhone), Chip: typeChip(phBehind)},
+		ConsoleCondition{Name: cadence + " check-in (any type)", Detail: lastDetail(ci.LastCheckIn), Chip: chipFor(contactBehind)},
+		ConsoleCondition{Name: "In-person visit (monthly)", Detail: lastDetail(ci.LastInPerson), Chip: chipFor(ipMonthBehind)},
 	)
 
 	// 2) GPS electronic monitoring (only when active).
@@ -1632,6 +1666,33 @@ func nameFor(clients map[string][]*compute.Client, idn string) string {
 // officerForIDN returns the supervising-officer display name for a client (open-
 // preferred rep), or "" if unknown — used to attribute court appearances to a
 // caseload.
+// nextUpcomingCourtLabel returns the soonest today-or-later court date for the
+// Case Summary, formatted "Jan 2, 2006 — <court>" (or "—" if none). It considers
+// BOTH each row's scheduled date AND any rescheduled "next date" logged with an
+// outcome, so a reset/continued hearing's new date still surfaces once the
+// original date has passed (officer report 2026-06-25: "logged the outcome and put
+// the next court date and it's not showing up on the case summary"). Picks the
+// earliest qualifying date across all rows, not the first one in list order.
+func nextUpcomingCourtLabel(courtDates []models.CourtDate, track time.Time) string {
+	var soonest time.Time
+	label := "—"
+	consider := func(dateStr, court string) {
+		dt, ok := compute.ParseDay(dateStr)
+		if !ok || dt.Before(track) {
+			return
+		}
+		if label == "—" || dt.Before(soonest) {
+			soonest = dt
+			label = dt.Format("Jan 2, 2006") + appendIf(" — ", court)
+		}
+	}
+	for _, cd := range courtDates {
+		consider(cd.CourtDate, cd.Court)
+		consider(cd.NextDate, cd.Court)
+	}
+	return label
+}
+
 func officerForIDN(clients map[string][]*compute.Client, idn string) string {
 	if c := openRep(clients[idn]); c != nil {
 		return c.Officer

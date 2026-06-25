@@ -93,32 +93,55 @@ func TestCheckIns_L2_Reasonover(t *testing.T) {
 	if len(r.Windows) != 5 {
 		t.Fatalf("L2 windows=%d want 5", len(r.Windows))
 	}
-	// Both in-person AND phone are required. April has only an in-person visit, so
-	// it is NOT satisfied (the in-person half is met, the phone half is not).
-	if r.Windows[3].Satisfied || !r.Windows[3].SatisfiedInPerson || r.Windows[3].SatisfiedPhone {
-		t.Fatalf("Apr in-person-only: satisfied=%v ip=%v ph=%v want false/true/false",
+	// Any check-in satisfies a window (revised 2026-06-25). April has an in-person
+	// visit, so it is satisfied even though no phone call was logged that month.
+	if !r.Windows[3].Satisfied || !r.Windows[3].SatisfiedInPerson || r.Windows[3].SatisfiedPhone {
+		t.Fatalf("Apr in-person-only: satisfied=%v ip=%v ph=%v want true/true/false",
 			r.Windows[3].Satisfied, r.Windows[3].SatisfiedInPerson, r.Windows[3].SatisfiedPhone)
 	}
-	// initial, Feb, Mar, Apr missed (Apr now missed for lack of a phone); May current.
-	if len(r.Missed) != 4 {
-		t.Fatalf("L2 missed=%d want 4 (initial,Feb,Mar,Apr)", len(r.Missed))
+	// initial, Feb, Mar missed (no contact at all); Apr satisfied by the visit; May current.
+	if len(r.Missed) != 3 {
+		t.Fatalf("L2 missed=%d want 3 (initial,Feb,Mar)", len(r.Missed))
 	}
 	if r.LastInPerson == nil || !r.LastInPerson.Equal(Noon(2026, 4, 7)) || r.LastPhone != nil {
 		t.Fatalf("L2 lastInPerson=%v lastPhone=%v want 4/7 / nil", r.LastInPerson, r.LastPhone)
 	}
 
-	// Add a phone in April → both halves met → April satisfied, missed drops to 3.
-	c.addCI("4/8/2026", "Phone")
+	// Add a phone in March → March now satisfied by the call, missed drops to 2.
+	c.addCI("3/10/2026", "Phone")
 	r = ComputeCheckIns(c, track)
-	if !r.Windows[3].Satisfied || r.Windows[4].Missed {
-		t.Fatalf("L2 Apr.satisfied=%v May.missed=%v want true/false",
-			r.Windows[3].Satisfied, r.Windows[4].Missed)
+	if !r.Windows[2].Satisfied {
+		t.Fatalf("L2 Mar.satisfied=%v want true (phone counts)", r.Windows[2].Satisfied)
 	}
-	if len(r.Missed) != 3 {
-		t.Fatalf("L2 missed=%d want 3 (initial,Feb,Mar)", len(r.Missed))
+	if len(r.Missed) != 2 {
+		t.Fatalf("L2 missed=%d want 2 (initial,Feb)", len(r.Missed))
 	}
-	if r.LastPhone == nil || !r.LastPhone.Equal(Noon(2026, 4, 8)) {
-		t.Fatalf("L2 lastPhone=%v want 4/8", r.LastPhone)
+	if r.LastPhone == nil || !r.LastPhone.Equal(Noon(2026, 3, 10)) {
+		t.Fatalf("L2 lastPhone=%v want 3/10", r.LastPhone)
+	}
+}
+
+// Revised 2026-06-25 (the Peek case): officers legitimately alternate in-person and
+// phone week to week, so any single check-in — of either type — satisfies a weekly
+// window. Only a week with NO contact at all is missed.
+func TestCheckIns_L3_AlternatingTypesSatisfy(t *testing.T) {
+	c := mkClient("3", "1/1/2026", "")
+	c.addCI("1/12/2026", "Phone")     // week of Jan 12 — phone only
+	c.addCI("1/20/2026", "In Person") // week of Jan 19 — in-person only
+	c.addCI("1/26/2026", "Phone")     // week of Jan 26 — phone only
+	r := ComputeCheckIns(c, track)
+	for _, w := range r.Windows {
+		// A week with exactly one type of contact must still be satisfied + not missed.
+		if w.Type == "week" && (w.SatisfiedInPerson != w.SatisfiedPhone) {
+			if !w.Satisfied || w.Missed {
+				t.Fatalf("%s with one contact: satisfied=%v missed=%v want true/false",
+					w.Label, w.Satisfied, w.Missed)
+			}
+		}
+	}
+	// The first weekly window (Jan 5–9) had no contact at all → still missed.
+	if !r.Windows[1].Missed {
+		t.Fatalf("empty week %s should be missed", r.Windows[1].Label)
 	}
 }
 
@@ -161,10 +184,9 @@ func TestCheckIns_L1_NextDueOnMissedInitial(t *testing.T) {
 		t.Fatalf("L1 missed: NextDue.Deadline=%v want %v (refDate+3)", r.NextDue.Deadline, want)
 	}
 
-	// Made: both an in-person AND a phone contact inside the initial window → nextDue nil.
+	// Made: any contact inside the initial window satisfies it → nextDue nil.
 	c2 := mkClient("1", "1/1/2026", "")
 	c2.addCI("1/2/2026", "In Person")
-	c2.addCI("1/2/2026", "Phone")
 	r2 := ComputeCheckIns(c2, track)
 	if r2.NextDue != nil {
 		t.Fatalf("L1 made: NextDue=%v want nil", r2.NextDue)

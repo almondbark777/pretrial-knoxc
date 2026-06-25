@@ -361,9 +361,12 @@ type Client struct {
 	Custody []CustodyPeriod
 }
 
-// CustodyPeriod is one in-custody span: GPS is off, so [Start, End) is NOT billed.
-// End is the "back on GPS"/reinstall date and IS billed (so a same-day re-fit
-// counts). EndOK=false means still in custody — excluded through the window end.
+// CustodyPeriod is one in-custody span: GPS is off for the full days strictly
+// between the dates, so the OPEN interval (Start, End) is NOT billed. BOTH
+// endpoints ARE billed — Start ("taken off GPS") because the vendor still charges
+// for the removal day, and End ("back on GPS") the reinstall day (a same-day re-fit
+// counts). EndOK=false means still in custody — every day after Start is excluded
+// through the window end.
 type CustodyPeriod struct {
 	Start, End     time.Time
 	StartOK, EndOK bool
@@ -371,9 +374,11 @@ type CustodyPeriod struct {
 
 // CustodyDaysInWindow returns how many days inside [winStart, winEnd] (inclusive)
 // fall in a custody period and so must NOT be billed for GPS. Each period excludes
-// [Start, End) — the End ("back on GPS") day is billable; an open period (EndOK
-// false) excludes through winEnd. Overlapping periods are merged so a day is never
-// counted twice.
+// the OPEN interval (Start, End): both the take-off day (Start) and the reinstall
+// day (End) are billable — the vendor charges for removal and reinstall days — so
+// only the full days in between are dropped. An open period (EndOK false) excludes
+// every day after Start through winEnd. Overlapping periods are merged so a day is
+// never counted twice.
 func CustodyDaysInWindow(periods []CustodyPeriod, winStart, winEnd time.Time) int {
 	if len(periods) == 0 || winEnd.Before(winStart) {
 		return 0
@@ -385,7 +390,10 @@ func CustodyDaysInWindow(periods []CustodyPeriod, winStart, winEnd time.Time) in
 		if !p.StartOK {
 			continue
 		}
-		a := p.Start
+		// Exclude the OPEN interval (Start, End): the take-off day (Start) is billed
+		// — the vendor still charges for the removal day — so exclusion begins the
+		// day AFTER Start. The reinstall day (End) is billed via the [a, End) span.
+		a := addDays(p.Start, 1)
 		if a.Before(winStart) {
 			a = winStart
 		}
@@ -419,10 +427,12 @@ func CustodyDaysInWindow(periods []CustodyPeriod, winStart, winEnd time.Time) in
 	return total
 }
 
-// Window is one required check-in window. Per office policy a window requires
-// BOTH an in-person and a phone check-in at the level's cadence, so Satisfied is
-// true only when both occurred; SatisfiedInPerson / SatisfiedPhone expose which
-// half is met (so the UI can show "phone done, in-person still due", etc.).
+// Window is one required check-in window. Per office policy (revised 2026-06-25) a
+// window is satisfied by ANY check-in at the level's cadence — in-person OR phone —
+// so Satisfied is true when either occurred. SatisfiedInPerson / SatisfiedPhone
+// expose which type(s) were logged (so the UI can still show what happened). The
+// in-person requirement is enforced separately as a monthly rule in the reporting
+// layer, not by requiring both types within every window.
 type Window struct {
 	Type              string    `json:"type"` // initial | month | week
 	Start             time.Time `json:"start"`
@@ -501,9 +511,14 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 		effEnd = c.ClosedD
 	}
 
-	// Valid check-in dates, split by type. Policy: a window needs BOTH an in-person
-	// and a phone check-in, so the two are tracked separately (a phone call alone no
-	// longer satisfies a window — the Ivan-Littlejohn case). allCi keeps every type
+	// Valid check-in dates, split by type. Policy (2026-06-25, revised): a periodic
+	// window is SATISFIED by ANY check-in — in-person OR phone — because officers
+	// legitimately alternate the two week to week (the Peek case). The in-person
+	// guarantee is enforced SEPARATELY as a monthly requirement (so an all-phone
+	// client like Littlejohn is still caught — see the reporting layer's
+	// missedCheckInsRoster / "in-person visit" condition), not by requiring both
+	// types inside every window. SatisfiedInPerson/SatisfiedPhone are still tracked
+	// per window so the UI can show which type was logged; allCi keeps every type
 	// for the "last check-in (any)" figure.
 	var allCi, inPersonCi, phoneCi []time.Time
 	for _, ci := range c.CheckIns {
@@ -528,7 +543,7 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 	initialDeadline := addDays(ref, 3)
 	initIP := anyInRange(inPersonCi, ref, initialDeadline)
 	initPH := anyInRange(phoneCi, ref, initialDeadline)
-	initialMade := initIP && initPH
+	initialMade := initIP || initPH // any contact satisfies the window
 	initialMissed := !initialMade && gt(effEnd, initialDeadline)
 
 	windows := []Window{{
@@ -564,7 +579,7 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 			windowEnd := minTime(monthEnd, effEnd)
 			ip := anyInRange(inPersonCi, cur, windowEnd)
 			ph := anyInRange(phoneCi, cur, windowEnd)
-			hit := ip && ph
+			hit := ip || ph // any contact satisfies the window
 			monthClosed := ge(effEnd, monthEnd) || (c.ClosedOK && le(c.ClosedD, monthEnd))
 			isFuture := gt(cur, effEnd)
 			windows = append(windows, Window{
@@ -587,7 +602,7 @@ func ComputeCheckIns(c Client, track time.Time) CheckInResult {
 		windowEnd := minTime(weekFri, effEnd)
 		ip := anyInRange(inPersonCi, weekMon, windowEnd)
 		ph := anyInRange(phoneCi, weekMon, windowEnd)
-		hit := ip && ph
+		hit := ip || ph // any contact satisfies the window
 		weekClosed := ge(effEnd, weekFri)
 		isFuture := gt(weekMon, effEnd)
 		windows = append(windows, Window{
