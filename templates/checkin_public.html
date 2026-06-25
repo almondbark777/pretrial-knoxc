@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pre-Trial Check-In — Knox County</title>
+<style>
+:root{--ink:#11161d;--muted:#5b6573;--line:#d8dee7;--brand:#1f4e79;--bg:#f4f6f9;--panel:#fff;--ok:#1c7a4a;--risk:#b3261e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+.wrap{max-width:560px;margin:0 auto;padding:18px 16px 40px}
+.brand{display:flex;align-items:center;gap:10px;margin:6px 0 16px}
+.mark{width:38px;height:38px;border-radius:9px;background:var(--brand);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+h1{font-size:21px;margin:0}
+.sub{color:var(--muted);font-size:13.5px;margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+label{display:block;font-weight:600;font-size:13.5px;margin:12px 0 5px}
+input[type=text],input[type=tel],input[type=date],select{width:100%;font-size:16px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.row{display:flex;gap:10px}.row>div{flex:1}
+.seg{display:flex;gap:8px;margin-top:5px}
+.seg label{flex:1;margin:0;font-weight:600;text-align:center;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:#fff}
+.seg input{position:absolute;opacity:0;width:0;height:0}
+.seg input:checked+span{}
+.seg label:has(input:checked){border-color:var(--brand);background:#eaf1f8;color:var(--brand)}
+.hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+.consent{background:#f7f9fc;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;color:#33404f;margin-top:6px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:14px}
+.chk input{width:20px;height:20px;margin-top:1px;flex:none}
+button.go{width:100%;margin-top:18px;font-size:17px;font-weight:700;padding:15px;border:0;border-radius:12px;background:var(--brand);color:#fff}
+button.go:disabled{opacity:.5}
+.loc{font-size:12.5px;margin-top:10px;padding:9px 11px;border-radius:9px;background:#eef3f8;color:#33404f}
+.loc.ok{background:#e7f5ee;color:var(--ok)}.loc.no{background:#fdecea;color:var(--risk)}
+.err{background:#fdecea;color:var(--risk);border:1px solid #f3c0bb;border-radius:10px;padding:10px 12px;font-size:14px;margin-top:12px}
+.hide{display:none}
+.req{color:var(--risk)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="mark">PT</div>
+    <div><h1>Pre-Trial Check-In</h1><div class="sub">Knox County Sheriff's Office · Pre-Trial Release Services</div></div>
+  </div>
+
+  {{if .Err}}<div class="err">{{if eq .Err "consent"}}You must accept the check-in notice to submit.{{else}}Something went wrong — please try again.{{end}}</div>{{end}}
+
+  <form id="ci" method="post" action="/checkin/submit" autocomplete="off">
+    <input type="hidden" name="week_code" value="{{.WeekCode}}">
+    <input type="hidden" name="consent_version" value="{{.ConsentVersion}}">
+    <!-- telemetry, populated by JS -->
+    <input type="hidden" name="gps_lat" id="gps_lat"><input type="hidden" name="gps_lng" id="gps_lng">
+    <input type="hidden" name="gps_accuracy" id="gps_accuracy"><input type="hidden" name="gps_perm" id="gps_perm" value="unavailable">
+    <input type="hidden" name="client_ts" id="client_ts"><input type="hidden" name="timezone" id="timezone">
+    <input type="hidden" name="locale" id="locale"><input type="hidden" name="device_id" id="device_id">
+
+    <div class="card">
+      <label>Report type</label>
+      <select name="report_type">
+        <option>Pre-Trial</option><option>Electronic Monitoring</option><option>SCRAM</option>
+      </select>
+
+      <label>Full name <span class="req">*</span></label>
+      <input type="text" name="client_name" required placeholder="First and last name">
+      <label>Date of birth <span class="req">*</span></label>
+      <input type="date" name="dob" required>
+      <div class="hint">Your name and date of birth let us match this check-in to your case.</div>
+
+      <label>Phone</label>
+      <input type="tel" name="phone" placeholder="(865) 555-1234">
+      <label>Street address</label>
+      <input type="text" name="address_line1" placeholder="Address">
+      <input type="text" name="address_line2" placeholder="Apt / unit (optional)" style="margin-top:8px">
+      <div class="row" style="margin-top:8px">
+        <div><input type="text" name="city" placeholder="City"></div>
+        <div style="max-width:80px"><input type="text" name="state" placeholder="State" value="TN"></div>
+        <div style="max-width:120px"><input type="text" name="zip" placeholder="ZIP"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Employment status</label>
+      <div class="seg">
+        <label><input type="radio" name="employment_status" value="Employed" checked><span>Employed</span></label>
+        <label><input type="radio" name="employment_status" value="Unemployed"><span>Unemployed</span></label>
+      </div>
+      <div id="empWrap"><label>Employer</label><input type="text" name="employer" placeholder="Where you work"></div>
+      <div id="unempWrap" class="hide"><label>How long unemployed?</label><input type="text" name="unemployed_length" placeholder="e.g. 2 months"></div>
+    </div>
+
+    <div class="card">
+      <label>Have you received a citation since your last report? <span class="req">*</span></label>
+      <div class="seg">
+        <label><input type="radio" name="citation_since" value="" checked onchange="tog('cit',0)"><span>No</span></label>
+        <label><input type="radio" name="citation_since" value="yes" onchange="tog('cit',1)"><span>Yes</span></label>
+      </div>
+      <div id="citWrap" class="hide"><label>Date</label><input type="date" name="citation_date"></div>
+
+      <label style="margin-top:16px">Were you arrested or picked up by police since your last report? <span class="req">*</span></label>
+      <div class="seg">
+        <label><input type="radio" name="arrested_since" value="" checked onchange="tog('arr',0)"><span>No</span></label>
+        <label><input type="radio" name="arrested_since" value="yes" onchange="tog('arr',1)"><span>Yes</span></label>
+      </div>
+      <div id="arrWrap" class="hide"><label>Date</label><input type="date" name="arrested_date"></div>
+
+      <label style="margin-top:16px">Next court date (if known)</label>
+      <input type="date" name="next_court_date">
+    </div>
+
+    <div class="card">
+      <label>Signature <span class="req">*</span></label>
+      <input type="text" name="signature_name" required placeholder="Type your full name">
+      <div class="consent">{{.ConsentText}}</div>
+      <div class="loc" id="locBox">Getting your location…</div>
+      <label class="chk"><input type="checkbox" name="consent_accept" id="consent_accept" required><span>I have read the notice above, the information I provided is true, and I consent to the check-in.</span></label>
+    </div>
+
+    <button type="submit" class="go" id="submitBtn">Submit check-in</button>
+    <div class="hint" style="text-align:center;margin-top:10px">Your check-in is reviewed by a Pre-Trial officer before it's accepted.</div>
+  </form>
+</div>
+
+<script>
+(function(){
+  // ── client-supplied telemetry (corroborating) ──
+  var d=new Date();
+  document.getElementById('client_ts').value=d.toISOString();
+  try{document.getElementById('timezone').value=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
+  document.getElementById('locale').value=(navigator.language||'');
+
+  // lightweight device fingerprint: not PII, just a stable-ish handset signature
+  // so one phone checking in several people is visible to the officer.
+  var fp=[navigator.userAgent,navigator.platform,screen.width+'x'+screen.height,screen.colorDepth,(navigator.hardwareConcurrency||''),document.getElementById('timezone').value].join('|');
+  var h=0;for(var i=0;i<fp.length;i++){h=((h<<5)-h+fp.charCodeAt(i))|0;}
+  document.getElementById('device_id').value='d'+(h>>>0).toString(16);
+
+  // ── geolocation ──
+  var box=document.getElementById('locBox');
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(function(p){
+      document.getElementById('gps_lat').value=p.coords.latitude;
+      document.getElementById('gps_lng').value=p.coords.longitude;
+      document.getElementById('gps_accuracy').value=p.coords.accuracy||'';
+      document.getElementById('gps_perm').value='granted';
+      box.className='loc ok';box.textContent='✓ Location captured (±'+Math.round((p.coords.accuracy||0)*3.28084)+' ft).';
+    },function(err){
+      document.getElementById('gps_perm').value=(err&&err.code===1)?'denied':'unavailable';
+      box.className='loc no';box.textContent=(err&&err.code===1)?'Location was blocked. You can still submit, but the officer will see location wasn’t shared.':'Location unavailable. You can still submit.';
+    },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+  } else { document.getElementById('gps_perm').value='unavailable'; box.className='loc no'; box.textContent='This device can’t share location.'; }
+
+  // ── conditional fields ──
+  window.tog=function(which,on){document.getElementById((which==='cit'?'cit':'arr')+'Wrap').classList.toggle('hide',!on);};
+  document.querySelectorAll('input[name=employment_status]').forEach(function(r){
+    r.addEventListener('change',function(){
+      var emp=document.querySelector('input[name=employment_status]:checked').value==='Employed';
+      document.getElementById('empWrap').classList.toggle('hide',!emp);
+      document.getElementById('unempWrap').classList.toggle('hide',emp);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -9,6 +9,9 @@ func TestAllowListFallback(t *testing.T) {
 	if !a.IsAllowed("alexander.bentley@knoxsheriff.org") {
 		t.Error("a built-in default user should be allowed when ALLOWED_EMAILS is unset")
 	}
+	if !a.IsAllowed("mickey.flynt@knoxsheriff.org") {
+		t.Error("mickey.flynt should be on the built-in allow-list")
+	}
 	if a.IsAllowed("stranger@example.com") {
 		t.Error("a non-allow-list email must be rejected")
 	}

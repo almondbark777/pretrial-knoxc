@@ -195,6 +195,11 @@ func main() {
 	r.Post("/api/login", srv.APILogin)
 	r.Post("/api/logout", srv.APILogout)
 
+	// Public self-check-in (unauthenticated; reached by scanning the lobby QR).
+	r.Get("/checkin", srv.CheckinPage)
+	r.Post("/checkin/submit", srv.CheckinSubmit)
+	r.Get("/checkin/done", srv.CheckinDone)
+
 	// Landing page = the client tracker (shell + iframe). The primary app is the
 	// Case Console at /console.
 	r.Get("/", srv.Home)
@@ -211,6 +216,7 @@ func main() {
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
 	r.Get("/console/help", srv.ConsoleHelp)
+	r.Get("/console/checkins", srv.ConsoleCheckins)  // self-service check-in approval queue
 	r.Get("/console/problems", srv.ConsoleProblems)  // submitted "Report a problem" feedback (supervisor)
 	r.Get("/console/ptr-check", srv.ConsolePtrCheck) // check the daily PTR export .txt vs live Blue Book (browser-side)
 	r.Get("/console/import", srv.ImportPage)         // stop-gap SharePoint CSV upload (supervisor)
@@ -296,6 +302,8 @@ func main() {
 		ar.Post("/checkin/add", srv.AddCheckIn)
 		ar.Post("/checkin/bulk", srv.BulkAddCheckIn)
 		ar.Post("/checkin/delete", srv.DeleteAddedCheckIn)
+		ar.Post("/checkin/approve", srv.ApproveSelfCheckin) // approve a self-service check-in into the record
+		ar.Post("/checkin/reject", srv.RejectSelfCheckin)   // reject a self-service check-in with a reason
 		ar.Post("/schedule/add", srv.AddScheduledCheckIn)
 		ar.Post("/schedule/delete", srv.DeleteScheduledCheckIn)
 		ar.Post("/custody/add", srv.AddCustodyPeriod)       // GPS-off (in custody) span

@@ -378,3 +378,130 @@ type ChatMessage struct {
 	Body    string `json:"body"`
 	Created string `json:"created"`
 }
+
+// ── QR self-check-in (migration 011) ────────────────────────────────────────
+
+// ClientContact is the structured phone + home address for a client, used by
+// the QR self-check-in flow: the phone is the SMS-OTP destination (proof of
+// possession of the registered handset) and the home lat/lng is what an
+// approving officer's "checked in from their own house" comparison runs
+// against. App-owned + audited; the intake wizard is the write path going
+// forward. PhoneE164 is stored canonicalized ("+18655551234").
+type ClientContact struct {
+	IDN             string  `json:"idn"`
+	PhoneE164       string  `json:"phoneE164"`
+	PhoneVerifiedAt string  `json:"phoneVerifiedAt"`
+	AddressLine1    string  `json:"addressLine1"`
+	AddressLine2    string  `json:"addressLine2"`
+	City            string  `json:"city"`
+	State           string  `json:"state"`
+	Zip             string  `json:"zip"`
+	HomeLat         float64 `json:"homeLat"`
+	HomeLng         float64 `json:"homeLng"`
+	HasHomeGeo      bool    `json:"hasHomeGeo"` // false until an address is geocoded
+	UpdatedBy       string  `json:"updatedBy"`
+	UpdatedAt       string  `json:"updatedAt"`
+}
+
+// WeeklyCode is one rotating check-in code (migration 011). The QR posted in
+// the lobby encodes the currently-active code; it does not *block* an at-home
+// check-in by itself (a client keeps a working URL for the week) — it's a
+// hygiene + provenance signal: a submission stamped with an expired/old code is
+// auto-flagged, and the code can be reprinted each week.
+type WeeklyCode struct {
+	ID        int64  `json:"id"`
+	Code      string `json:"code"`
+	Label     string `json:"label"` // "Week of Jun 22, 2026"
+	ValidFrom string `json:"validFrom"`
+	ValidTo   string `json:"validTo"`
+	Active    bool   `json:"active"`
+	CreatedBy string `json:"createdBy"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// CheckinFlag is one machine-derived suspicion/quality flag on a Checkin
+// (e.g. "off_site", "stale_code", "gps_denied", "new_device",
+// "impossible_travel", "matches_home"). Stored as a JSON array on the row and
+// surfaced to the approving officer.
+type CheckinFlag string
+
+// Checkin is one self-service check-in submission — the tamper-evident
+// evidence record that (once approved) stands in for the paper Pre-Trial
+// Release Reporting Form. Append-only: corrections are new rows, never edits.
+// Telemetry is split into server-observed (trustworthy — the app recorded it
+// directly off the connection) and client-supplied (corroborating — the phone
+// handed it over and a determined person could spoof it). The hash chain
+// (PrevHash → RecordHash) makes post-hoc alteration provable.
+type Checkin struct {
+	ID         int64  `json:"id"`
+	IDN        string `json:"idn"`
+	Status     string `json:"status"` // pending | approved | rejected
+	ReportType string `json:"reportType"`
+
+	// Client-confirmed snapshot of the reporting form.
+	ClientName       string `json:"clientName"`
+	Phone            string `json:"phone"`
+	AddressLine1     string `json:"addressLine1"`
+	AddressLine2     string `json:"addressLine2"`
+	City             string `json:"city"`
+	State            string `json:"state"`
+	Zip              string `json:"zip"`
+	EmploymentStatus string `json:"employmentStatus"`
+	Employer         string `json:"employer"`
+	UnemployedLength string `json:"unemployedLength"`
+	CitationSince    bool   `json:"citationSince"`
+	CitationDate     string `json:"citationDate"`
+	ArrestedSince    bool   `json:"arrestedSince"`
+	ArrestedDate     string `json:"arrestedDate"`
+	NextCourtDate    string `json:"nextCourtDate"`
+	SignatureKind    string `json:"signatureKind"` // typed | drawn
+	SignatureData    string `json:"signatureData"` // typed name, or PNG data URL
+
+	// Consent (what they agreed to, when).
+	ConsentVersion string `json:"consentVersion"`
+	ConsentText    string `json:"consentText"`
+	ConsentAt      string `json:"consentAt"`
+
+	// Server-observed telemetry (trustworthy).
+	ServerTS      string `json:"serverTs"`
+	SrcIP         string `json:"srcIp"`
+	IPCity        string `json:"ipCity"`
+	IPRegion      string `json:"ipRegion"`
+	IPISP         string `json:"ipIsp"`
+	WeekCodeID    int64  `json:"weekCodeId"`
+	WeekCodeValid bool   `json:"weekCodeValid"`
+
+	// Client-supplied telemetry (corroborating).
+	ClientTS    string  `json:"clientTs"`
+	GPSLat      float64 `json:"gpsLat"`
+	GPSLng      float64 `json:"gpsLng"`
+	GPSAccuracy float64 `json:"gpsAccuracyM"`
+	GPSPerm     string  `json:"gpsPerm"` // granted | denied | unavailable
+	Timezone    string  `json:"timezone"`
+	Locale      string  `json:"locale"`
+	UserAgent   string  `json:"userAgent"`
+	DeviceID    string  `json:"deviceId"`
+
+	// Identity factors.
+	OTPPhoneMask   string `json:"otpPhoneMask"`
+	OTPVerifiedAt  string `json:"otpVerifiedAt"`
+	SelfiePath     string `json:"selfiePath"`
+	SelfieLiveness string `json:"selfieLiveness"` // passed | failed | skipped
+
+	// Computed presence assessment.
+	DistOfficeM   float64 `json:"distOfficeM"`
+	DistHomeM     float64 `json:"distHomeM"`
+	PresenceBadge string  `json:"presenceBadge"` // green | yellow | red
+	Flags         string  `json:"flags"`         // JSON array of CheckinFlag
+
+	// Tamper-evidence (sha256 chain over the canonical record).
+	PrevHash   string `json:"prevHash"`
+	RecordHash string `json:"recordHash"`
+
+	// Review.
+	ApprovedBy   string `json:"approvedBy"`
+	ApprovedAt   string `json:"approvedAt"`
+	RejectReason string `json:"rejectReason"`
+
+	CreatedAt string `json:"createdAt"`
+}

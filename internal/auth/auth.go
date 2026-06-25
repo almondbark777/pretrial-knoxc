@@ -2,7 +2,7 @@
 //  1. Cloudflare Access (upstream) — we trust the Cf-Access-Authenticated-User-Email
 //     header when the email is on the allow-list.
 //  2. App login — session cookie (12h) OR HTTP Basic fallback, single shared
-//     APP_PASSWORD, 22 @knoxsheriff.org allow-list emails.
+//     APP_PASSWORD, 23 @knoxsheriff.org allow-list emails.
 //
 // /health and static assets bypass auth.
 package auth
@@ -21,7 +21,7 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-// defaultUsers — the built-in 22 @knoxsheriff.org allow-list (matched
+// defaultUsers — the built-in @knoxsheriff.org allow-list (matched
 // case-insensitively), ported from webapp/users.py. Used as the FALLBACK when
 // ALLOWED_EMAILS is unset, so deployments can override the list via config
 // without a rebuild (the email list is no longer hard-wired into behavior).
@@ -37,6 +37,7 @@ var defaultUsers = []string{
 	"Donna.Ogle@knoxsheriff.org", "Tyler.Rickman@knoxsheriff.org",
 	"Stoney.Gentry@knoxsheriff.org", "amy.arroyo@knoxsheriff.org",
 	"Johnie.Carter@knoxsheriff.org", "alexander.bentley@knoxsheriff.org",
+	"mickey.flynt@knoxsheriff.org",
 }
 
 // defaultAdmin is the hardcoded break-glass admin: ALWAYS admin regardless of the
@@ -74,7 +75,7 @@ const sessionName = "kh_sess"
 // New builds an Authenticator. sessionSecret signs the cookie (12h lifetime).
 // allowedEmails is the @knoxsheriff.org allow-list (from ALLOWED_EMAILS); when
 // empty it falls back to the built-in defaultUsers, so an unset env keeps the
-// prior 22-user behavior. supervisorEmails is the SUPERVISOR_EMAILS subset that
+// prior built-in behavior. supervisorEmails is the SUPERVISOR_EMAILS subset that
 // may delete / restore / override (Phase 7 roles); entries not on the allow-list
 // are ignored — a supervisor must still be an allowed user.
 func New(password, sessionSecret string, allowedEmails, supervisorEmails, adminEmails []string) *Authenticator {
@@ -360,7 +361,7 @@ func (a *Authenticator) checkPassword(p string) bool {
 	return subtle.ConstantTimeCompare([]byte(p), []byte(a.password)) == 1
 }
 
-var publicPrefixes = []string{"/health", "/metrics", "/favicon.ico", "/static/", "/login", "/api/login", "/api/logout"}
+var publicPrefixes = []string{"/health", "/metrics", "/favicon.ico", "/static/", "/login", "/api/login", "/api/logout", "/checkin"}
 
 func isPublic(path string) bool {
 	for _, p := range publicPrefixes {

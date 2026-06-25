@@ -59,6 +59,12 @@ func (s *Server) consoleBase(w http.ResponseWriter, r *http.Request, active stri
 	// Data freshness renders from the `dataFreshness` template func at both the
 	// topbar and the sidebar foot (freshness.go is the one source of truth) — no
 	// per-handler plumbing, and both stamps agree on wording + source.
+	// Pending self-check-in count drives the nav badge on every console page, so
+	// the approval queue is discoverable from anywhere. Cheap indexed COUNT;
+	// errors degrade to no badge.
+	if n, err := db.CountPendingCheckins(s.DB); err == nil {
+		data["PendingCheckins"] = n
+	}
 	return data
 }
 

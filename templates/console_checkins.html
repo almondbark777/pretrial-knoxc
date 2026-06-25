@@ -1,0 +1,90 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Check-in approvals</h1>
+    <div class="sub">Self-service check-ins waiting for review, oldest first. Approving one makes it the official check-in record; rejecting keeps it on file with your reason. Nothing here is editable — the captured data is sealed.</div>
+  </div>
+  <div class="phead-side">
+    <span class="chip {{if .PendingCount}}warn{{else}}ok{{end}}">{{.PendingCount}} pending</span>
+  </div>
+</div>
+
+<div class="checkin-queue">
+  {{range .Checkins}}
+  <div class="panel checkin-card">
+    <div class="ch-top">
+      <div class="ch-who">
+        <a href="/console/clients/{{.IDN}}"><b>{{if .ClientName}}{{.ClientName}}{{else}}IDN {{.IDN}}{{end}}</b></a>
+        <div class="m">IDN {{.IDN}}{{if .ReportType}} · {{.ReportType}}{{end}} · submitted {{shortdate .ServerTS}}</div>
+      </div>
+      <span class="chip {{.BadgeTone}}" title="Presence assessment from IP, GPS and the home-address comparison">{{.BadgeLabel}}</span>
+    </div>
+
+    {{if .FlagList}}
+    <div class="ch-flags">
+      {{range .FlagList}}<span class="chip risk sm">⚑ {{.}}</span>{{end}}
+    </div>
+    {{end}}
+
+    <div class="ch-grid">
+      <div class="ch-cell" title="Server-observed: distance of the submitting connection from the office">
+        <span class="k">From office</span><span class="v">{{.OfficeLabel}}</span></div>
+      <div class="ch-cell" title="Distance from the client's home address on file — a hit on their own house is the tell">
+        <span class="k">From home</span><span class="v">{{.HomeLabel}}</span></div>
+      <div class="ch-cell"><span class="k">GPS</span><span class="v">{{.GpsLabel}}</span></div>
+      <div class="ch-cell" title="Server-observed source IP and its geolocation">
+        <span class="k">IP</span><span class="v">{{if .SrcIP}}{{.SrcIP}}{{if .IPCity}} · {{.IPCity}}{{end}}{{else}}—{{end}}</span></div>
+      <div class="ch-cell"><span class="k">Identity (SMS)</span><span class="v">{{if .OTPVerifiedAt}}✓ {{.OTPPhoneMask}}{{else}}— not verified{{end}}</span></div>
+      <div class="ch-cell"><span class="k">Selfie</span><span class="v">{{if .SelfiePath}}{{.SelfieLiveness}}{{else}}—{{end}}</span></div>
+      <div class="ch-cell"><span class="k">Lobby code</span><span class="v">{{if .WeekCodeValid}}current{{else}}⚠ stale / unknown{{end}}</span></div>
+      <div class="ch-cell"><span class="k">Court date</span><span class="v">{{if .NextCourtDate}}{{.NextCourtDate}}{{else}}—{{end}}</span></div>
+    </div>
+
+    <div class="ch-answers">
+      <span class="chip {{if .CitationSince}}risk{{else}}ok{{end}} sm">Citation since last report: {{if .CitationSince}}YES{{if .CitationDate}} ({{.CitationDate}}){{end}}{{else}}No{{end}}</span>
+      <span class="chip {{if .ArrestedSince}}risk{{else}}ok{{end}} sm">Arrested since last report: {{if .ArrestedSince}}YES{{if .ArrestedDate}} ({{.ArrestedDate}}){{end}}{{else}}No{{end}}</span>
+      {{if .EmploymentStatus}}<span class="chip neutral sm">{{.EmploymentStatus}}{{if .Employer}} · {{.Employer}}{{end}}</span>{{end}}
+    </div>
+
+    <div class="ch-actions">
+      <form method="post" action="/admin/checkin/approve" class="ch-approve">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="next" value="/console/checkins">
+        <button type="submit" class="btn">Approve</button>
+      </form>
+      <form method="post" action="/admin/checkin/reject" class="ch-reject">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="next" value="/console/checkins">
+        <input type="text" name="reason" placeholder="Reason (e.g. pinged home address)" maxlength="300" aria-label="Rejection reason">
+        <button type="submit" class="btn ghost">Reject</button>
+      </form>
+    </div>
+  </div>
+  {{else}}
+  <div class="panel"><div class="emptybox" style="padding:34px">
+    <div class="big">✓</div>No check-ins waiting. New self-service check-ins land here for approval.
+  </div></div>
+  {{end}}
+</div>
+
+<style>
+.checkin-queue{display:flex;flex-direction:column;gap:14px}
+.checkin-card{padding:16px 18px}
+.ch-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ch-who .m{color:var(--muted);font-size:12.5px;margin-top:2px}
+.ch-flags{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.ch-grid{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 18px}
+.ch-cell{display:flex;flex-direction:column;gap:2px}
+.ch-cell .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ch-cell .v{font-size:14px;font-weight:600}
+.ch-answers{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+.ch-actions{margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-top:1px solid var(--line-2);padding-top:12px}
+.ch-reject{display:flex;align-items:center;gap:8px;flex:1;min-width:240px}
+.ch-reject input[type=text]{flex:1;min-height:38px;padding:6px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel-2);color:var(--ink);font-size:16px}
+.chip.sm{font-size:11.5px;padding:2px 8px}
+.phead-side{display:flex;align-items:center}
+@media(max-width:560px){.ch-actions{flex-direction:column;align-items:stretch}.ch-reject{min-width:0}}
+</style>
+{{template "c_bot" .}}
