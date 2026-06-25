@@ -377,8 +377,10 @@ Autonomously doable, in rough value order — R3 may also find its own:
   columns the daily import lacks)
 - Roster: true server-side paging/windowing follow-up for the ~3,300-row live
   case (client windowing shipped; server paging parked)
-- Letters: surface letter history beyond the record timeline (e.g. an Admin
-  report of recent generation events from `letter_log`)
+- ~~Letters: surface letter history beyond the record timeline (e.g. an Admin
+  report of recent generation events from `letter_log`)~~ **DONE 2026-06-25**:
+  `/reports/letters` + `/export/letters.csv` (cross-client show-cause-letter
+  history). See `CONSOLE_DASHBOARD.md` 2026-06-25.
 - Help page: keep `/console/help` in sync as features land (cheap, recurring)
 - Test depth: handlers still under-pinned vs db/compute (R2 names candidates)
 - A11y sweep of newer modals (waiver/schedule/import) against the older ones

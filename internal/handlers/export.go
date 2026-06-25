@@ -50,6 +50,17 @@ func (s *Server) ExportReferrals(w http.ResponseWriter, r *http.Request) {
 	writeCSV(w, "referrals-"+stamp()+".csv", header, referralExportRows(clients))
 }
 
+// ExportLetters streams the cross-client show-cause-letter history as CSV — the
+// download companion to the /reports/letters page, same rows and header.
+func (s *Server) ExportLetters(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.letterHistory(2000)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeCSV(w, "show-cause-letters-"+stamp()+".csv", letterReportColumns, rows)
+}
+
 // ExportBehind streams the Behind-on-GPS roster as CSV.
 func (s *Server) ExportBehind(w http.ResponseWriter, r *http.Request) {
 	clients, err := s.clients()

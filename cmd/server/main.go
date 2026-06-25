@@ -242,6 +242,7 @@ func main() {
 	r.Get("/export/violations.csv", srv.ExportViolations)
 	r.Get("/export/cases.csv", srv.ExportCases)
 	r.Get("/export/em-fees.csv", srv.ExportEMFees)
+	r.Get("/export/letters.csv", srv.ExportLetters)     // show-cause letter history
 	r.Get("/export/referrals.csv", srv.ExportReferrals) // app-entered referral data
 	r.Get("/export/all.zip", srv.ExportAllData)         // full DB dump (supervisor-gated inside the handler)
 
@@ -249,6 +250,7 @@ func main() {
 	r.Get("/reports", srv.Reports)
 	r.Get("/reports/behind", srv.ReportBehind)
 	r.Get("/reports/missed", srv.ReportMissed)
+	r.Get("/reports/letters", srv.ReportLetters) // cross-client show-cause-letter history
 
 	// Past-Due EM Fees report + memo generation (the show-cause letters).
 	r.Get("/reports/em-fees", srv.ReportEMFees)

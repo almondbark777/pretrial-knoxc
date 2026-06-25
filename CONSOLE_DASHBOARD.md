@@ -822,3 +822,46 @@ Two requested tweaks, both live-verified, full suite green.
    `consoleClientRows` sorts the same way so the no-JS path matches. CSV export
    gained the column. Tests updated: `TestRosterRowsJSON` (rd/rds keys),
    `TestConsoleClientRowsDateSortKeys` (referral key ISO-or-empty).
+
+## 2026-06-25 · Show-Cause Letters history report (R3) — `/reports/letters`
+
+Backlog pick (playbook §10: "surface letter history beyond the record
+timeline"). The `letter_log` table already recorded every past-due EM-fee memo
+generated — single download or batch zip — but that history was only visible
+per-client (record Activity tab + the EM-fees report's "Last letter" column).
+There was no office-wide view of *who got a letter and when*, so a second
+officer could re-send what was just sent. This adds that cross-client log as a
+printable report + CSV, reusing the existing report machinery (zero new
+template — it renders the generic `report.html`).
+
+- **Data:** `db.ListRecentLetters(d, limit)` — all `letter_log` rows, newest
+  first (`created_at DESC, letter_id DESC`), capped (default 500 / 2000 for CSV),
+  tolerant of a pre-migration DB (missing table → empty, same as `LastLetters`).
+- **Report:** `GET /reports/letters` (`ReportLetters`) — columns Generated (ET) ·
+  Client · IDN · Case · Type · Detail · By. Client name resolved from the live
+  roster (`clientNames` map over `s.clients()`); a since-removed/closed client
+  with no roster row falls back to its IDN. The roster build is skipped entirely
+  when there are zero letters (the common pre-go-live case). Officer shown via
+  `compute.FmtOfficer`; type token labeled ("em_fees" → "Past-due EM fee").
+- **CSV:** `GET /export/letters.csv` (`ExportLetters`) — same header/rows
+  (`letterReportColumns` + `letterReportRows` shared so the two never drift).
+- **Discoverability:** new card on the Reports hub (with CSV button) and a
+  "Letter history" button in the EM-fees report toolbar (next to the generator).
+  Open to any allowed officer, like the other reports (not supervisor-gated —
+  it's the same audience that runs the letter batches).
+- **Tests:** `TestListRecentLetters` (newest-first across clients, limit cap,
+  missing-table tolerance), `TestLetterReportRows` (name resolution + IDN
+  fallback + type label + officer-not-email), `TestExportLettersCSV` (end-to-end
+  CSV: header, newest-first order, roster name spliced in, unknown IDN passes
+  through). Full `go test ./...` green; gofmt/vet/build clean.
+- **Live-verified** (preview, supervisor login): `/reports/letters` 200 + empty
+  state on a fresh DB, CSV header correct, hub card + EM-fees link present; then
+  generated one real memo via the live POST → the report's table rendered the
+  row (name "ABSHER, KELLY SHERMAN" from the roster, ET timestamp, "Past-due EM
+  fee", "behind $816.00 · open", officer "Alexander Bentley"), CSV gained the
+  matching data line. Smoke DB deleted after.
+
+**Remaining candidates** for a future R3: EM-fees xlsx export option (§10);
+a11y sweep of the newer modals (waiver/schedule/import/GPS-edit) vs the older
+ones; `/console/help` sync for features landed since (GPS tab, edit-case-info,
+PTR check, letter history); handler-layer test depth (R2 names the thinnest).

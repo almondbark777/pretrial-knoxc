@@ -8,6 +8,7 @@ import (
 
 	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/models"
 )
 
@@ -131,5 +132,96 @@ func (s *Server) ReportMissed(w http.ResponseWriter, r *http.Request) {
 		Columns:  []string{"Name", "IDN", "Officer", "Level", "Detail"},
 		Rows:     rows,
 		CSVPath:  "/export/missed.csv",
+	})
+}
+
+// letterReportColumns is the shared header for the show-cause-letter history —
+// the printable report and the CSV export use the same shape so the two never
+// drift. Kept here next to letterReportRows.
+var letterReportColumns = []string{"Generated (ET)", "Client", "IDN", "Case", "Type", "Detail", "By"}
+
+// letterTypeLabel turns the stored letter_type token into a human label. Only
+// "em_fees" exists today; the default keeps any future type readable.
+func letterTypeLabel(t string) string {
+	switch strings.TrimSpace(t) {
+	case "em_fees":
+		return "Past-due EM fee"
+	case "":
+		return "—"
+	default:
+		return t
+	}
+}
+
+// clientNames maps each IDN to its display name from the computed roster, so a
+// letter-history row can show a name instead of a bare IDN. A letter for a
+// since-removed/closed client just isn't in the active roster — callers fall
+// back to the IDN for those.
+func clientNames(clients map[string][]*compute.Client) map[string]string {
+	out := make(map[string]string, len(clients))
+	for idn, cs := range clients {
+		for _, c := range cs {
+			if n := strings.TrimSpace(c.Name); n != "" {
+				out[idn] = n
+				break
+			}
+		}
+	}
+	return out
+}
+
+// letterReportRows formats letter_log entries into table/CSV rows, resolving
+// each IDN to a name where the roster knows it. Aligned with
+// letterReportColumns.
+func letterReportRows(entries []models.LetterLogEntry, names map[string]string) [][]string {
+	rows := make([][]string, 0, len(entries))
+	for _, e := range entries {
+		name := names[e.IDN]
+		if name == "" {
+			name = e.IDN
+		}
+		rows = append(rows, []string{
+			e.CreatedAt, name, e.IDN, e.Case, letterTypeLabel(e.Type), e.Detail,
+			compute.FmtOfficer(e.GeneratedBy),
+		})
+	}
+	return rows
+}
+
+// letterHistory loads the recent letter-generation feed and resolves client
+// names — the shared body of the report and the CSV export. The roster build is
+// skipped entirely when no letters exist (the common pre-go-live case).
+func (s *Server) letterHistory(limit int) ([][]string, error) {
+	entries, err := db.ListRecentLetters(s.DB, limit)
+	if err != nil {
+		return nil, err
+	}
+	names := map[string]string{}
+	if len(entries) > 0 {
+		if clients, err := s.clients(); err == nil {
+			names = clientNames(clients)
+		}
+	}
+	return letterReportRows(entries, names), nil
+}
+
+// ReportLetters is the print-ready cross-client show-cause-letter history: every
+// past-due EM-fee memo the site has generated (single download or batch zip),
+// newest first. The per-client view lives on the record's Activity timeline and
+// the EM-fees report's "Last letter" column; this is the office-wide log of who
+// got a letter and when — so a second officer doesn't re-send what was just sent.
+func (s *Server) ReportLetters(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.letterHistory(500)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	s.renderReport(w, r, models.Report{
+		Title:    "Show-Cause Letters — Recent",
+		Subtitle: "Past-due EM-fee memos generated from this site, newest first",
+		Columns:  letterReportColumns,
+		Rows:     rows,
+		CSVPath:  "/export/letters.csv",
+		Note:     "Logged automatically when a memo is downloaded — single downloads and batch zips alike. The per-client history also shows on each record's Activity tab and as the “Last letter” column on the Past-Due EM Fees report.",
 	})
 }

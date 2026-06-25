@@ -85,6 +85,36 @@ func ListLetters(d *sql.DB, idn string) ([]models.LetterLogEntry, error) {
 	return out, rows.Err()
 }
 
+// ListRecentLetters returns the most recent letter-generation events across ALL
+// clients, newest first, capped at limit — the feed behind the cross-client
+// "Show-Cause Letters" report. Tolerant of a pre-migration DB (missing table
+// reads as empty) so the report renders "nothing yet" instead of erroring.
+func ListRecentLetters(d *sql.DB, limit int) ([]models.LetterLogEntry, error) {
+	if limit <= 0 || limit > 2000 {
+		limit = 500
+	}
+	if !tableExists(d, "letter_log") {
+		return nil, nil
+	}
+	rows, err := d.Query(
+		`SELECT letter_id, idn, IFNULL(case_number,''), letter_type, IFNULL(detail,''),
+		        IFNULL(generated_by,''), created_at
+		   FROM letter_log ORDER BY created_at DESC, letter_id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.LetterLogEntry
+	for rows.Next() {
+		var l models.LetterLogEntry
+		if err := rows.Scan(&l.ID, &l.IDN, &l.Case, &l.Type, &l.Detail, &l.GeneratedBy, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
 // LastLetters returns each client's most recent letter generation for the
 // given type. Tolerant of a pre-migration DB (missing table reads as empty) —
 // callers just show "—".
