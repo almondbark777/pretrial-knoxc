@@ -5,7 +5,9 @@ go 1.22
 require (
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/gorilla/sessions v1.2.2
+	github.com/makiuchi-d/gozxing v0.1.1
 	modernc.org/sqlite v1.29.5
+	rsc.io/qr v0.2.0
 )
 
 require (
@@ -17,6 +19,8 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.41.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
