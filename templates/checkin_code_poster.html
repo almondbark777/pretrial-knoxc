@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check-In Poster — {{.Code}}</title>
+<style>
+:root{--ink:#11161d;--muted:#5b6573;--brand:#1f4e79}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font:16px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.bar{padding:12px 16px;border-bottom:1px solid #e2e7ee;display:flex;gap:10px;justify-content:flex-end}
+.bar a,.bar button{font:inherit;font-size:14px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--brand);background:#fff;color:var(--brand);cursor:pointer;text-decoration:none}
+.bar button.solid{background:var(--brand);color:#fff}
+.poster{max-width:680px;margin:0 auto;padding:46px 40px;text-align:center}
+.kicker{color:var(--muted);font-size:15px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+h1{font-size:40px;margin:10px 0 6px}
+.lead{font-size:20px;color:#33404f;margin:0 0 26px}
+.qrbox{display:inline-block;padding:18px;border:2px solid var(--ink);border-radius:18px}
+.qrbox svg{width:300px;height:300px;display:block}
+.steps{margin:30px auto 0;max-width:440px;text-align:left;font-size:18px}
+.steps li{margin:8px 0}
+.code{margin-top:26px;font-size:17px;color:var(--muted)}
+.code b{color:var(--ink);font-size:26px;letter-spacing:.06em}
+.url{margin-top:8px;font-size:15px;color:var(--muted);word-break:break-all}
+.foot{margin-top:30px;color:var(--muted);font-size:13px}
+@media print{.bar{display:none}.poster{padding:24px}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <a href="/console/checkins/codes">← Back</a>
+  <button class="solid" onclick="window.print()">Print</button>
+</div>
+<div class="poster">
+  <div class="kicker">Knox County Pre-Trial Services</div>
+  <h1>Check in here</h1>
+  <p class="lead">Scan the code with your phone's camera to report.</p>
+  <div class="qrbox">{{.QR}}</div>
+  <ol class="steps">
+    <li>Open the camera app on your phone.</li>
+    <li>Point it at the square code above.</li>
+    <li>Tap the link, fill out the short form, and submit.</li>
+  </ol>
+  <div class="code">Or visit the address below and enter code <b>{{.Code}}</b></div>
+  <div class="url">{{.URL}}</div>
+  <div class="foot">A Pre-Trial officer reviews every check-in before it's accepted.</div>
+</div>
+</body>
+</html>

@@ -409,6 +409,42 @@ CREATE TABLE IF NOT EXISTS checkin_config (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS checkin_media (
+    media_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    checkin_id INTEGER NOT NULL,
+    kind       TEXT NOT NULL,
+    mime       TEXT NOT NULL,
+    sha256     TEXT NOT NULL,
+    image_b64  TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_checkin_media ON checkin_media(checkin_id, kind);
+
+CREATE TABLE IF NOT EXISTS client_flags (
+    flag_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn        INTEGER NOT NULL,
+    severity   TEXT NOT NULL DEFAULT 'red',
+    reason     TEXT,
+    active     INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cleared_by TEXT,
+    cleared_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_client_flags ON client_flags(idn, active);
+
+CREATE TABLE IF NOT EXISTS bulletins (
+    bulletin_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    body        TEXT,
+    priority    TEXT NOT NULL DEFAULT 'normal',
+    pinned      INTEGER NOT NULL DEFAULT 0,
+    active      INTEGER NOT NULL DEFAULT 1,
+    created_by  TEXT,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_bulletins_active ON bulletins(active, pinned, bulletin_id);
 `
 
 // EnsureSchema creates the admin + extension tables if they don't exist. Safe to

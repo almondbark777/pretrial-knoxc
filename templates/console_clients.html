@@ -179,6 +179,7 @@ document.addEventListener('DOMContentLoaded',function(){
       default: return chip('neutral','',label||'—');
     }
   }
+  function flagChip(sev){return '<span class="chip '+(sev==='amber'?'warn':'risk')+' sm" title="Flagged client" style="margin-left:6px">🚩</span>'}
   function levelLabel(l){return (l>=1&&l<=3)?('Level '+l):'Level —'}
   function compKey(label){return label==='Behind on GPS'?'behind':label==='Missed check-in'?'missed':label==='Compliant'?'ok':'other'}
   function statusKey(label){return label==='Active'?'active':(label==='Closed'?'closed':'other')}
@@ -186,7 +187,7 @@ document.addEventListener('DOMContentLoaded',function(){
   function rowHTML(r){
     return '<tr data-idn="'+esc(r.i)+'" data-href="/console/clients/'+esc(r.i)+'" tabindex="0">'
       +'<td class="cbcol"><input type="checkbox" class="rcb" aria-label="Select '+esc(r.n)+'"></td>'
-      +'<td><div class="namecell"><span class="av">'+esc(r.a)+'</span><span class="nm">'+esc(r.n)+'</span></div></td>'
+      +'<td><div class="namecell"><span class="av">'+esc(r.a)+'</span><span class="nm">'+esc(r.n)+'</span>'+(r.fl?flagChip(r.fl):'')+'</div></td>'
       +'<td>'+esc(r.c)+'</td>'
       +'<td>'+lvlChip(r.l,r.g)+'</td>'
       +'<td>'+statusChip(r.st)+'</td>'

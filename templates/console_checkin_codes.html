@@ -1,0 +1,78 @@
+{{template "c_top" .}}
+<div class="phead">
+  <div>
+    <h1>Lobby check-in code</h1>
+    <div class="sub">The rotating code the lobby QR encodes. It's a provenance signal, not a lock — a check-in stamped with an old or unknown code is auto-flagged for review. Mint a fresh code each week and reprint the poster.</div>
+  </div>
+  <div class="phead-side">
+    <a class="btn ghost" href="/console/checkins">← Approvals</a>
+  </div>
+</div>
+
+{{if .Active}}
+<div class="panel codecard">
+  <div class="cc-l">
+    <span class="k">Active code</span>
+    <div class="cc-code">{{.Active.Code}}</div>
+    <div class="cc-meta">{{.Active.Label}} · {{.Active.Window}}{{if .Active.CreatedBy}} · minted by {{.Active.CreatedBy}}{{end}}</div>
+  </div>
+  <div class="cc-r">
+    <a class="btn" href="/console/checkins/poster?c={{.Active.Code}}" target="_blank" rel="noopener">Print poster →</a>
+  </div>
+</div>
+{{else}}
+<div class="panel"><div class="emptybox" style="padding:26px">No active code yet. Mint one below, then print the poster for the lobby.</div></div>
+{{end}}
+
+<div class="panel mintpanel">
+  <h2>Mint a new code</h2>
+  <p class="sub">This deactivates the current code. Defaults cover this week — adjust if you like.</p>
+  <form method="post" action="/admin/checkin/code/create" class="mintform">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="mf-grid">
+      <label>Code<input type="text" name="code" value="{{.SuggestCode}}" maxlength="16"></label>
+      <label>Label<input type="text" name="label" value="{{.SuggestLabel}}" maxlength="60"></label>
+      <label>Valid from<input type="date" name="valid_from" value="{{.SuggestFrom}}"></label>
+      <label>Valid to<input type="date" name="valid_to" value="{{.SuggestTo}}"></label>
+    </div>
+    <button type="submit" class="btn">Mint code</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>History</h2>
+  <table class="ctable">
+    <thead><tr><th>Code</th><th>Window</th><th>Label</th><th>Minted by</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {{range .Codes}}
+      <tr>
+        <td><b>{{.Code}}</b></td>
+        <td>{{.Window}}</td>
+        <td>{{.Label}}</td>
+        <td>{{.CreatedBy}}</td>
+        <td>{{if .Active}}<span class="chip ok sm">active</span>{{else}}<span class="chip neutral sm">retired</span>{{end}}</td>
+        <td><a href="/console/checkins/poster?c={{.Code}}" target="_blank" rel="noopener">poster</a></td>
+      </tr>
+      {{else}}
+      <tr><td colspan="6" class="muted">No codes minted yet.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<style>
+.codecard{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px}
+.cc-l .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.cc-code{font-size:32px;font-weight:800;letter-spacing:.06em;margin:4px 0}
+.cc-meta{color:var(--muted);font-size:13px}
+.mintpanel{padding:18px 20px}.mintpanel h2{margin:0 0 4px;font-size:16px}
+.mintform{margin-top:12px}
+.mf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+.mf-grid label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.mf-grid input{font-size:15px;padding:9px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel);color:var(--ink)}
+.ctable{width:100%;border-collapse:collapse;margin-top:10px}
+.ctable th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--line-2)}
+.ctable td{padding:8px 10px;border-bottom:1px solid var(--line-2);font-size:14px}
+.ctable .muted{color:var(--muted)}
+</style>
+{{template "c_bot" .}}

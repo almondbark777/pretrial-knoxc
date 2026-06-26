@@ -59,6 +59,7 @@ func (s *Server) ConsoleCheckins(w http.ResponseWriter, r *http.Request) {
 	data := s.consoleBase(w, r, "checkins", s.trackFrom(r))
 	data["Checkins"] = rows
 	data["PendingCount"] = len(rows)
+	data["Bulletins"], _ = db.ListBulletins(s.DB) // office-wide notice board on the check-in page
 	s.renderConsole(w, "console_checkins.html", data)
 }
 

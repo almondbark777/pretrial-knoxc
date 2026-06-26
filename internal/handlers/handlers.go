@@ -19,6 +19,7 @@ import (
 	"pretrial-knoxc/internal/chat"
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
+	"pretrial-knoxc/internal/ipgeo"
 	"pretrial-knoxc/internal/models"
 )
 
@@ -50,6 +51,14 @@ type Server struct {
 	// Set in main after New(); may be nil in tests that don't exercise chat.
 	Chat *chat.Hub
 
+	// IPGeo enriches a self-check-in's source IP with city/region/ISP for the
+	// approval queue. Inert (no-op) unless configured; set in main after New().
+	IPGeo ipgeo.Provider
+
+	// checkinLimiter rate-limits the public /checkin/submit endpoint (the one
+	// unauthenticated write surface). Always non-nil after New().
+	checkinLimiter *submitLimiter
+
 	cacheTTL   time.Duration
 	mu         sync.Mutex
 	cached     map[string][]*compute.Client
@@ -67,7 +76,12 @@ type Server struct {
 
 // New builds a Server.
 func New(db *sql.DB, a *auth.Authenticator, tmpl *template.Template, ttl time.Duration, importerRetired bool) *Server {
-	return &Server{DB: db, Auth: a, Tmpl: tmpl, cacheTTL: ttl, ImporterRetired: importerRetired}
+	return &Server{
+		DB: db, Auth: a, Tmpl: tmpl, cacheTTL: ttl, ImporterRetired: importerRetired,
+		IPGeo: ipgeo.Disabled{}, // overridden in main when enrichment is configured
+		// Public-check-in abuse guard: ≤6 submits / 10 min / IP, ≥15s apart.
+		checkinLimiter: newSubmitLimiter(6, 10*time.Minute, 15*time.Second),
+	}
 }
 
 // clients returns the joined client set (idn -> all case rows), rebuilt at most

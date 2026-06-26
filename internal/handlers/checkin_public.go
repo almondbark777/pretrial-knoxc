@@ -19,6 +19,10 @@
 package handlers
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -30,6 +34,10 @@ import (
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/models"
 )
+
+// maxImageBytes caps a decoded selfie/signature (the request body is already
+// capped upstream; this bounds a single field and what we persist per row).
+const maxImageBytes = 1 << 20 // 1 MiB
 
 // consentText is the notice the client accepts. Stored verbatim on each
 // submission (with its version) so the record proves exactly what was agreed to.
@@ -56,6 +64,13 @@ func (s *Server) CheckinDone(w http.ResponseWriter, r *http.Request) {
 // CheckinSubmit records one self-check-in (status pending) with server-observed
 // + client-supplied telemetry and a computed presence assessment.
 func (s *Server) CheckinSubmit(w http.ResponseWriter, r *http.Request) {
+	// Abuse guard on the one unauthenticated write endpoint (burst + spacing).
+	if s.checkinLimiter != nil {
+		if ok, _ := s.checkinLimiter.allow(clientIP(r)); !ok {
+			http.Redirect(w, r, "/checkin?err=toomany", http.StatusSeeOther)
+			return
+		}
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -126,15 +141,75 @@ func (s *Server) CheckinSubmit(w http.ResponseWriter, r *http.Request) {
 	dob := strings.TrimSpace(r.FormValue("dob"))
 	c.IDN = s.matchClientIDN(c.ClientName, dob)
 
+	// Enrich the server-observed source IP (best-effort; inert unless configured).
+	// Done before the hash is sealed so the geo is part of the evidence record.
+	if s.IPGeo != nil && s.IPGeo.Enabled() {
+		ctx, cancel := context.WithTimeout(r.Context(), 2500*time.Millisecond)
+		geo := s.IPGeo.Lookup(ctx, c.SrcIP)
+		cancel()
+		c.IPCity, c.IPRegion, c.IPISP = geo.City, geo.Region, geo.ISP
+	}
+
+	// Captured images: a selfie and, when the client draws rather than types,
+	// their signature. We seal each image's sha256 INTO the record (so the bytes
+	// stored separately in checkin_media can't be swapped undetected) before the
+	// hash chain closes; the bytes themselves are saved after we have the row id.
+	selfie := decodeDataImage(r.FormValue("selfie_jpeg"))
+	sig := decodeDataImage(r.FormValue("signature_jpeg"))
+	if len(selfie) > 0 {
+		c.SelfiePath = "sha256:" + sha256Hex(selfie)
+		c.SelfieLiveness = "self-captured" // honest: a photo, not a verified-liveness check
+	}
+	if len(sig) > 0 {
+		c.SignatureKind = "drawn"
+		name := c.SignatureData
+		c.SignatureData = strings.TrimSpace(name + " · drawn:sha256:" + sha256Hex(sig))
+	}
+
 	// Presence assessment (badge + distances + flags), server-side.
 	s.assessPresence(&c, dob)
 
-	if _, _, err := db.InsertCheckin(s.DB, c); err != nil {
+	id, _, err := db.InsertCheckin(s.DB, c)
+	if err != nil {
 		http.Error(w, "could not record check-in", http.StatusInternalServerError)
 		return
 	}
+	// Persist the heavy image blobs against the new row (the digests are already
+	// sealed above). A media failure shouldn't lose the check-in — log-and-skip.
+	if len(selfie) > 0 {
+		_, _ = db.SaveCheckinMedia(s.DB, id, "selfie", "image/jpeg", selfie)
+	}
+	if len(sig) > 0 {
+		_, _ = db.SaveCheckinMedia(s.DB, id, "signature", "image/jpeg", sig)
+	}
 	s.clearCache() // refresh the pending-count nav badge
 	http.Redirect(w, r, "/checkin/done", http.StatusSeeOther)
+}
+
+// decodeDataImage parses a "data:image/jpeg;base64,…" URL into raw JPEG bytes,
+// returning nil for anything blank, non-JPEG, or over the size cap.
+func decodeDataImage(dataURL string) []byte {
+	dataURL = strings.TrimSpace(dataURL)
+	if dataURL == "" {
+		return nil
+	}
+	i := strings.IndexByte(dataURL, ',')
+	if i < 0 || !strings.Contains(strings.ToLower(dataURL[:i]), "image/jpeg") {
+		return nil
+	}
+	raw, err := base64.StdEncoding.DecodeString(dataURL[i+1:])
+	if err != nil || len(raw) < 4 || len(raw) > maxImageBytes {
+		return nil
+	}
+	if raw[0] != 0xFF || raw[1] != 0xD8 { // JPEG SOI magic
+		return nil
+	}
+	return raw
+}
+
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
 
 // matchClientIDN finds the unique client whose name tokens and birthdate match
@@ -216,6 +291,20 @@ func (s *Server) assessPresence(c *models.Checkin, dob string) {
 			flags = append(flags, "gps_denied")
 		} else {
 			flags = append(flags, "gps_unavailable")
+		}
+	}
+
+	// Device-binding signals (independent of GPS). The current submission isn't
+	// inserted yet, so these reflect prior history only.
+	if c.IDN != "0" && c.DeviceID != "" {
+		seen, others := db.DeviceUsage(s.DB, c.DeviceID, c.IDN)
+		if len(others) > 0 {
+			flags = append(flags, "shared_device") // one handset used for several clients
+		}
+		if !seen {
+			if prior, _ := db.ListCheckinsForIDN(s.DB, c.IDN); len(prior) > 0 {
+				flags = append(flags, "new_device") // checked in before, but never from this phone
+			}
 		}
 	}
 

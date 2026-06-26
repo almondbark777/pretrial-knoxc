@@ -340,6 +340,7 @@ type ConsoleClientRow struct {
 	ReferredSort    string // ISO key; "" when none, so the default newest-first sort drops it to the bottom
 	Compliance      Chip
 	GpsActive       bool
+	Flag            string // manual client-flag severity: "red" | "amber" | ""
 	// lowercase blobs for client-side filtering
 	Search string
 }
@@ -415,23 +416,24 @@ func consoleClientRows(clients map[string][]*compute.Client, track time.Time, co
 // client-side windowing. Keeping keys short trims the payload across thousands of
 // rows; chips are rebuilt in JS from L/St/Cmp so no markup is duplicated here.
 type rosterJSONRow struct {
-	I   string `json:"i"`   // idn
-	N   string `json:"n"`   // name
-	A   string `json:"a"`   // initials (avatar)
-	C   string `json:"c"`   // case no
-	L   int    `json:"l"`   // level
-	St  string `json:"st"`  // status chip label
-	Nc  string `json:"nc"`  // next court (display)
-	Ncs string `json:"ncs"` // next court (ISO sort key)
-	Ci  string `json:"ci"`  // next check-in (display)
-	Cis string `json:"cis"` // next check-in (ISO sort key)
-	Ov  bool   `json:"ov"`  // check-in overdue
-	Rd  string `json:"rd"`  // referred (display)
-	Rds string `json:"rds"` // referred (ISO sort key; "" when none)
-	Cm  string `json:"cm"`  // compliance chip label
-	G   bool   `json:"g"`   // gps active
-	O   string `json:"o"`   // officer (display)
-	S   string `json:"s"`   // lowercase search blob
+	I   string `json:"i"`            // idn
+	N   string `json:"n"`            // name
+	A   string `json:"a"`            // initials (avatar)
+	C   string `json:"c"`            // case no
+	L   int    `json:"l"`            // level
+	St  string `json:"st"`           // status chip label
+	Nc  string `json:"nc"`           // next court (display)
+	Ncs string `json:"ncs"`          // next court (ISO sort key)
+	Ci  string `json:"ci"`           // next check-in (display)
+	Cis string `json:"cis"`          // next check-in (ISO sort key)
+	Ov  bool   `json:"ov"`           // check-in overdue
+	Rd  string `json:"rd"`           // referred (display)
+	Rds string `json:"rds"`          // referred (ISO sort key; "" when none)
+	Cm  string `json:"cm"`           // compliance chip label
+	G   bool   `json:"g"`            // gps active
+	O   string `json:"o"`            // officer (display)
+	Fl  string `json:"fl,omitempty"` // manual client-flag severity ("red"|"amber")
+	S   string `json:"s"`            // lowercase search blob
 }
 
 // rosterRowsJSON marshals the roster as a compact JSON array embedded in the page
@@ -446,7 +448,7 @@ func rosterRowsJSON(rows []ConsoleClientRow) template.JS {
 			St: r.StatusChip.Label, Nc: r.NextCourt, Ncs: r.NextCourtSort,
 			Ci: r.NextCheckIn, Cis: r.NextCheckInSort, Ov: r.CheckInOverdue,
 			Rd: r.Referred, Rds: r.ReferredSort,
-			Cm: r.Compliance.Label, G: r.GpsActive, O: r.Officer, S: r.Search,
+			Cm: r.Compliance.Label, G: r.GpsActive, O: r.Officer, Fl: r.Flag, S: r.Search,
 		}
 	}
 	b, err := json.Marshal(out)

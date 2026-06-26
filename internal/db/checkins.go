@@ -31,6 +31,7 @@ import (
 var checkinConfigDefaults = map[string]string{
 	"background_location_enabled": "0",
 	"sms_otp_enabled":             "0",       // capability built (internal/otp); off until Twilio + 10DLC are live
+	"ip_geo_enabled":              "0",       // capability built (internal/ipgeo); off until a lookup endpoint is set
 	"office_lat":                  "35.9646", // 300 Main St, Knoxville TN (approx; set precisely in admin)
 	"office_lng":                  "-83.9202",
 	"geofence_radius_m":           "150",
@@ -180,6 +181,29 @@ func CreateWeeklyCode(d *sql.DB, code, label, validFrom, validTo, by string) (in
 		return 0, err
 	}
 	return id, tx.Commit()
+}
+
+// ListWeeklyCodes returns every minted lobby code, newest first — the history
+// behind the weekly-code admin page (the active one sorts to the top).
+func ListWeeklyCodes(d *sql.DB) ([]models.WeeklyCode, error) {
+	rows, err := d.Query(`
+		SELECT code_id, code, IFNULL(label,''), valid_from, valid_to, active, IFNULL(created_by,''), IFNULL(created_at,'')
+		  FROM checkin_weekly_codes ORDER BY active DESC, code_id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.WeeklyCode
+	for rows.Next() {
+		var w models.WeeklyCode
+		var active int
+		if err := rows.Scan(&w.ID, &w.Code, &w.Label, &w.ValidFrom, &w.ValidTo, &active, &w.CreatedBy, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		w.Active = active != 0
+		out = append(out, w)
+	}
+	return out, rows.Err()
 }
 
 func scanWeeklyCode(row *sql.Row) (*models.WeeklyCode, error) {

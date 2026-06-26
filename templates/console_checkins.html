@@ -4,8 +4,46 @@
     <h1>Check-in approvals</h1>
     <div class="sub">Self-service check-ins waiting for review, oldest first. Approving one makes it the official check-in record; rejecting keeps it on file with your reason. Nothing here is editable — the captured data is sealed.</div>
   </div>
-  <div class="phead-side">
+  <div class="phead-side" style="gap:10px">
+    <a class="btn" href="/console/checkins/poster" target="_blank" rel="noopener" title="Printable lobby QR for self check-in">📱 Check-in QR</a>
+    <a class="btn ghost" href="/console/checkins/codes">Lobby code</a>
     <span class="chip {{if .PendingCount}}warn{{else}}ok{{end}}">{{.PendingCount}} pending</span>
+  </div>
+</div>
+
+{{/* ── Office notice board (persistent, every officer sees it) ── */}}
+<div class="panel noticeboard">
+  <div class="nb-head">
+    <h2>📌 Office notice board</h2>
+    <button type="button" class="btn ghost sm" onclick="var f=document.getElementById('nbForm');f.classList.toggle('hide');if(!f.classList.contains('hide'))f.querySelector('input[name=title]').focus();">+ Post a notice</button>
+  </div>
+  <form id="nbForm" class="nb-form hide" method="post" action="/admin/bulletin/add">
+    <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="next" value="/console/checkins">
+    <input type="text" name="title" placeholder="Title — e.g. Court closed Friday" maxlength="120" required>
+    <textarea name="body" rows="2" placeholder="Details (optional)" maxlength="2000"></textarea>
+    <div class="nb-row">
+      <label class="nb-chk"><input type="checkbox" name="priority" value="high"> High priority</label>
+      <label class="nb-chk"><input type="checkbox" name="pinned" value="1"> Pin to top</label>
+      <span class="grow"></span>
+      <button type="submit" class="btn">Post notice</button>
+    </div>
+  </form>
+  <div class="nb-list">
+    {{range .Bulletins}}
+    <div class="nb-item{{if eq .Priority "high"}} high{{end}}{{if .Pinned}} pinned{{end}}">
+      <div class="nb-main">
+        <div class="nb-title">{{if .Pinned}}📌 {{end}}{{if eq .Priority "high"}}<span class="chip risk sm">High</span> {{end}}{{.Title}}</div>
+        {{if .Body}}<div class="nb-body">{{.Body}}</div>{{end}}
+        <div class="nb-meta">{{officer .CreatedBy}}{{if .CreatedAt}} · {{shortdate .CreatedAt}}{{end}}</div>
+      </div>
+      <form method="post" action="/admin/bulletin/remove" onsubmit="return confirm('Remove this notice?')" style="margin:0">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/checkins">
+        <button type="submit" class="nb-x" aria-label="Remove notice">×</button>
+      </form>
+    </div>
+    {{else}}
+    <div class="nb-empty">No notices posted. Use <b>+ Post a notice</b> to share something with the team — it stays here until someone removes it.</div>
+    {{end}}
   </div>
 </div>
 
@@ -35,7 +73,7 @@
       <div class="ch-cell" title="Server-observed source IP and its geolocation">
         <span class="k">IP</span><span class="v">{{if .SrcIP}}{{.SrcIP}}{{if .IPCity}} · {{.IPCity}}{{end}}{{else}}—{{end}}</span></div>
       <div class="ch-cell"><span class="k">Identity (SMS)</span><span class="v">{{if .OTPVerifiedAt}}✓ {{.OTPPhoneMask}}{{else}}— not verified{{end}}</span></div>
-      <div class="ch-cell"><span class="k">Selfie</span><span class="v">{{if .SelfiePath}}{{.SelfieLiveness}}{{else}}—{{end}}</span></div>
+      <div class="ch-cell"><span class="k">Selfie</span><span class="v">{{if .SelfiePath}}<a href="/console/checkins/{{.ID}}/selfie" target="_blank" rel="noopener" title="View selfie"><img class="ch-thumb" src="/console/checkins/{{.ID}}/selfie" alt="selfie"></a>{{else}}—{{end}}</span></div>
       <div class="ch-cell"><span class="k">Lobby code</span><span class="v">{{if .WeekCodeValid}}current{{else}}⚠ stale / unknown{{end}}</span></div>
       <div class="ch-cell"><span class="k">Court date</span><span class="v">{{if .NextCourtDate}}{{.NextCourtDate}}{{else}}—{{end}}</span></div>
     </div>
@@ -47,6 +85,7 @@
     </div>
 
     <div class="ch-actions">
+      <a href="/console/checkins/{{.ID}}/packet" target="_blank" rel="noopener" class="btn ghost" title="Tamper-sealed evidence PDF for a DA">Court packet (PDF)</a>
       <form method="post" action="/admin/checkin/approve" class="ch-approve">
         <input type="hidden" name="csrf" value="{{$.CSRF}}">
         <input type="hidden" name="id" value="{{.ID}}">
@@ -84,7 +123,26 @@
 .ch-reject{display:flex;align-items:center;gap:8px;flex:1;min-width:240px}
 .ch-reject input[type=text]{flex:1;min-height:38px;padding:6px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel-2);color:var(--ink);font-size:16px}
 .chip.sm{font-size:11.5px;padding:2px 8px}
+.ch-thumb{width:34px;height:34px;border-radius:6px;object-fit:cover;border:1px solid var(--line-2);vertical-align:middle}
 .phead-side{display:flex;align-items:center}
+.noticeboard{padding:16px 18px;margin-bottom:16px}
+.nb-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.nb-head h2{margin:0;font-size:16px}
+.nb-form{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding:12px;border:1px solid var(--line-2);border-radius:10px;background:var(--panel-2)}
+.nb-form input[type=text],.nb-form textarea{width:100%;font-size:15px;padding:9px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel);color:var(--ink)}
+.nb-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.nb-chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.nb-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.nb-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--panel)}
+.nb-item.high{border-color:#f3c0bb;background:#fdecea}
+.nb-item.pinned{border-left:3px solid var(--brand)}
+.nb-main{flex:1}
+.nb-title{font-weight:600;font-size:14.5px}
+.nb-body{font-size:13.5px;color:var(--ink);margin-top:3px;white-space:pre-wrap}
+.nb-meta{font-size:12px;color:var(--muted);margin-top:4px}
+.nb-x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px}
+.nb-empty{font-size:13.5px;color:var(--muted);padding:8px 2px}
+.hide{display:none}
 @media(max-width:560px){.ch-actions{flex-direction:column;align-items:stretch}.ch-reject{min-width:0}}
 </style>
 {{template "c_bot" .}}

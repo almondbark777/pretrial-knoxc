@@ -33,6 +33,12 @@ button.go:disabled{opacity:.5}
 .err{background:#fdecea;color:var(--risk);border:1px solid #f3c0bb;border-radius:10px;padding:10px 12px;font-size:14px;margin-top:12px}
 .hide{display:none}
 .req{color:var(--risk)}
+.snap{width:100%;margin-top:10px;font-size:15px;font-weight:600;padding:12px;border:1px solid var(--brand);border-radius:10px;background:var(--brand);color:#fff}
+.snap.ghost{background:#fff;color:var(--brand)}
+.snap.sm{width:auto;margin:0;padding:7px 12px;font-size:13px}
+.sigwrap{margin-top:8px}
+.sigpad{width:100%;height:170px;border:1px dashed var(--line);border-radius:10px;background:#fff;touch-action:none}
+.sigrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -42,7 +48,7 @@ button.go:disabled{opacity:.5}
     <div><h1>Pre-Trial Check-In</h1><div class="sub">Knox County Sheriff's Office · Pre-Trial Release Services</div></div>
   </div>
 
-  {{if .Err}}<div class="err">{{if eq .Err "consent"}}You must accept the check-in notice to submit.{{else}}Something went wrong — please try again.{{end}}</div>{{end}}
+  {{if .Err}}<div class="err">{{if eq .Err "consent"}}You must accept the check-in notice to submit.{{else if eq .Err "toomany"}}Too many check-in attempts from this connection. Please wait a minute and try again.{{else}}Something went wrong — please try again.{{end}}</div>{{end}}
 
   <form id="ci" method="post" action="/checkin/submit" autocomplete="off">
     <input type="hidden" name="week_code" value="{{.WeekCode}}">
@@ -52,6 +58,7 @@ button.go:disabled{opacity:.5}
     <input type="hidden" name="gps_accuracy" id="gps_accuracy"><input type="hidden" name="gps_perm" id="gps_perm" value="unavailable">
     <input type="hidden" name="client_ts" id="client_ts"><input type="hidden" name="timezone" id="timezone">
     <input type="hidden" name="locale" id="locale"><input type="hidden" name="device_id" id="device_id">
+    <input type="hidden" name="selfie_jpeg" id="selfie_jpeg"><input type="hidden" name="signature_jpeg" id="signature_jpeg">
 
     <div class="card">
       <label>Report type</label>
@@ -107,8 +114,31 @@ button.go:disabled{opacity:.5}
     </div>
 
     <div class="card">
+      <label>Photo <span class="hint" style="font-weight:400">(optional, helps confirm it's you)</span></label>
+      <div id="camWrap" class="hide">
+        <video id="cam" playsinline autoplay muted style="width:100%;border-radius:10px;background:#000;max-height:280px;object-fit:cover"></video>
+        <button type="button" class="snap" id="snapBtn">Take photo</button>
+      </div>
+      <div id="shotWrap" class="hide">
+        <img id="shot" alt="Your photo" style="width:100%;border-radius:10px;max-height:280px;object-fit:cover">
+        <button type="button" class="snap ghost" id="retakeBtn">Retake</button>
+      </div>
+      <div id="camFallback" class="hide">
+        <input type="file" accept="image/*" capture="user" id="selfieFile" style="font-size:14px">
+        <div class="hint">Your browser couldn't open the camera. You can attach a photo instead.</div>
+      </div>
+    </div>
+
+    <div class="card">
       <label>Signature <span class="req">*</span></label>
       <input type="text" name="signature_name" required placeholder="Type your full name">
+      <div class="sigwrap">
+        <canvas id="sigPad" class="sigpad" width="520" height="170"></canvas>
+        <div class="sigrow">
+          <span class="hint" id="sigHint">Optional: sign with your finger above.</span>
+          <button type="button" class="snap ghost sm" id="sigClear">Clear</button>
+        </div>
+      </div>
       <div class="consent">{{.ConsentText}}</div>
       <div class="loc" id="locBox">Getting your location…</div>
       <label class="chk"><input type="checkbox" name="consent_accept" id="consent_accept" required><span>I have read the notice above, the information I provided is true, and I consent to the check-in.</span></label>
@@ -156,6 +186,66 @@ button.go:disabled{opacity:.5}
       document.getElementById('empWrap').classList.toggle('hide',!emp);
       document.getElementById('unempWrap').classList.toggle('hide',emp);
     });
+  });
+
+  // ── selfie capture (optional) ──
+  var camWrap=document.getElementById('camWrap'),shotWrap=document.getElementById('shotWrap'),
+      fb=document.getElementById('camFallback'),video=document.getElementById('cam'),stream=null;
+  function stopCam(){ if(stream){stream.getTracks().forEach(function(t){t.stop();});stream=null;} }
+  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false}).then(function(s){
+      stream=s;video.srcObject=s;camWrap.classList.remove('hide');
+    }).catch(function(){ fb.classList.remove('hide'); });
+  } else { fb.classList.remove('hide'); }
+
+  document.getElementById('snapBtn').addEventListener('click',function(){
+    var cw=video.videoWidth||480, ch=video.videoHeight||640, max=640, sc=Math.min(1,max/Math.max(cw,ch));
+    var cv=document.createElement('canvas');cv.width=Math.round(cw*sc);cv.height=Math.round(ch*sc);
+    cv.getContext('2d').drawImage(video,0,0,cv.width,cv.height);
+    var url=cv.toDataURL('image/jpeg',0.7);
+    document.getElementById('selfie_jpeg').value=url;
+    document.getElementById('shot').src=url;
+    camWrap.classList.add('hide');shotWrap.classList.remove('hide');stopCam();
+  });
+  document.getElementById('retakeBtn').addEventListener('click',function(){
+    document.getElementById('selfie_jpeg').value='';shotWrap.classList.add('hide');
+    if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false}).then(function(s){
+      stream=s;video.srcObject=s;camWrap.classList.remove('hide');}).catch(function(){fb.classList.remove('hide');});}
+  });
+  document.getElementById('selfieFile').addEventListener('change',function(e){
+    var f=e.target.files&&e.target.files[0];if(!f)return;
+    var img=new Image(),rd=new FileReader();
+    rd.onload=function(){img.onload=function(){
+      var max=640,sc=Math.min(1,max/Math.max(img.width,img.height));
+      var cv=document.createElement('canvas');cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      document.getElementById('selfie_jpeg').value=cv.toDataURL('image/jpeg',0.7);
+    };img.src=rd.result;};
+    rd.readAsDataURL(f);
+  });
+
+  // ── signature pad (optional drawn signature) ──
+  var pad=document.getElementById('sigPad'),pctx=pad.getContext('2d'),drawing=false,dirty=false,last=null;
+  function fitPad(){
+    var ratio=window.devicePixelRatio||1, cssW=pad.clientWidth, cssH=170;
+    pad.width=Math.round(cssW*ratio); pad.height=Math.round(cssH*ratio);
+    pctx.setTransform(ratio,0,0,ratio,0,0);
+    pctx.fillStyle='#fff';pctx.fillRect(0,0,cssW,cssH);
+    pctx.strokeStyle='#11161d';pctx.lineWidth=2.2;pctx.lineCap='round';pctx.lineJoin='round';
+  }
+  fitPad();
+  function pos(e){var r=pad.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+  function start(e){drawing=true;last=pos(e);e.preventDefault();}
+  function move(e){if(!drawing)return;var p=pos(e);pctx.beginPath();pctx.moveTo(last.x,last.y);pctx.lineTo(p.x,p.y);pctx.stroke();last=p;dirty=true;e.preventDefault();}
+  function end(){drawing=false;}
+  pad.addEventListener('mousedown',start);pad.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+  pad.addEventListener('touchstart',start,{passive:false});pad.addEventListener('touchmove',move,{passive:false});pad.addEventListener('touchend',end);
+  document.getElementById('sigClear').addEventListener('click',function(){dirty=false;fitPad();document.getElementById('signature_jpeg').value='';});
+
+  // ── on submit, capture the drawn signature if present ──
+  document.getElementById('ci').addEventListener('submit',function(){
+    if(dirty){ document.getElementById('signature_jpeg').value=pad.toDataURL('image/jpeg',0.85); }
+    stopCam();
   });
 })();
 </script>

@@ -51,6 +51,7 @@
         <button type="button" onclick="cmOpen('screenModal')">Record drug screen</button>
         <button type="button" onclick="cmOpen('scheduleModal')">Schedule check-in</button>
         <button type="button" onclick="cmOpen('tagModal')">Add tag</button>
+        <button type="button" onclick="cmOpen('flagModal')">🚩 Flag client</button>
         <form method="post" action="/admin/pin/toggle" style="margin:0">
           <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
           <button type="submit">{{if .Pinned}}Unpin client{{else}}Pin client{{end}}</button>
@@ -67,6 +68,30 @@
     </div>
   </div>
 </div>
+
+{{if .Flags}}
+<div class="flagbar">
+  {{range .Flags}}
+  <div class="flagrow {{if eq .Severity "amber"}}amber{{else}}red{{end}}">
+    <span class="fi" aria-hidden="true">🚩</span>
+    <div class="ft"><b>{{if eq .Severity "amber"}}Caution{{else}}Alert{{end}}</b>{{if .Reason}} — {{.Reason}}{{end}}<span class="fm">flagged by {{officer .CreatedBy}}{{if .CreatedAt}} · {{shortdate .CreatedAt}}{{end}}</span></div>
+    <form method="post" action="/admin/flag/clear" onsubmit="return confirm('Clear this flag?')" style="margin:0">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <button type="submit" class="btn ghost sm">Clear</button>
+    </form>
+  </div>
+  {{end}}
+</div>
+<style>
+.flagbar{display:flex;flex-direction:column;gap:8px;margin:4px 0 16px}
+.flagrow{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:10px;border:1px solid;font-size:14px}
+.flagrow.red{background:#fdecea;border-color:#f3c0bb;color:#7a1a13}
+.flagrow.amber{background:#fdf3e0;border-color:#f0d9a8;color:#7a5212}
+.flagrow .fi{font-size:18px}
+.flagrow .ft{flex:1}.flagrow .ft b{font-weight:700}
+.flagrow .fm{display:block;font-size:12px;opacity:.8;margin-top:1px}
+</style>
+{{end}}
 
 <div class="tabs" role="tablist" aria-label="Client record sections">
   <button class="active" data-tab="t-summary">Case Summary</button>
@@ -141,7 +166,7 @@
 
 {{/* ── Check-ins ── */}}
 <div class="tabpane" id="t-checkins">
-  <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><button class="btn ghost" onclick="cmOpen('scheduleModal')">Schedule Check-in</button><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><a class="btn ghost" href="/console/checkins/poster" target="_blank" rel="noopener" title="Printable lobby QR for self check-in">📱 Check-in QR</a><button class="btn ghost" onclick="cmOpen('scheduleModal')">Schedule Check-in</button><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
   {{if $r.AllCheckIns}}
   <div class="panel" style="margin-bottom:14px">
     <div class="h"><h2>All check-ins</h2><span class="muted" style="margin-left:8px;font-size:12px">imported + app · full history</span><span class="grow"></span><span class="count">{{len $r.AllCheckIns}}</span></div>
@@ -445,6 +470,20 @@
       <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, observations, etc.)</span></label><textarea name="note" placeholder="e.g. GPS fitment — strap sized, base unit #1234 issued"></textarea></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('checkinModal')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>
+  </form>
+</div></div>
+
+{{/* ── Raise a manual alert flag on the client ── */}}
+<div class="backdrop" id="flagModal" data-cm><div class="modal" role="dialog" aria-modal="true">
+  <form method="post" action="/admin/flag/add">
+    <div class="mh"><h3>🚩 Flag client</h3><button type="button" class="x" onclick="cmClose('flagModal')" aria-label="Close">×</button></div>
+    <div class="mb">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+      <p class="note-hint" style="margin:0 0 12px">A flag shows a banner here and a chip on the roster until an officer clears it. Use it for things the whole team should see at a glance — safety risk, absconding risk, do-not-release.</p>
+      <div class="fld"><label>Severity</label><select name="severity"><option value="red">Alert (red)</option><option value="amber">Caution (amber)</option></select></div>
+      <div class="fld"><label>Reason</label><textarea name="reason" required placeholder="e.g. History of violence toward officers — do not meet alone"></textarea></div>
+    </div>
+    <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('flagModal')">Cancel</button><button type="submit" class="btn">Flag client</button></div>
   </form>
 </div></div>
 

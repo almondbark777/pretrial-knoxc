@@ -140,6 +140,13 @@ func (s *Server) ConsoleClients(w http.ResponseWriter, r *http.Request) {
 	// consoleClientRows builds the behind/missed sets internally; reuse them to
 	// assemble Stats without a second full-roster pass (#11 dedup).
 	rows, behind, missed := consoleClientRows(clients, track, courtByIDN)
+	// Decorate with manual client-flag severity (one query) so the roster shows a
+	// flag chip next to flagged clients.
+	if flagged := db.ActiveFlagSeverity(s.DB); len(flagged) > 0 {
+		for i := range rows {
+			rows[i].Flag = flagged[rows[i].IDN]
+		}
+	}
 	data["RowsJSON"] = rosterRowsJSON(rows) // client-side windowing: only the visible page hits the DOM
 	data["RowCount"] = len(rows)
 	st := rosterStateCounts(clients)
@@ -314,7 +321,8 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 	data["OverridableFields"] = db.OverridableFields() // for the supervisor "Correct field" modal
 	data["Officers"] = s.officerChoices(clients)       // for the "Edit case info" officer select
 	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)
-	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn) // Waive-fees vs Remove-waiver on the ⋯ menu
+	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn)   // Waive-fees vs Remove-waiver on the ⋯ menu
+	data["Flags"], _ = db.ListActiveFlags(s.DB, idn) // manual alert banner at the top of the record
 	s.renderConsole(w, "console_record.html", data)
 }
 

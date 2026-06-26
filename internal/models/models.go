@@ -505,3 +505,31 @@ type Checkin struct {
 
 	CreatedAt string `json:"createdAt"`
 }
+
+// ClientFlag is a manual alert an officer raises on a client — a prominent
+// "pay attention to this person" marker (e.g. safety risk, absconding risk, do
+// not release). App-owned + audited; shown as a banner on the record and a chip
+// on the roster until another officer clears it. Severity is "red" (urgent) or
+// "amber" (caution).
+type ClientFlag struct {
+	ID        int64  `json:"id"`
+	IDN       string `json:"idn"`
+	Severity  string `json:"severity"` // red | amber
+	Reason    string `json:"reason"`
+	CreatedBy string `json:"createdBy"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// Bulletin is one post on the office-wide notice board shown on the check-in
+// page — a persistent announcement (unlike the 7-day group chat) every officer
+// sees: policy reminders, "court closed Friday", "watch for X". App-owned +
+// audited; high-priority/pinned posts sort to the top.
+type Bulletin struct {
+	ID        int64  `json:"id"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	Priority  string `json:"priority"` // normal | high
+	Pinned    bool   `json:"pinned"`
+	CreatedBy string `json:"createdBy"`
+	CreatedAt string `json:"createdAt"`
+}

@@ -36,6 +36,7 @@ import (
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 	"pretrial-knoxc/internal/handlers"
+	"pretrial-knoxc/internal/ipgeo"
 	"pretrial-knoxc/internal/metrics"
 )
 
@@ -155,6 +156,13 @@ func main() {
 	srv.DBPath = dbPath   // CSV upload page (importcsv.go): reconcile target + staging location
 	srv.Roles = roleCache // user-management handlers invalidate this after a role change
 	srv.Chat = chat.NewHub()
+	// IP-geolocation enrichment for self-check-ins (off by default; it sends each
+	// client's IP to a third party, so it stays gated behind the DB flag + an env
+	// endpoint, mirroring the SMS-OTP capability).
+	srv.IPGeo = ipgeo.New(ipgeo.Config{
+		Enabled:  db.GetCheckinConfig(database, "ip_geo_enabled") == "1",
+		Endpoint: os.Getenv("IP_GEO_ENDPOINT"),
+	})
 	startChatPrune(database) // enforce the 7-day chat retention window
 	// Bind the real freshness lookup now that the Server exists (the parse-time
 	// placeholder in tmplFuncs returns an empty stamp). Funcs is safe to call
@@ -216,10 +224,14 @@ func main() {
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
 	r.Get("/console/help", srv.ConsoleHelp)
-	r.Get("/console/checkins", srv.ConsoleCheckins)  // self-service check-in approval queue
-	r.Get("/console/problems", srv.ConsoleProblems)  // submitted "Report a problem" feedback (supervisor)
-	r.Get("/console/ptr-check", srv.ConsolePtrCheck) // check the daily PTR export .txt vs live Blue Book (browser-side)
-	r.Get("/console/import", srv.ImportPage)         // stop-gap SharePoint CSV upload (supervisor)
+	r.Get("/console/checkins", srv.ConsoleCheckins)           // self-service check-in approval queue
+	r.Get("/console/checkins/codes", srv.CheckinCodes)        // mint/print the rotating lobby code (static wins over {id})
+	r.Get("/console/checkins/poster", srv.CheckinPoster)      // printable QR poster for a lobby code
+	r.Get("/console/checkins/{id}/packet", srv.CheckinPacket) // tamper-sealed evidence PDF
+	r.Get("/console/checkins/{id}/selfie", srv.CheckinSelfie) // stored selfie image
+	r.Get("/console/problems", srv.ConsoleProblems)           // submitted "Report a problem" feedback (supervisor)
+	r.Get("/console/ptr-check", srv.ConsolePtrCheck)          // check the daily PTR export .txt vs live Blue Book (browser-side)
+	r.Get("/console/import", srv.ImportPage)                  // stop-gap SharePoint CSV upload (supervisor)
 	r.Get("/api/clients/{idn}", srv.APIClientByID)
 
 	// Group chat: SSE stream (live messages + presence) + a CSRF-guarded send.
@@ -302,8 +314,9 @@ func main() {
 		ar.Post("/checkin/add", srv.AddCheckIn)
 		ar.Post("/checkin/bulk", srv.BulkAddCheckIn)
 		ar.Post("/checkin/delete", srv.DeleteAddedCheckIn)
-		ar.Post("/checkin/approve", srv.ApproveSelfCheckin) // approve a self-service check-in into the record
-		ar.Post("/checkin/reject", srv.RejectSelfCheckin)   // reject a self-service check-in with a reason
+		ar.Post("/checkin/approve", srv.ApproveSelfCheckin)    // approve a self-service check-in into the record
+		ar.Post("/checkin/reject", srv.RejectSelfCheckin)      // reject a self-service check-in with a reason
+		ar.Post("/checkin/code/create", srv.CreateCheckinCode) // mint a new rotating lobby code
 		ar.Post("/schedule/add", srv.AddScheduledCheckIn)
 		ar.Post("/schedule/delete", srv.DeleteScheduledCheckIn)
 		ar.Post("/custody/add", srv.AddCustodyPeriod)       // GPS-off (in custody) span
@@ -314,6 +327,10 @@ func main() {
 		ar.Post("/date/add", srv.AddClientDate)             // attach an additional labeled date
 		ar.Post("/date/delete", srv.DeleteClientDate)       // remove an additional date
 		ar.Post("/problem/report", srv.ReportProblem)       // "Report a problem" — logs page + description
+		ar.Post("/flag/add", srv.AddClientFlag)             // raise a manual alert flag on a client
+		ar.Post("/flag/clear", srv.ClearClientFlag)         // clear a client flag
+		ar.Post("/bulletin/add", srv.AddBulletin)           // post to the office notice board
+		ar.Post("/bulletin/remove", srv.RemoveBulletin)     // remove a notice
 
 		// Per-defendant extension CRUD (any allowed officer).
 		ar.Post("/note/add", srv.AddNote)
