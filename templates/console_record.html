@@ -167,6 +167,58 @@
 {{/* ── Check-ins ── */}}
 <div class="tabpane" id="t-checkins">
   <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><a class="btn ghost" href="/console/checkins/poster" target="_blank" rel="noopener" title="Printable lobby QR for self check-in">📱 Check-in QR</a><button class="btn ghost" onclick="cmOpen('scheduleModal')">Schedule Check-in</button><button class="btn" onclick="cmOpen('checkinModal')">+ Log Check-in</button></div>
+
+  {{if .SelfCheckins}}
+  <div class="panel" style="margin-bottom:14px">
+    <div class="h"><h2>Self-service check-ins</h2><span class="muted" style="margin-left:8px;font-size:12px">submitted via the lobby QR</span><span class="grow"></span><span class="count">{{len .SelfCheckins}}</span></div>
+    <div class="body">
+      {{range .SelfCheckins}}
+      <div class="scin">
+        <div class="scin-img">
+          {{if .SelfiePath}}<a href="/console/checkins/{{.ID}}/selfie" target="_blank" rel="noopener" title="View selfie"><img class="scin-thumb" src="/console/checkins/{{.ID}}/selfie" alt="selfie"></a>{{else}}<span class="scin-noimg">no photo</span>{{end}}
+        </div>
+        <div class="grow">
+          <div class="scin-top">
+            <span class="t" style="font-weight:600">{{if .ReportType}}{{.ReportType}}{{else}}Check-in{{end}} · {{shortdate .ServerTS}}</span>
+            <span class="chip {{.BadgeTone}} sm" title="Presence assessment from IP, GPS and the home-address comparison">{{.BadgeLabel}}</span>
+            {{if eq .Status "approved"}}<span class="chip ok sm">Approved</span>{{else if eq .Status "rejected"}}<span class="chip risk sm">Rejected</span>{{else}}<span class="chip warn sm">Pending</span>{{end}}
+          </div>
+          {{if .FlagList}}<div class="scin-flags">{{range .FlagList}}<span class="chip risk sm">⚑ {{.}}</span>{{end}}</div>{{end}}
+          <div class="m">From office {{.OfficeLabel}} · GPS {{.GpsLabel}} · IP {{if .SrcIP}}{{.SrcIP}}{{if .IPCity}} ({{.IPCity}}){{end}}{{else}}—{{end}}</div>
+          <div class="m">{{if eq .Status "approved"}}Approved by {{officer .ApprovedBy}}{{if .ApprovedAt}} · {{.ApprovedAt}}{{end}}{{else if eq .Status "rejected"}}Rejected{{if .RejectReason}}: {{.RejectReason}}{{end}}{{if .ApprovedBy}} · by {{officer .ApprovedBy}}{{end}}{{else}}Awaiting officer review{{end}}</div>
+          <div class="scin-acts">
+            <a href="/console/checkins/{{.ID}}/packet" target="_blank" rel="noopener" class="btn ghost sm">Connection information</a>
+            {{if eq .Status "pending"}}
+            <form method="post" action="/admin/checkin/approve" style="margin:0">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+              <button type="submit" class="btn sm">Approve</button>
+            </form>
+            <form method="post" action="/admin/checkin/reject" class="scin-reject">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+              <input type="text" name="reason" placeholder="Reason" maxlength="300" aria-label="Rejection reason">
+              <button type="submit" class="btn ghost sm">Reject</button>
+            </form>
+            {{end}}
+          </div>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  <style>
+  .scin{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line-2)}
+  .scin:first-child{border-top:0}
+  .scin-img{flex:none;width:54px}
+  .scin-thumb{width:54px;height:54px;border-radius:8px;object-fit:cover;border:1px solid var(--line-2)}
+  .scin-noimg{display:flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:8px;border:1px dashed var(--line-2);color:var(--muted);font-size:10px;text-align:center}
+  .scin-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .scin-flags{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+  .scin .m{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .scin-acts{margin-top:10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .scin-reject{display:flex;align-items:center;gap:6px;margin:0}
+  .scin-reject input[type=text]{min-height:32px;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel-2);color:var(--ink);font-size:14px;max-width:170px}
+  </style>
+  {{end}}
   {{if $r.AllCheckIns}}
   <div class="panel" style="margin-bottom:14px">
     <div class="h"><h2>All check-ins</h2><span class="muted" style="margin-left:8px;font-size:12px">imported + app · full history</span><span class="grow"></span><span class="count">{{len $r.AllCheckIns}}</span></div>

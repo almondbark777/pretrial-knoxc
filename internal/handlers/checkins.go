@@ -44,23 +44,29 @@ func (s *Server) ConsoleCheckins(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := make([]checkinRow, 0, len(pending))
 	for _, c := range pending {
-		tone, label := badgeDisplay(c.PresenceBadge)
-		gpsOK := strings.EqualFold(c.GPSPerm, "granted")
-		rows = append(rows, checkinRow{
-			Checkin:     c,
-			BadgeTone:   tone,
-			BadgeLabel:  label,
-			FlagList:    parseFlags(c.Flags),
-			OfficeLabel: distLabel(c.DistOfficeM, gpsOK),
-			HomeLabel:   distLabel(c.DistHomeM, gpsOK),
-			GpsLabel:    gpsLabel(c.GPSPerm, c.GPSAccuracy),
-		})
+		rows = append(rows, decorateCheckin(c))
 	}
 	data := s.consoleBase(w, r, "checkins", s.trackFrom(r))
 	data["Checkins"] = rows
 	data["PendingCount"] = len(rows)
 	data["Bulletins"], _ = db.ListBulletins(s.DB) // office-wide notice board on the check-in page
 	s.renderConsole(w, "console_checkins.html", data)
+}
+
+// decorateCheckin turns a stored submission into the display row shared by the
+// approval queue and the client record's check-in tab.
+func decorateCheckin(c models.Checkin) checkinRow {
+	tone, label := badgeDisplay(c.PresenceBadge)
+	gpsOK := strings.EqualFold(c.GPSPerm, "granted")
+	return checkinRow{
+		Checkin:     c,
+		BadgeTone:   tone,
+		BadgeLabel:  label,
+		FlagList:    parseFlags(c.Flags),
+		OfficeLabel: distLabel(c.DistOfficeM, gpsOK),
+		HomeLabel:   distLabel(c.DistHomeM, gpsOK),
+		GpsLabel:    gpsLabel(c.GPSPerm, c.GPSAccuracy),
+	}
 }
 
 // ApproveSelfCheckin approves one pending submission into the official record.

@@ -323,6 +323,15 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)
 	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn)   // Waive-fees vs Remove-waiver on the ⋯ menu
 	data["Flags"], _ = db.ListActiveFlags(s.DB, idn) // manual alert banner at the top of the record
+	// Self-service (QR) check-ins for this client, decorated like the approval
+	// queue, so the record's Check-ins tab shows them with status + telemetry.
+	if selfCheckins, err := db.ListCheckinsForIDN(s.DB, idn); err == nil && len(selfCheckins) > 0 {
+		rows := make([]checkinRow, 0, len(selfCheckins))
+		for _, c := range selfCheckins {
+			rows = append(rows, decorateCheckin(c))
+		}
+		data["SelfCheckins"] = rows
+	}
 	s.renderConsole(w, "console_record.html", data)
 }
 
