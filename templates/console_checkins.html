@@ -85,7 +85,7 @@
     </div>
 
     <div class="ch-actions">
-      <a href="/console/checkins/{{.ID}}/packet" target="_blank" rel="noopener" class="btn ghost" title="Tamper-sealed evidence PDF for a DA">Court packet (PDF)</a>
+      <a href="/console/checkins/{{.ID}}/packet" target="_blank" rel="noopener" class="btn ghost" title="Connection &amp; telemetry record for this check-in (PDF)">Connection information</a>
       <form method="post" action="/admin/checkin/approve" class="ch-approve">
         <input type="hidden" name="csrf" value="{{$.CSRF}}">
         <input type="hidden" name="id" value="{{.ID}}">
