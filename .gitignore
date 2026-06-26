@@ -70,6 +70,8 @@ ptr1-deploy.tar.gz
 
 # deploy bundle build output
 deploy/dist/
+# deploy staging dir (prebuilt binary+templates+static copied for a manual scp)
+deploy/stage/
 /server-linux
 
 # PTR tracker bundle edit scratch (unpack/repack workspace)
