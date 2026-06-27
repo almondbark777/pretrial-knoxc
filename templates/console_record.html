@@ -349,6 +349,10 @@
           <div class="fld"><label>Switched date</label><input type="date" name="switched_gps_date" value="{{$r.GpsSwitchedInput}}"></div>
           <div class="fld"><label>DA emailed (date)</label><input type="date" name="da_emailed" value="{{$r.GpsDAEmailedInput}}"></div>
           <div class="fld"><label>Court-ordered?</label><select name="court_order"><option value="">— choose —</option><option{{if eq $r.GpsCourtOrder "Yes"}} selected{{end}}>Yes</option><option{{if eq $r.GpsCourtOrder "No"}} selected{{end}}>No</option></select></div>
+          <div class="fld"><label>GPS status <span class="muted" style="font-weight:400">(force off if taken off GPS)</span></label><select name="gps_removed">
+            <option value="">On GPS</option>
+            <option value="true"{{if $r.GpsRemoved}} selected{{end}}>Removed / off GPS</option>
+          </select></div>
         </div>
         <div class="note-hint" style="margin:16px 0 12px"><b>Victim &amp; 48-hour notification</b> — update the time after re-notifying (e.g. when a device is tampered with).</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
@@ -404,6 +408,17 @@
       {{else if $r.GPS.TotalGpsPaid}}
       <table class="kv"><tr><td>GPS payments on file</td><td>{{money $r.GPS.TotalGpsPaid}}</td></tr><tr><td>Vendor / rate</td><td class="warn-t">MISSING</td></tr></table>
       {{else}}<p class="muted" style="padding:0">No GPS monitoring on this client. Set a vendor in the form above to start tracking.</p>{{end}}
+      {{if $r.GpsNetShow}}
+      {{/* Multi-GPS-case client: the table above is the SELECTED case only. The
+           compliance roster nets owed/paid across all {{$r.GpsNetCases}} GPS cases,
+           so show that net here — it is the authoritative figure. */}}
+      <div class="note-hint" style="margin:14px 0 8px">This client has {{$r.GpsNetCases}} active GPS cases. The figures above are for the selected case; the net across all cases (what the compliance roster uses) is:</div>
+      <table class="kv">
+        <tr><td>Net total owed</td><td>{{money $r.GpsNetOwed}}</td></tr>
+        <tr><td>Net total paid</td><td>{{money $r.GpsNetPaid}}</td></tr>
+        <tr><td>{{if $r.GpsNetCovered}}Net surplus{{else}}Net behind{{end}}</td><td class="{{if $r.GpsNetCovered}}ok-t{{else}}risk-t{{end}}">{{money $r.GpsNetSurplus}}</td></tr>
+      </table>
+      {{end}}
     </div>
   </div>
 
@@ -481,9 +496,35 @@
   </div>
 </div>
 
-{{/* ── Documents ── */}}
+{{/* ── Documents & Photos ── */}}
 <div class="tabpane" id="t-docs">
-  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" disabled style="opacity:.45;cursor:not-allowed" title="Document upload arrives in a later build">+ Upload Document</button></div>
+  <div class="panel" style="margin-bottom:16px">
+    <div class="h"><h2>Photos</h2><span class="muted" style="font-weight:400;font-size:12px;margin-left:8px">defendant &amp; victim</span></div>
+    <div class="pad">
+      <form method="post" action="/admin/photo/add" enctype="multipart/form-data" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+        <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
+        <div class="fld"><label>Type</label><select name="kind"><option value="defendant">Defendant</option><option value="victim">Victim</option></select></div>
+        <div class="fld" style="flex:1;min-width:200px"><label>Caption (optional)</label><input type="text" name="caption" placeholder="e.g. booking photo, Jun 2026"></div>
+        <div class="fld"><label>Photo (image, ≤ 8 MB)</label><input type="file" name="photo" accept="image/*" required></div>
+        <button type="submit" class="btn">Upload</button>
+      </form>
+      {{if .Photos}}<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+        {{range .Photos}}<figure style="margin:0;border:1px solid var(--panel-3);border-radius:8px;overflow:hidden;background:var(--panel-2)">
+          <a href="/console/clients/{{.IDN}}/photo/{{.ID}}" target="_blank" rel="noopener"><img src="/console/clients/{{.IDN}}/photo/{{.ID}}" alt="{{.Kind}} photo" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block"></a>
+          <figcaption style="padding:6px 8px;font-size:11.5px;color:var(--muted)">
+            <span class="chip {{if eq .Kind "victim"}}risk{{else}}neutral{{end}}">{{.Kind}}</span>
+            {{if .Caption}}<div style="margin-top:3px;color:var(--ink)">{{.Caption}}</div>{{end}}
+            <form method="post" action="/admin/photo/delete" onsubmit="return confirm('Remove this photo?')" style="margin-top:5px">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="idn" value="{{.IDN}}"><input type="hidden" name="next" value="/console/clients/{{.IDN}}">
+              <button type="submit" class="btn ghost sm">Remove</button>
+            </form>
+          </figcaption>
+        </figure>{{end}}
+      </div>{{else}}<div class="muted" style="font-size:12.5px">No photos yet — add a booking photo of the defendant, or a victim photo if one is on file.</div>{{end}}
+    </div>
+  </div>
+
+  {{/* Documents (release agreements, orders, assessments) — still to come. */}}
   <div class="panel"><div class="emptybox"><div class="big">▤</div>Document upload isn't built yet.<div class="m" style="margin-top:6px">Release agreements, orders, and assessments will live here in a later build — until then, keep them in the usual shared location.</div></div></div>
 </div>
 
@@ -518,7 +559,7 @@
     <div class="mb">
       <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" value="{{$r.IDN}}"><input type="hidden" name="next" value="/console/clients/{{$r.IDN}}">
       <div class="fld"><label>Type</label><select name="type_of_check_in"><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>
-      <div class="fld"><label>Date</label><input type="date" name="date" value="{{.AsOfInput}}" required></div>
+      <div class="fld" style="display:flex;gap:10px"><div style="flex:1"><label>Date</label><input type="date" name="date" value="{{.AsOfInput}}" required style="width:100%"></div><div style="flex:1"><label>Time <span class="muted" style="font-weight:400">(optional)</span></label><input type="time" name="time" style="width:100%"></div></div>
       <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, observations, etc.)</span></label><textarea name="note" placeholder="e.g. GPS fitment — strap sized, base unit #1234 issued"></textarea></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="cmClose('checkinModal')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>

@@ -18,6 +18,11 @@ func TestNormInputDate(t *testing.T) {
 		{"", ""},                     // blank -> blank
 		{"not a date", "not a date"}, // junk -> unchanged (flexible parsers decide)
 		{"2026-13-40", "2026-13-40"}, // impossible date -> left as-is
+		// A manually entered check-in carries a clock; the date is canonicalized
+		// but the time rides along (ParseDay still buckets it to the right day).
+		{"2026-05-01 14:30", "5/1/2026 14:30"},
+		{"2026-12-25 09:05", "12/25/2026 09:05"},
+		{"5/1/2026 14:30", "5/1/2026 14:30"}, // already canonical + time -> unchanged
 	}
 	for _, c := range cases {
 		if got := normInputDate(c.in); got != c.want {

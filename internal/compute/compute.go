@@ -303,13 +303,17 @@ type Payment struct {
 // three compute functions read). Dates are pre-parsed (RefD/ClosedD) exactly as
 // buildClients pre-parses c._refD / c._closedD.
 type Client struct {
-	IDN            string
-	Name           string
-	Level          string
-	Status         string
-	Officer        string
-	CaseNo         string
-	GpsActive      bool
+	IDN       string
+	Name      string
+	Level     string
+	Status    string
+	Officer   string
+	CaseNo    string
+	GpsActive bool
+	// NotBehind: an officer reviewed this person and marked them not actually
+	// behind on fees, so they're held off the compliance Behind roster (problem
+	// report #12 — distinct from a fee waiver, which forgives real debt).
+	NotBehind      bool
 	GpsType        string
 	DayAdj         float64
 	GpInstall      string
@@ -845,6 +849,11 @@ func isReliefSwitch(t string) bool {
 	}
 	return reRelief.MatchString(u)
 }
+
+// IsReliefSwitch reports whether a GPS "switched to" value denotes removal from
+// GPS ("no gps" / "off gps" / "removed" / "gps relieved") rather than a device
+// switch to another vendor. Exported for the build layer's GpsActive/tag logic.
+func IsReliefSwitch(t string) bool { return isReliefSwitch(t) }
 
 var gpsPayTypes = map[string]bool{"gps": true, "allied": true, "scram": true}
 

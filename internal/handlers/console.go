@@ -9,6 +9,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
+	"pretrial-knoxc/internal/models"
 )
 
 // trackFrom resolves the "as-of" date the whole console computes against. It
@@ -321,8 +323,9 @@ func (s *Server) ConsoleRecordPage(w http.ResponseWriter, r *http.Request) {
 	data["OverridableFields"] = db.OverridableFields() // for the supervisor "Correct field" modal
 	data["Officers"] = s.officerChoices(clients)       // for the "Edit case info" officer select
 	data["Pinned"] = db.IsPinned(s.DB, auth.User(r), idn)
-	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn)   // Waive-fees vs Remove-waiver on the ⋯ menu
-	data["Flags"], _ = db.ListActiveFlags(s.DB, idn) // manual alert banner at the top of the record
+	data["AppWaiver"] = db.HasFeeWaiver(s.DB, idn)        // Waive-fees vs Remove-waiver on the ⋯ menu
+	data["Flags"], _ = db.ListActiveFlags(s.DB, idn)      // manual alert banner at the top of the record
+	data["Photos"], _ = db.ListDefendantPhotos(s.DB, idn) // defendant/victim photos (report #10)
 	// Self-service (QR) check-ins for this client, decorated like the approval
 	// queue, so the record's Check-ins tab shows them with status + telemetry.
 	if selfCheckins, err := db.ListCheckinsForIDN(s.DB, idn); err == nil && len(selfCheckins) > 0 {
@@ -395,7 +398,8 @@ func (s *Server) ConsoleCalendar(w http.ResponseWriter, r *http.Request) {
 	if idn != "" {
 		if cases := clients[idn]; len(cases) > 0 {
 			c, _ := selectCase(cases, r.URL.Query().Get("case"))
-			title, days := calendarMonth(c, track, year, month)
+			courtDates, _ := db.ListCourtDates(s.DB, idn) // merge app-entered court dates
+			title, days := calendarMonth(c, courtDates, track, year, month)
 			data["Client"] = c
 			data["Title"] = title
 			data["Days"] = days
@@ -403,11 +407,174 @@ func (s *Server) ConsoleCalendar(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	rc := rosterCalendarMonth(clients, track, year, month)
+	// Roster (team-standup) view — optionally scoped to one officer's caseload so
+	// each officer can pull up just their own people. The officer picker lists
+	// every supervising officer; an empty selection is the division-wide view.
+	officer := strings.TrimSpace(r.URL.Query().Get("officer"))
+	data["Officers"] = distinctOfficers(clients)
+	data["Fofficer"] = officer
+	data["FofficerQ"] = url.QueryEscape(officer)
+	rc := rosterCalendarMonth(clientsForOfficer(clients, officer), courtDatesByIDN(s.DB), track, year, month)
 	data["Roster"] = true
 	data["RC"] = rc
 	data["Title"] = rc.Title
+	data["MonthISO"] = cur.Format("2006-01") // template builds day-drill links: ?date=MonthISO-DD
 	s.renderConsole(w, "console_calendar.html", data)
+}
+
+// courtDatesByIDN groups every live (non-tombstoned) court date by client IDN,
+// for the roster calendar's per-day court counts.
+func courtDatesByIDN(d *sql.DB) map[string][]models.CourtDate {
+	all, _ := db.ListAllCourtDatesLive(d)
+	out := make(map[string][]models.CourtDate, len(all))
+	for _, cd := range all {
+		out[cd.IDN] = append(out[cd.IDN], cd)
+	}
+	return out
+}
+
+// ── /console/calendar/day — drill-down for one day ────────────────────────────
+
+// calDayItem is one client's event on the drilled-into day.
+type calDayItem struct {
+	IDN     string
+	Name    string
+	Officer string
+	Kind    string // court | checkin-* | payment | ptr-fee | missed | due | referral | gps-* | closed
+	Label   string
+}
+
+// calDaySection is a titled group of same-category items for the day page.
+type calDaySection struct {
+	Title string
+	Tone  string // chip tone: info | risk | warn | ok | neutral
+	Items []calDayItem
+}
+
+// calDayBuckets accumulates day items into fixed, priority-ordered categories.
+type calDayBuckets struct {
+	court, missed, due, checkin, payment, other []calDayItem
+}
+
+func (b *calDayBuckets) add(kind string, it calDayItem) {
+	switch {
+	case kind == "court":
+		b.court = append(b.court, it)
+	case kind == "missed":
+		b.missed = append(b.missed, it)
+	case kind == "due":
+		b.due = append(b.due, it)
+	case strings.HasPrefix(kind, "checkin"):
+		b.checkin = append(b.checkin, it)
+	case kind == "payment" || kind == "ptr-fee":
+		b.payment = append(b.payment, it)
+	default:
+		b.other = append(b.other, it)
+	}
+}
+
+func (b *calDayBuckets) total() int {
+	return len(b.court) + len(b.missed) + len(b.due) + len(b.checkin) + len(b.payment) + len(b.other)
+}
+
+// sections returns the non-empty categories in display order, items sorted by name.
+func (b *calDayBuckets) sections() []calDaySection {
+	defs := []calDaySection{
+		{Title: "Court appearances", Tone: "info", Items: b.court},
+		{Title: "Missed check-ins", Tone: "risk", Items: b.missed},
+		{Title: "Check-ins due", Tone: "warn", Items: b.due},
+		{Title: "Check-ins logged", Tone: "ok", Items: b.checkin},
+		{Title: "Payments", Tone: "neutral", Items: b.payment},
+		{Title: "Other", Tone: "neutral", Items: b.other},
+	}
+	out := make([]calDaySection, 0, len(defs))
+	for _, sec := range defs {
+		if len(sec.Items) == 0 {
+			continue
+		}
+		sort.Slice(sec.Items, func(i, j int) bool { return sec.Items[i].Name < sec.Items[j].Name })
+		out = append(out, sec)
+	}
+	return out
+}
+
+// ConsoleCalendarDay lists everything happening on one day across the (optionally
+// officer-scoped) caseload — the click-into-a-day drill-down from the calendar:
+// court appearances, missed/due check-ins, logged check-ins, payments, and the
+// rest, each linking to the client's record.
+func (s *Server) ConsoleCalendarDay(w http.ResponseWriter, r *http.Request) {
+	clients, err := s.clients()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	track := s.trackFrom(r)
+
+	// Target day (default today).
+	day := compute.Noon(track.Year(), track.Month(), track.Day())
+	if dp := strings.TrimSpace(r.URL.Query().Get("date")); dp != "" {
+		if dt, ok := compute.ParseDay(dp); ok {
+			day = dt
+		}
+	}
+	officer := strings.TrimSpace(r.URL.Query().Get("officer"))
+	courtByIDN := courtDatesByIDN(s.DB)
+	floor := compute.CheckInDataFloor()
+
+	buckets := &calDayBuckets{}
+	for idn, cases := range clientsForOfficer(clients, officer) {
+		c := openRep(cases)
+		if c == nil {
+			continue
+		}
+		name, off := dash(c.Name), compute.FmtOfficer(c.Officer)
+		hasRec := hasCheckInRecord(c)
+		for _, ev := range compute.GetEventsForClient(*c, track) {
+			if !sameDay(ev.Date, day) {
+				continue
+			}
+			if ev.Kind == "missed" && (!hasRec || ev.Date.Before(floor)) {
+				continue // same gating as the rosters/roster calendar
+			}
+			buckets.add(ev.Kind, calDayItem{IDN: idn, Name: name, Officer: off, Kind: ev.Kind, Label: ev.Label})
+		}
+		for _, cd := range courtByIDN[idn] {
+			if dt, ok := compute.ParseDay(cd.CourtDate); ok && sameDay(dt, day) {
+				buckets.add("court", calDayItem{IDN: idn, Name: name, Officer: off, Kind: "court", Label: courtLabel(cd.Court, false)})
+			}
+			if dt, ok := compute.ParseDay(cd.NextDate); ok && sameDay(dt, day) {
+				buckets.add("court", calDayItem{IDN: idn, Name: name, Officer: off, Kind: "court", Label: courtLabel(cd.Court, true)})
+			}
+		}
+	}
+
+	data := s.consoleBase(w, r, "calendar", track)
+	data["DayTitle"] = day.Format("Monday, January 2, 2006")
+	data["PrevDay"] = day.AddDate(0, 0, -1).Format("2006-01-02")
+	data["NextDay"] = day.AddDate(0, 0, 1).Format("2006-01-02")
+	data["BackMonth"] = day.Format("2006-01")
+	data["Fofficer"] = officer
+	data["FofficerQ"] = url.QueryEscape(officer)
+	data["Sections"] = buckets.sections()
+	data["Total"] = buckets.total()
+	s.renderConsole(w, "console_calendar_day.html", data)
+}
+
+// clientsForOfficer narrows the roster to clients whose open-preferred case is
+// supervised by the named officer (case-insensitive). An empty name returns the
+// full set unchanged, so the division-wide calendar is the default.
+func clientsForOfficer(clients map[string][]*compute.Client, officer string) map[string][]*compute.Client {
+	officer = strings.TrimSpace(officer)
+	if officer == "" {
+		return clients
+	}
+	out := make(map[string][]*compute.Client, len(clients))
+	for idn, cases := range clients {
+		if c := openRep(cases); c != nil && strings.EqualFold(strings.TrimSpace(c.Officer), officer) {
+			out[idn] = cases
+		}
+	}
+	return out
 }
 
 // ── /console/compliance — Behind on GPS + Missed Check-Ins ────────────────────
@@ -422,6 +589,7 @@ func (s *Server) ConsoleCompliance(w http.ResponseWriter, r *http.Request) {
 	now := compute.NowET()
 	data := s.consoleBase(w, r, "compliance", track)
 	data["Behind"] = behindRoster(clients, track)
+	data["Reviewed"] = reviewedNotBehindRoster(clients)
 	data["Missed"] = missedCheckInsRoster(clients, track)
 	violations, _ := db.ListAllViolations(s.DB)
 	// Scope to the stats epoch so the roster count matches the dashboard's

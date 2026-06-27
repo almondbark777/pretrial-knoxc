@@ -272,6 +272,43 @@ CREATE TABLE IF NOT EXISTS fee_waivers (
     CONSTRAINT uq_waiver_idn UNIQUE(idn)
 );
 
+-- "Reviewed — not behind": an officer checked a Behind-on-GPS flag and confirmed
+-- the person is NOT actually behind, holding them off the compliance roster.
+-- Distinct from a fee waiver (which forgives a real debt). App-owned, audited.
+CREATE TABLE IF NOT EXISTS not_behind_acks (
+    ack_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn         TEXT NOT NULL,
+    reason      TEXT NULL,
+    acked_by    TEXT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_not_behind_idn UNIQUE(idn)
+);
+
+-- PTR-export-check "addressed" marks (problem report #9): officer ticks a row on
+-- /console/ptr-check once a discrepancy has been looked at & handled. App-owned.
+CREATE TABLE IF NOT EXISTS ptr_check_addressed (
+    addr_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn         TEXT NOT NULL,
+    addressed_by TEXT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_ptrc_addr_idn UNIQUE(idn)
+);
+
+-- Defendant / victim photos (problem report #10): images stored as base64 in the
+-- DB (same approach as checkin_media) so deploy stays single-binary and uploads
+-- survive the flaky uplink. kind = 'defendant' | 'victim'. App-owned, audited.
+CREATE TABLE IF NOT EXISTS defendant_photos (
+    photo_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    idn        TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    mime       TEXT NOT NULL,
+    caption    TEXT NULL,
+    image_b64  TEXT NOT NULL,
+    author     TEXT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_defphoto_idn ON defendant_photos(idn);
+
 CREATE TABLE IF NOT EXISTS scheduled_check_ins (
     sched_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     idn             INTEGER NOT NULL,
@@ -659,6 +696,9 @@ var overridableFields = map[string]bool{
 	"victim_2_idn":           true,
 	"victim_3":               true,
 	"victim_3_idn":           true,
+	// Synthetic "off GPS" flag (problem report #11 backstop) — not a raw column,
+	// but stored as an override so it survives the import and is audited/reversible.
+	"gps_removed": true,
 }
 
 // gpsDetailFields is the subset of overridable fields the GPS-details editor
@@ -668,6 +708,10 @@ var gpsDetailFields = []string{
 	"gps_type", "gps_install_date", "switched_to", "switched_gps_date",
 	"da_emailed", "court_order", "victim_time_48", "victim_accept_deny_gps",
 	"victim", "victim_idn", "victim_2", "victim_2_idn", "victim_3", "victim_3_idn",
+	// Synthetic flag (not a raw_blue_book column): an explicit officer override to
+	// mark a client OFF GPS when the import never recorded a removal row. A truthy
+	// value clears the GPS-Monitored tag and stops billing (see BuildClients).
+	"gps_removed",
 }
 
 // IsGPSDetailField reports whether field is one the GPS-details editor may set.
@@ -810,7 +854,7 @@ var extensionTablesByIDN = []string{
 	"defendant_notes", "defendant_tags", "court_dates", "violations",
 	"reminders", "overrides", "pinned_defendants", "defendant_documents",
 	"scheduled_check_ins", "drug_screens", "fee_waivers", "letter_log",
-	"custody_periods",
+	"custody_periods", "not_behind_acks", "ptr_check_addressed", "defendant_photos",
 }
 
 // raw tables physically purged only on the IMPORTER_RETIRED path.

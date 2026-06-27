@@ -22,7 +22,7 @@ func TestRosterCalendarMonth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildClients: %v", err)
 	}
-	rc := rosterCalendarMonth(clients, adminTrack, 2026, time.May)
+	rc := rosterCalendarMonth(clients, nil, adminTrack, 2026, time.May)
 	if rc.Title != "May 2026" {
 		t.Errorf("title = %q, want %q", rc.Title, "May 2026")
 	}
@@ -36,16 +36,17 @@ func TestRosterCalendarMonth(t *testing.T) {
 			t.Errorf("Days[%d] should be a padding cell (Day 0), got %d", i, rc.Days[i].Day)
 		}
 	}
-	var ci, pm, ms, du int
+	var ci, pm, ct, ms, du int
 	for _, x := range rc.Days {
 		ci += x.CheckIns
 		pm += x.Payments
+		ct += x.Court
 		ms += x.Missed
 		du += x.Due
 	}
-	if ci != rc.TotCheckIns || pm != rc.TotPayments || ms != rc.TotMissed || du != rc.TotDue {
-		t.Errorf("per-day sums (%d/%d/%d/%d) != totals (%d/%d/%d/%d)",
-			ci, pm, ms, du, rc.TotCheckIns, rc.TotPayments, rc.TotMissed, rc.TotDue)
+	if ci != rc.TotCheckIns || pm != rc.TotPayments || ct != rc.TotCourt || ms != rc.TotMissed || du != rc.TotDue {
+		t.Errorf("per-day sums (%d/%d/%d/%d/%d) != totals (%d/%d/%d/%d/%d)",
+			ci, pm, ct, ms, du, rc.TotCheckIns, rc.TotPayments, rc.TotCourt, rc.TotMissed, rc.TotDue)
 	}
 	if rc.TotMissed == 0 {
 		t.Error("expected some missed windows in the stale offline snapshot")
@@ -66,17 +67,19 @@ func TestRosterCalendarMonth(t *testing.T) {
 		}
 		wk.CheckIns += w.Tot.CheckIns
 		wk.Payments += w.Tot.Payments
+		wk.Court += w.Tot.Court
 		wk.Missed += w.Tot.Missed
 		wk.Due += w.Tot.Due
 	}
 	for _, c := range rc.ColTotals {
 		col.CheckIns += c.CheckIns
 		col.Payments += c.Payments
+		col.Court += c.Court
 		col.Missed += c.Missed
 		col.Due += c.Due
 	}
 	want := models.RosterTotals{CheckIns: rc.TotCheckIns, Payments: rc.TotPayments,
-		Missed: rc.TotMissed, Due: rc.TotDue}
+		Court: rc.TotCourt, Missed: rc.TotMissed, Due: rc.TotDue}
 	if wk != want {
 		t.Errorf("sum of week totals %+v != month totals %+v", wk, want)
 	}

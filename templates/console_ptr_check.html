@@ -144,6 +144,9 @@
 (function(){
 /* ---------- live Blue Book data (server-embedded) ---------- */
 const BB_RAW = {{.BBJson}};
+/* per-IDN "addressed" marks (problem report #9) + CSRF for the toggle POST */
+const ADDR = {{.AddrJson}}||{};
+const CSRF = "{{.CSRF}}";
 
 /* ---------- code maps ---------- */
 const SUP={PTR:"Pre-Trial",G:"GPS",B:"Bond Supervision",BS:"Bond SCRAM",PS:"Plea SCRAM",DS:"Drug Screen",R:"Remote Breath / IID","":""};
@@ -297,7 +300,8 @@ const COLS=[
   {k:"presence",t:"Presence"},{k:"ref",t:"Referral date (PTR / System)"},
   {k:"level",t:"Level"},{k:"sup",t:"Supervision"},{k:"order",t:"Order from"},
   {k:"division",t:"Division (PTR)"},{k:"status",t:"Status (System)"},
-  {k:"digital",t:"Digital order (PTR)"},{k:"custody",t:"In custody"}
+  {k:"digital",t:"Digital order (PTR)"},{k:"custody",t:"In custody"},
+  {k:"addr",t:"Addressed"}
 ];
 
 function rows(){
@@ -324,6 +328,7 @@ function rows(){
     else if(key==="presence"){av=a.presence;bv=b.presence;}
     else if(key==="level"){av=(a.pRow&&a.pRow.level)||(a.bRow&&a.bRow.level)||"";bv=(b.pRow&&b.pRow.level)||(b.bRow&&b.bRow.level)||"";}
     else if(key==="sup"){av=(a.pRow&&a.pRow.sup)||(a.bRow&&a.bRow.sup)||"";bv=(b.pRow&&b.pRow.sup)||(b.bRow&&b.bRow.sup)||"";}
+    else if(key==="addr"){av=ADDR[a.idn]?1:0;bv=ADDR[b.idn]?1:0;}
     else {av=a[key]||"";bv=b[key]||"";}
     if(av<bv)return -1*dir; if(av>bv)return 1*dir; return 0;
   });
@@ -381,8 +386,19 @@ function render(){
       <td>${esc(p.bRow?p.bRow.status:"")||'<span class="muted">—</span>'}</td>
       <td>${p.pRow&&p.pRow.digital?'<span class="digi">Yes</span>':'<span class="muted">No</span>'}</td>
       <td>${p.custody==="T"?'<span class="cust">IN CUSTODY</span>':'<span class="muted">No</span>'}</td>
+      <td class="addrcell"><input type="checkbox" class="addrck" data-idn="${esc(p.idn)}"${ADDR[p.idn]?" checked":""} title="Mark this row looked-at &amp; addressed"></td>
     </tr>`;
   }).join("");
+  // Persist an "addressed" tick per IDN (problem report #9). Optimistic: update
+  // ADDR locally, POST in the background; revert the box if the save fails.
+  els.tbody.querySelectorAll(".addrck").forEach(cb=>cb.onchange=()=>{
+    const idn=cb.dataset.idn, on=cb.checked;
+    if(on) ADDR[idn]=true; else delete ADDR[idn];
+    fetch("/admin/ptr-check/addressed",{method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:"csrf="+encodeURIComponent(CSRF)+"&idn="+encodeURIComponent(idn)+"&addressed="+(on?"true":"false")})
+      .then(r=>{if(!r.ok)throw 0;}).catch(()=>{cb.checked=!on; if(!on)ADDR[idn]=true; else delete ADDR[idn];});
+  });
 }
 
 function renderKpis(){

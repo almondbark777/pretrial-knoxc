@@ -367,10 +367,14 @@ html[data-theme="dark"] .tabs button.active{color:var(--accent-ink);border-botto
 .ev.referral{border-left-color:var(--info)}
 .ev.checkin{border-left-color:var(--ok)}
 .ev.payment{border-left-color:var(--ok-ink)}
+.ev.court{border-left-color:#7c5cbf;color:#4a3a78;font-weight:600}
 .ev.gps{border-left-color:var(--warn)}
 .ev.missed{border-left-color:var(--risk);color:var(--risk-ink)}
 .ev.due{border-left-color:var(--warn-ink)}
 .ev.closed{border-left-color:var(--faint);color:var(--muted)}
+/* roster day cells link to the day drill-down */
+a.cal-d{text-decoration:none;color:inherit;transition:border-color .12s,box-shadow .12s}
+a.cal-d:hover{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
 /* roster-calendar totals: trailing week-total column + weekday footer row */
 .cal.tot{grid-template-columns:repeat(7,1fr) minmax(96px,.75fr)}
 .cal-d.sum{background:transparent;border:1px dashed var(--line);min-height:0}

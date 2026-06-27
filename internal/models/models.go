@@ -96,6 +96,7 @@ type RosterDay struct {
 	Day      int `json:"day"`
 	CheckIns int `json:"checkIns"`
 	Payments int `json:"payments"`
+	Court    int `json:"court"`
 	Missed   int `json:"missed"`
 	Due      int `json:"due"`
 }
@@ -106,13 +107,14 @@ type RosterDay struct {
 type RosterTotals struct {
 	CheckIns int `json:"checkIns"`
 	Payments int `json:"payments"`
+	Court    int `json:"court"`
 	Missed   int `json:"missed"`
 	Due      int `json:"due"`
 }
 
 // Any reports whether the bucket has anything to show (keeps templates clean).
 func (t RosterTotals) Any() bool {
-	return t.CheckIns+t.Payments+t.Missed+t.Due > 0
+	return t.CheckIns+t.Payments+t.Court+t.Missed+t.Due > 0
 }
 
 // RosterWeek is one rendered week row: exactly 7 (possibly padded) day cells
@@ -134,6 +136,7 @@ type RosterCalendar struct {
 	Month       RosterTotals   `json:"month"`     // grand totals (same as Tot*)
 	TotCheckIns int            `json:"totCheckIns"`
 	TotPayments int            `json:"totPayments"`
+	TotCourt    int            `json:"totCourt"`
 	TotMissed   int            `json:"totMissed"`
 	TotDue      int            `json:"totDue"`
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -97,48 +98,153 @@ func reportedMissed(c *compute.Client, ci compute.CheckInResult) []compute.Windo
 	return out
 }
 
-// behindRoster mirrors the HTML BehindRoster default view: one rep per IDN
-// (open-preferred among the IDN's GPS-active cases), GPS surplusDollars < 0, and
-// the rep is open (the component defaults to its 'open' filter). Sorted by name.
+// behindRoster mirrors the HTML BehindRoster default view but nets GPS across
+// the IDN's cases (GPS is per-case — a person can have several GPS cases). One
+// row per IDN, summing owed/paid/surplus over the IDN's DISTINCT GPS-active
+// cases; included when the net surplus is negative and the open rep is open.
+// Payments are split per case only when the IDN has more than one GPS case —
+// single-GPS-case clients use the all-payments sum, identical to before. Sorted
+// by name.
 func behindRoster(clients map[string][]*compute.Client, track time.Time) []models.RosterRow {
 	var rows []models.RosterRow
 	for _, cases := range clients {
-		// Dedup among GPS-active cases (the canonical filters !gpsActive first).
+		// GPS-active cases (the canonical filters !gpsActive first).
 		var gpsCases []*compute.Client
 		for _, c := range cases {
 			if c.GpsActive {
 				gpsCases = append(gpsCases, c)
 			}
 		}
-		c := openRep(gpsCases)
-		if c == nil {
-			continue
-		}
-		g := compute.ComputeGPS(*c, track, nil, "")
-		if g.SurplusDollars == nil || *g.SurplusDollars >= 0 {
-			continue
-		}
+		rep := openRep(gpsCases)
 		// Default 'open' filter: a closed-only IDN has a non-open rep -> excluded.
-		if !reOpen.MatchString(c.Status) {
+		if rep == nil || !reOpen.MatchString(rep.Status) {
 			continue
 		}
-		lvl, _ := compute.ParseLevel(c.Level)
-		detail := "behind $" + ftoa(-*g.SurplusDollars)
-		if g.SurplusDays != nil {
-			detail += " / " + itoa(-*g.SurplusDays) + " days"
+		// An officer reviewed this person and confirmed they're not actually behind
+		// (problem report #12) — hold them off the roster.
+		if rep.NotBehind {
+			continue
 		}
-		owed := 0.0
-		if g.TotalOwedDollars != nil {
-			owed = *g.TotalOwedDollars
+		n := netGPS(gpsCases, rep, track)
+		if !n.HaveOwed {
+			continue
+		}
+		if n.Surplus >= 0 {
+			continue
+		}
+		lvl, _ := compute.ParseLevel(rep.Level)
+		detail := "behind $" + ftoa(-n.Surplus)
+		if n.Rate != nil && *n.Rate > 0 {
+			if days := int(math.Ceil(-n.Surplus / float64(*n.Rate))); days > 0 {
+				detail += " / " + itoa(days) + " days"
+			}
 		}
 		rows = append(rows, models.RosterRow{
-			IDN: c.IDN, Name: c.Name, Officer: c.Officer, Level: lvl,
-			Detail: detail, Amount: *g.SurplusDollars,
-			Owed: owed, Paid: g.TotalGpsPaid, Waived: compute.IsFeesWaived(c.GpNotes),
+			IDN: rep.IDN, Name: rep.Name, Officer: rep.Officer, Level: lvl,
+			Detail: detail, Amount: n.Surplus,
+			Owed: n.Owed, Paid: n.Paid, Waived: compute.IsFeesWaived(rep.GpNotes),
 		})
 	}
 	sortByName(rows)
 	return rows
+}
+
+// netGPSResult is the NET GPS owed/paid/surplus summed across an IDN's DISTINCT
+// GPS-active cases. Cases is the distinct GPS-case count (>1 = a multi-GPS-case
+// client, whose per-case card diverges from this net). HaveOwed is false when no
+// case yields an owed figure (e.g. vendor unset) — callers treat that as
+// "uncomputable" and fall back to the per-case view.
+type netGPSResult struct {
+	Owed, Adj, Paid, Surplus float64
+	Rate                     *int
+	Cases                    int
+	HaveOwed                 bool
+}
+
+// netGPS nets GPS owed/paid/surplus across an IDN's DISTINCT GPS-active cases:
+// OWED summed per case (each case's own window), PAID counted ONCE via a union
+// caseFilter. A payment tagged with several case #s must not be credited once
+// per case — that double-counts (audit 2026-06-27: 5 idns, $6,375 over-credited).
+// A single GPS case uses the all-payments sum (filter="") so a payment with a
+// blank/odd case_number still credits — identical to the pre-per-case behavior.
+// This is the shared net math behind both the Behind-on-GPS roster and the
+// record's net GPS card, so the two never diverge. rep is the IDN's
+// open-preferred GPS case (its payment list backs the union sum); pass
+// openRep(gpsCases).
+func netGPS(gpsCases []*compute.Client, rep *compute.Client, track time.Time) netGPSResult {
+	// One entry per distinct case (by case-token set) so two blue-book rows for
+	// the same case aren't double counted.
+	distinct := map[string]*compute.Client{}
+	var order []string
+	for _, c := range gpsCases {
+		k := caseKey(c.CaseNo)
+		if _, ok := distinct[k]; !ok {
+			distinct[k] = c
+			order = append(order, k)
+		}
+	}
+
+	var n netGPSResult
+	n.Cases = len(order)
+	switch {
+	case len(order) == 0 || rep == nil:
+		return n
+	case len(order) == 1:
+		g := compute.ComputeGPS(*distinct[order[0]], track, nil, "")
+		if g.TotalOwedDollars == nil {
+			return n
+		}
+		n.Owed, n.Adj, n.Paid, n.Rate = *g.TotalOwedDollars, g.AdjDollars, g.TotalGpsPaid, g.DailyRate
+		n.HaveOwed = true
+	default:
+		var union []string
+		for _, k := range order {
+			c := distinct[k]
+			g := compute.ComputeGPS(*c, track, nil, c.CaseNo)
+			if g.TotalOwedDollars == nil {
+				continue
+			}
+			n.HaveOwed = true
+			n.Owed += *g.TotalOwedDollars
+			n.Adj += g.AdjDollars
+			if n.Rate == nil {
+				n.Rate = g.DailyRate
+			}
+			if strings.TrimSpace(c.CaseNo) != "" {
+				union = append(union, c.CaseNo)
+			}
+		}
+		n.Paid = compute.ComputeGPS(*rep, track, nil, strings.Join(union, ", ")).TotalGpsPaid
+	}
+	n.Surplus = (n.Paid + n.Adj) - n.Owed
+	return n
+}
+
+// reviewedNotBehindRoster lists clients an officer has marked "reviewed — not
+// behind" (problem report #12), so the compliance page can show them with an
+// Undo. One row per IDN.
+func reviewedNotBehindRoster(clients map[string][]*compute.Client) []models.RosterRow {
+	var rows []models.RosterRow
+	for _, cases := range clients {
+		rep := openRep(cases)
+		if rep == nil || !rep.NotBehind {
+			continue
+		}
+		lvl, _ := compute.ParseLevel(rep.Level)
+		rows = append(rows, models.RosterRow{
+			IDN: rep.IDN, Name: rep.Name, Officer: rep.Officer, Level: lvl,
+		})
+	}
+	sortByName(rows)
+	return rows
+}
+
+// caseKey is a stable identity for a case from its case-number tokens (sorted),
+// so two blue-book rows for the same case map to the same key.
+func caseKey(caseNo string) string {
+	toks := compute.CaseTokens(caseNo)
+	sort.Strings(toks)
+	return strings.Join(toks, ",")
 }
 
 // missedCheckInsRoster mirrors the HTML MissedCheckInsRoster: one open rep per
@@ -414,7 +520,7 @@ func topBars(m map[string]int, n int) []models.Bar {
 // calendarMonth builds the rendered month grid for one client: the leading
 // padding cells (Sunday-started weeks) + one cell per day, each carrying the
 // events that fall on it. Returns the month title and the day cells.
-func calendarMonth(c *compute.Client, track time.Time, year int, month time.Month) (string, []models.CalDay) {
+func calendarMonth(c *compute.Client, courtDates []models.CourtDate, track time.Time, year int, month time.Month) (string, []models.CalDay) {
 	first := compute.Noon(year, month, 1)
 	title := first.Format("January 2006")
 	daysIn := first.AddDate(0, 1, -1).Day()
@@ -427,6 +533,13 @@ func calendarMonth(c *compute.Client, track time.Time, year int, month time.Mont
 			byDay[d] = append(byDay[d], models.CalEvent{Day: d, Kind: ev.Kind, Label: ev.Label})
 		}
 	}
+	// Court dates live in the app extension table, not the computed Client, so
+	// merge them in here. Plot the scheduled date and, when a hearing was logged
+	// with a reschedule, the next date too (matching the case-summary logic).
+	for _, cd := range courtDates {
+		addCourtCell(byDay, cd.CourtDate, courtLabel(cd.Court, false), year, month)
+		addCourtCell(byDay, cd.NextDate, courtLabel(cd.Court, true), year, month)
+	}
 	var days []models.CalDay
 	for i := 0; i < int(first.Weekday()); i++ { // Sunday=0 leading pad
 		days = append(days, models.CalDay{Day: 0})
@@ -437,19 +550,69 @@ func calendarMonth(c *compute.Client, track time.Time, year int, month time.Mont
 	return title, days
 }
 
+// addCourtCell appends a "court" event for dateStr to the right day bucket when
+// it parses and falls inside the rendered month.
+func addCourtCell(byDay map[int][]models.CalEvent, dateStr, label string, year int, month time.Month) {
+	dt, ok := compute.ParseDay(dateStr)
+	if !ok || dt.Year() != year || dt.Month() != month {
+		return
+	}
+	d := dt.Day()
+	byDay[d] = append(byDay[d], models.CalEvent{Day: d, Kind: "court", Label: label})
+}
+
+// courtLabel builds the calendar label for a court appearance, naming the court
+// when known and flagging a rescheduled (post-outcome) date.
+func courtLabel(court string, rescheduled bool) string {
+	label := "Court"
+	if rescheduled {
+		label = "Court (rescheduled)"
+	}
+	if c := strings.TrimSpace(court); c != "" {
+		label += " — " + c
+	}
+	return label
+}
+
+// countCourtDates returns how many court appearances (scheduled + any logged
+// reschedule) fall on each day-of-month within the rendered month, for the
+// roster aggregate.
+func countCourtDates(courtDates []models.CourtDate, year int, month time.Month) map[int]int {
+	out := map[int]int{}
+	bump := func(dateStr string) {
+		if dt, ok := compute.ParseDay(dateStr); ok && dt.Year() == year && dt.Month() == month {
+			out[dt.Day()]++
+		}
+	}
+	for _, cd := range courtDates {
+		bump(cd.CourtDate)
+		bump(cd.NextDate)
+	}
+	return out
+}
+
 // rosterCalendarMonth aggregates events across ALL clients into per-day counts
 // for the roster-mode (team standup) calendar — Brief 2.9's second calendar mode.
 // One representative per IDN (open-preferred) is used so a multi-case person's
 // shared check-ins/payments aren't double-counted. Categories: check-ins,
-// payments (GPS + PTR), missed windows, and upcoming due windows.
-func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, year int, month time.Month) models.RosterCalendar {
+// payments (GPS + PTR), court appearances, missed windows, and upcoming due
+// windows. courtByIDN supplies the app-entered court dates per client.
+func rosterCalendarMonth(clients map[string][]*compute.Client, courtByIDN map[string][]models.CourtDate, track time.Time, year int, month time.Month) models.RosterCalendar {
 	first := compute.Noon(year, month, 1)
 	daysIn := first.AddDate(0, 1, -1).Day()
 	byDay := map[int]*models.RosterDay{}
 	rc := models.RosterCalendar{Title: first.Format("January 2006")}
+	cell := func(d int) *models.RosterDay {
+		rd := byDay[d]
+		if rd == nil {
+			rd = &models.RosterDay{Day: d}
+			byDay[d] = rd
+		}
+		return rd
+	}
 
 	floor := compute.CheckInDataFloor()
-	for _, cases := range clients {
+	for idn, cases := range clients {
 		c := openRep(cases)
 		if c == nil {
 			continue
@@ -459,12 +622,7 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 			if ev.Date.Year() != year || ev.Date.Month() != month {
 				continue
 			}
-			d := ev.Date.Day()
-			rd := byDay[d]
-			if rd == nil {
-				rd = &models.RosterDay{Day: d}
-				byDay[d] = rd
-			}
+			rd := cell(ev.Date.Day())
 			switch {
 			case strings.HasPrefix(ev.Kind, "checkin"):
 				rd.CheckIns++
@@ -484,6 +642,11 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 				rd.Due++
 				rc.TotDue++
 			}
+		}
+		// Court appearances for this client (scheduled + any reschedule).
+		for d, n := range countCourtDates(courtByIDN[idn], year, month) {
+			cell(d).Court += n
+			rc.TotCourt += n
 		}
 	}
 
@@ -515,10 +678,12 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 		for i, rd := range week.Days {
 			week.Tot.CheckIns += rd.CheckIns
 			week.Tot.Payments += rd.Payments
+			week.Tot.Court += rd.Court
 			week.Tot.Missed += rd.Missed
 			week.Tot.Due += rd.Due
 			rc.ColTotals[i].CheckIns += rd.CheckIns
 			rc.ColTotals[i].Payments += rd.Payments
+			rc.ColTotals[i].Court += rd.Court
 			rc.ColTotals[i].Missed += rd.Missed
 			rc.ColTotals[i].Due += rd.Due
 		}
@@ -526,7 +691,7 @@ func rosterCalendarMonth(clients map[string][]*compute.Client, track time.Time, 
 	}
 	rc.Month = models.RosterTotals{
 		CheckIns: rc.TotCheckIns, Payments: rc.TotPayments,
-		Missed: rc.TotMissed, Due: rc.TotDue,
+		Court: rc.TotCourt, Missed: rc.TotMissed, Due: rc.TotDue,
 	}
 	return rc
 }

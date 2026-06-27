@@ -210,24 +210,29 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 	if err != nil {
 		return nil, err
 	}
+	notBehind, err := loadNotBehindAcks(d) // "reviewed — not behind" holds (report #12)
+	if err != nil {
+		return nil, err
+	}
 	custody, err := loadCustodyForCompute(d) // in-custody days excluded from GPS billing
 	if err != nil {
 		return nil, err
 	}
 
-	// GPS map: install-nonempty row wins per idn.
-	gpMap := map[string]map[string]string{}
+	// GPS records grouped per idn — KEEP EVERY ROW. GPS is per CASE, not per idn:
+	// a person can have multiple GPS records across cases (one open + several
+	// closed). Each blue-book case is matched to its own record below
+	// (gpsRecordForCase). Previously this kept a single "install-nonempty wins" row
+	// per idn, which shared one install window across all of the idn's cases and
+	// discarded removal info recorded on the other rows — over-billing closed-out
+	// cases and keeping the GPS tag lit after a client was taken off GPS.
+	gpByIDN := map[string][]map[string]string{}
 	for _, r := range gp {
 		k := norm(r["idn"])
 		if k == "" {
 			continue
 		}
-		cur, ok := gpMap[k]
-		has := norm(r["gps_install_date"]) != ""
-		curHas := ok && norm(cur["gps_install_date"]) != ""
-		if !ok || (has && !curHas) {
-			gpMap[k] = r
-		}
+		gpByIDN[k] = append(gpByIDN[k], r)
 	}
 
 	// check-ins / payments grouped by idn.
@@ -276,11 +281,13 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 			r[f] = v
 		}
 
-		gpRec := gpMap[idn]
+		gpsRecs := gpByIDN[idn]
+		gpRec := gpsRecordForCase(gpsRecs, caseNo)
 		// gpsField reads a GPS/victim detail with app-override precedence: an app
-		// override wins, else the GPS 48-hour record, else the blue-book / added-
-		// defendant row. Lets officers fill in or correct vendor / install / switch /
-		// victim 48-hour values that the import left blank — importer-proof & audited.
+		// override wins, else THIS CASE's GPS 48-hour record, else the blue-book /
+		// added-defendant row. Lets officers fill in or correct vendor / install /
+		// switch / victim 48-hour values that the import left blank — importer-proof
+		// & audited.
 		gpsField := func(col string) string {
 			if v := norm(ovIdn[col]); v != "" {
 				return v
@@ -294,12 +301,25 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 		}
 
 		gpsType := gpsField("gps_type")
-		gpsRaw := strings.ToLower(norm(r["gps"]))
-		// On GPS if the flag says so, a GPS record exists, or an app override supplied
-		// a vendor / install date (so editing GPS details on an unflagged client lights
-		// up the GPS card).
-		gpsActive := gpsRaw == "true" || gpsRaw == "yes" || gpsRaw == "1" || gpRec != nil ||
+		gpsRaw := strings.ToLower(strings.TrimSpace(norm(r["gps"])))
+		multiRec := len(gpsRecs) > 1
+		// Removed from GPS: a relief switch ("no gps" / "off gps" / "removed") on the
+		// record, OR an explicit officer "mark off GPS" override (gps_removed) for
+		// when the import never recorded a removal row. Clears the GPS-Monitored tag
+		// (problem report #11) and, in ComputeGPS, stops billing at the switch date.
+		// Date-independent so the build cache stays as-of-independent.
+		gpsRemovedFlag := strings.ToLower(strings.TrimSpace(gpsField("gps_removed")))
+		removed := compute.IsReliefSwitch(gpsField("switched_to")) ||
+			gpsRemovedFlag == "true" || gpsRemovedFlag == "yes" || gpsRemovedFlag == "1"
+		// A case can explicitly declare it is NOT a GPS case (gps flag False). Honor
+		// that only for multi-record idns (true per-case GPS) so we never strip the
+		// tag from a single-record GPS client whose import flag is a stale False.
+		explicitOff := multiRec && (gpsRaw == "false" || gpsRaw == "no" || gpsRaw == "0")
+		// On GPS if the flag says so, this case has a GPS record, or an app override
+		// supplied a vendor / install date — unless it's been removed or flagged off.
+		hasSignal := gpsRaw == "true" || gpsRaw == "yes" || gpsRaw == "1" || gpRec != nil ||
 			gpsType != "" || gpsField("gps_install_date") != ""
+		gpsActive := hasSignal && !removed && !explicitOff
 
 		c := &compute.Client{
 			IDN:       idn,
@@ -309,6 +329,7 @@ func BuildClients(d *sql.DB, track time.Time) (map[string][]*compute.Client, err
 			Officer:   compute.FmtOfficer(norm(r["supervising_officer"])),
 			CaseNo:    caseNo,
 			GpsActive: gpsActive,
+			NotBehind: notBehind[idn],
 			GpsType:   gpsType,
 			DayAdj:    toNum(r["day_adjustment"]),
 			CheckIns:  ciMap[idn],
@@ -364,4 +385,62 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// gpsRecordForCase picks the GPS 48-hour record(s) that apply to a blue-book
+// case. With 0 or 1 record for the idn it returns that record as-is (legacy: a
+// single GPS stint shared by the idn's case rows). With multiple records — the
+// person has GPS across more than one case — it returns only the record(s) whose
+// case tokens overlap this case, MERGED, so an install row and a later
+// removal/switch row for the same case combine into one complete record (the
+// import writes a removal as a separate row). Returns nil when no record applies.
+func gpsRecordForCase(recs []map[string]string, caseNo string) map[string]string {
+	switch len(recs) {
+	case 0:
+		return nil
+	case 1:
+		return recs[0]
+	}
+	toks := compute.CaseTokens(caseNo)
+	var matched []map[string]string
+	for _, r := range recs {
+		if caseToksOverlap(toks, compute.CaseTokens(norm(r["case_number"]))) {
+			matched = append(matched, r)
+		}
+	}
+	if len(matched) == 0 {
+		return nil
+	}
+	return mergeGpsRecords(matched)
+}
+
+// caseToksOverlap reports whether two token slices share any token.
+func caseToksOverlap(a, b []string) bool {
+	for _, x := range a {
+		for _, y := range b {
+			if x == y {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mergeGpsRecords combines GPS rows for the same case into one map, taking the
+// first non-empty value per column. The import records a GPS removal/switch as a
+// separate row (install on one, switched_to/date/notes on another), so merging
+// recovers the removal info the old one-row-per-idn pick dropped.
+func mergeGpsRecords(recs []map[string]string) map[string]string {
+	if len(recs) == 1 {
+		return recs[0]
+	}
+	out := map[string]string{}
+	for _, r := range recs {
+		for k, v := range r {
+			if strings.TrimSpace(out[k]) == "" && strings.TrimSpace(v) != "" {
+				out[k] = v
+			}
+		}
+	}
+	return out
 }

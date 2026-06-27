@@ -1,6 +1,7 @@
 {{define "c_rtot"}}{{if .Any}}
   {{if .CheckIns}}<span class="ev checkin">{{.CheckIns}} check-in{{if gt .CheckIns 1}}s{{end}}</span>{{end}}
   {{if .Payments}}<span class="ev payment">{{.Payments}} payment{{if gt .Payments 1}}s{{end}}</span>{{end}}
+  {{if .Court}}<span class="ev court">{{.Court}} court</span>{{end}}
   {{if .Due}}<span class="ev due">{{.Due}} due</span>{{end}}
   {{if .Missed}}<span class="ev missed">{{.Missed}} missed</span>{{end}}
 {{else}}<span class="ev nil">—</span>{{end}}{{end}}{{template "c_top" .}}
@@ -8,53 +9,65 @@
 <div class="phead">
   <div>
     <h1>Calendar</h1>
-    <div class="sub">{{if .Roster}}Division-wide activity per day — team standup view{{else}}{{with .Client}}{{.Name}} · IDN {{.IDN}}{{end}}{{end}}</div>
+    <div class="sub">{{if .Roster}}{{if .Fofficer}}{{.Fofficer}}'s caseload — per-day activity{{else}}Division-wide activity per day — team standup view{{end}}{{else}}{{with .Client}}{{.Name}} · IDN {{.IDN}}{{end}}{{end}}</div>
   </div>
   <div class="right">
-    <a class="btn ghost sm" href="/console/calendar?month={{.PrevMonth}}{{if .Client}}&idn={{.Client.IDN}}{{end}}">‹ Prev</a>
+    {{if .Roster}}
+    <select class="btn ghost sm" aria-label="Filter by officer caseload"
+      onchange="var u=new URL(location.href);if(this.value){u.searchParams.set('officer',this.value)}else{u.searchParams.delete('officer')}location.href=u.toString()">
+      <option value="">All officers</option>
+      {{range .Officers}}<option value="{{.}}"{{if eq . $.Fofficer}} selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    {{end}}
+    <a class="btn ghost sm" href="/console/calendar?month={{.PrevMonth}}{{if .Client}}&idn={{.Client.IDN}}{{end}}{{if .Fofficer}}&officer={{.FofficerQ}}{{end}}">‹ Prev</a>
     <span class="asof" style="font-weight:600">{{.Title}}</span>
-    <a class="btn ghost sm" href="/console/calendar?month={{.NextMonth}}{{if .Client}}&idn={{.Client.IDN}}{{end}}">Next ›</a>
+    <a class="btn ghost sm" href="/console/calendar?month={{.NextMonth}}{{if .Client}}&idn={{.Client.IDN}}{{end}}{{if .Fofficer}}&officer={{.FofficerQ}}{{end}}">Next ›</a>
     <button class="btn ghost sm" onclick="window.print()">Print</button>
   </div>
 </div>
 
 {{if .Roster}}
-<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+<div class="kpis" style="grid-template-columns:repeat(5,1fr)">
   <div class="kpi ok"><div class="n">{{.RC.TotCheckIns}}</div><div class="l">Check-ins this month</div></div>
   <div class="kpi"><div class="n">{{.RC.TotPayments}}</div><div class="l">Payments this month</div></div>
+  <div class="kpi"><div class="n">{{.RC.TotCourt}}</div><div class="l">Court dates</div></div>
   <div class="kpi warn"><div class="n">{{.RC.TotDue}}</div><div class="l">Check-ins due</div></div>
   <div class="kpi risk"><div class="n">{{.RC.TotMissed}}</div><div class="l">Missed windows</div></div>
 </div>
 <div class="callegend">
   <span><i style="background:var(--ok)"></i>Check-in</span>
   <span><i style="background:var(--ok-ink)"></i>Payment</span>
+  <span><i style="background:#7c5cbf"></i>Court</span>
   <span><i style="background:var(--warn-ink)"></i>Due</span>
   <span><i style="background:var(--risk)"></i>Missed</span>
+  <span class="muted">· click any day for the full list</span>
 </div>
 <div class="cal tot">
   <div class="cal-hd">Sun</div><div class="cal-hd">Mon</div><div class="cal-hd">Tue</div><div class="cal-hd">Wed</div><div class="cal-hd">Thu</div><div class="cal-hd">Fri</div><div class="cal-hd">Sat</div><div class="cal-hd">Week total</div>
   {{range .RC.Weeks}}
     {{range .Days}}
     {{if eq .Day 0}}<div class="cal-d pad"></div>
-    {{else}}<div class="cal-d"><div class="cal-n">{{.Day}}</div>
+    {{else}}<a class="cal-d" href="/console/calendar/day?date={{$.MonthISO}}-{{printf "%02d" .Day}}{{if $.Fofficer}}&officer={{$.FofficerQ}}{{end}}" title="See everything on this day"><div class="cal-n">{{.Day}}</div>
       {{if .CheckIns}}<span class="ev checkin">{{.CheckIns}} check-in{{if gt .CheckIns 1}}s{{end}}</span>{{end}}
       {{if .Payments}}<span class="ev payment">{{.Payments}} payment{{if gt .Payments 1}}s{{end}}</span>{{end}}
+      {{if .Court}}<span class="ev court">{{.Court}} court</span>{{end}}
       {{if .Due}}<span class="ev due">{{.Due}} due</span>{{end}}
       {{if .Missed}}<span class="ev missed">{{.Missed}} missed</span>{{end}}
-    </div>{{end}}
+    </a>{{end}}
     {{end}}
     <div class="cal-d sum">{{template "c_rtot" .Tot}}</div>
   {{end}}
   {{range .RC.ColTotals}}<div class="cal-d sum col">{{template "c_rtot" .}}</div>{{end}}
   <div class="cal-d sum grand"><div class="cal-n">Month</div>{{template "c_rtot" .RC.Month}}</div>
 </div>
-<p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">Right column totals each week; bottom row totals each weekday across the month (e.g. "every Tuesday"). Open any client record and the calendar can be focused to that person's events. Click an event in the per-client view to jump to the record.</p>
+<p class="muted" style="padding:0;margin-top:14px;font-size:12.5px">Click any day to pull up everyone on it — court appearances, check-ins due, payments. Right column totals each week; bottom row totals each weekday across the month (e.g. "every Tuesday"). Open any client record and the calendar can be focused to that person's events.</p>
 
 {{else}}
 <div class="callegend">
   <span><i style="background:var(--info)"></i>Referral</span>
   <span><i style="background:var(--ok)"></i>Check-in</span>
   <span><i style="background:var(--ok-ink)"></i>Payment</span>
+  <span><i style="background:#7c5cbf"></i>Court</span>
   <span><i style="background:var(--warn)"></i>GPS</span>
   <span><i style="background:var(--warn-ink)"></i>Due</span>
   <span><i style="background:var(--risk)"></i>Missed</span>

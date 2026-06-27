@@ -1,0 +1,36 @@
+{{template "c_top" .}}
+<a class="backlink" href="/console/calendar?month={{.BackMonth}}{{if .Fofficer}}&officer={{.FofficerQ}}{{end}}">← Back to calendar</a>
+<div class="phead">
+  <div>
+    <h1>{{.DayTitle}}</h1>
+    <div class="sub">{{if .Fofficer}}{{.Fofficer}}'s caseload — {{end}}{{.Total}} item{{if ne .Total 1}}s{{end}} on this day</div>
+  </div>
+  <div class="right">
+    <a class="btn ghost sm" href="/console/calendar/day?date={{.PrevDay}}{{if .Fofficer}}&officer={{.FofficerQ}}{{end}}">‹ Prev day</a>
+    <a class="btn ghost sm" href="/console/calendar/day?date={{.NextDay}}{{if .Fofficer}}&officer={{.FofficerQ}}{{end}}">Next day ›</a>
+    <button class="btn ghost sm" onclick="window.print()">Print</button>
+  </div>
+</div>
+
+{{if .Sections}}
+{{range .Sections}}
+<div class="panel" style="margin-bottom:14px">
+  <div class="h"><h2>{{.Title}}</h2><span class="grow"></span><span class="chip {{.Tone}}">{{len .Items}}</span></div>
+  <div class="body">
+    {{range .Items}}
+    <div class="frow"><span class="ev {{evclass .Kind}}" style="flex:0 0 auto;min-width:120px">{{.Label}}</span>
+      <div class="grow"><div class="t" style="font-weight:600"><a href="/console/clients/{{.IDN}}">{{.Name}}</a></div>
+        <div class="m">IDN {{.IDN}}{{if .Officer}} · {{.Officer}}{{end}}</div>
+      </div>
+      <a class="btn ghost sm" href="/console/clients/{{.IDN}}" style="align-self:center">Open record</a>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{else}}
+<div class="panel"><div class="emptybox" style="padding:34px">
+  <div class="big">✓</div>Nothing scheduled or logged on this day{{if .Fofficer}} for {{.Fofficer}}{{end}}.
+</div></div>
+{{end}}
+{{template "c_bot" .}}

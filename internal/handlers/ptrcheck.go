@@ -9,11 +9,15 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"strings"
 
+	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/compute"
+	"pretrial-knoxc/internal/db"
 )
 
 // ptrCheckRow is one live Blue Book record shipped to the PTR-check page. Only
@@ -43,7 +47,40 @@ func (s *Server) ConsolePtrCheck(w http.ResponseWriter, r *http.Request) {
 	// the Reports nav item highlighted while it's open.
 	data := s.consoleBase(w, r, "reports", s.trackFrom(r))
 	data["BBJson"] = ptrCheckBlueBookJSON(clients)
+	data["AddrJson"] = ptrCheckAddressedJSON(s.DB)
 	s.renderConsole(w, "console_ptr_check.html", data)
+}
+
+// ptrCheckAddressedJSON embeds the set of idns marked "addressed" as a JS object
+// {idn:true} so the page can pre-check the Addressed boxes (problem report #9).
+func ptrCheckAddressedJSON(d *sql.DB) template.JS {
+	set, err := db.LoadPtrCheckAddressed(d)
+	if err != nil || len(set) == 0 {
+		return template.JS("{}")
+	}
+	b, err := json.Marshal(set)
+	if err != nil {
+		return template.JS("{}")
+	}
+	return template.JS(b)
+}
+
+// TogglePtrCheckAddressed sets/clears an "addressed" mark for a PTR-check row.
+// POST /admin/ptr-check/addressed (idn, addressed=true|false). Officer-level.
+func (s *Server) TogglePtrCheckAddressed(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	idn := strings.TrimSpace(r.FormValue("idn"))
+	var err error
+	if strings.EqualFold(strings.TrimSpace(r.FormValue("addressed")), "true") {
+		err = db.SetPtrCheckAddressed(s.DB, idn, auth.User(r))
+	} else {
+		err = db.ClearPtrCheckAddressed(s.DB, idn, auth.User(r))
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ptrCheckBlueBookJSON flattens the cached client set into comparison rows (one

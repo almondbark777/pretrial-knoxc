@@ -772,8 +772,21 @@ type ConsoleRecord struct {
 	GpsActive       bool // on GPS — drives the "vendor not set" banner on the GPS card
 	GpsWaived       bool
 	GpsInstall      string
-	Notes           []models.Note
-	Activity        []ConsoleTLItem
+
+	// NET GPS across the IDN's active GPS cases, shown ONLY for multi-GPS-case
+	// clients (GpsNetShow). The per-case GPS card above (GPS) reflects the selected
+	// case; for a client with more than one GPS case that diverges from the
+	// authoritative Behind-on-GPS roster, which nets across cases (owed per case,
+	// paid counted once). Surfacing the net here keeps the record in agreement with
+	// the roster. Single-GPS-case clients leave GpsNetShow false (unaffected).
+	GpsNetShow    bool
+	GpsNetCases   int
+	GpsNetOwed    float64
+	GpsNetPaid    float64
+	GpsNetSurplus float64
+	GpsNetCovered bool
+	Notes         []models.Note
+	Activity      []ConsoleTLItem
 
 	// GPS / victim 48-hour detail — display on the GPS card + victim panel, and
 	// raw values to pre-fill the "Edit GPS details" modal (selects/dates).
@@ -785,6 +798,7 @@ type ConsoleRecord struct {
 	GpsDAEmailed      string          // display
 	GpsDAEmailedInput string          // yyyy-mm-dd
 	GpsCourtOrder     string          // "Yes"/"No"/""
+	GpsRemoved        bool            // explicit officer "off GPS" override (gps_removed)
 	Victims           []ConsoleVictim // non-empty victims, for the panel
 	Victim48          string          // display of the 48-hour notification time
 	Victim48Input     string          // yyyy-mm-ddThh:mm for the datetime-local input
@@ -897,6 +911,26 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 		}
 	}
 
+	// NET GPS across the IDN's active GPS cases. The card above shows the selected
+	// case's GPS math; for a client with more than one GPS case that diverges from
+	// the compliance roster (which nets across cases). Surface the net for
+	// multi-GPS-case clients so the record agrees with the Behind-on-GPS roster.
+	// Reuses the roster's net math (netGPS): owed per case, paid counted once.
+	var gpsCases []*compute.Client
+	for _, cc := range allCases {
+		if cc.GpsActive {
+			gpsCases = append(gpsCases, cc)
+		}
+	}
+	if n := netGPS(gpsCases, openRep(gpsCases), track); n.Cases > 1 && n.HaveOwed {
+		rec.GpsNetShow = true
+		rec.GpsNetCases = n.Cases
+		rec.GpsNetOwed = n.Owed
+		rec.GpsNetPaid = n.Paid
+		rec.GpsNetSurplus = n.Surplus
+		rec.GpsNetCovered = n.Surplus >= 0
+	}
+
 	// GPS / victim 48-hour detail — display + raw values for the "Edit GPS details"
 	// modal. Officers fill vendor / install / device switch / victim 48-hour info
 	// the daily import frequently leaves blank (item: "where do we modify the
@@ -908,6 +942,10 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 	rec.GpsSwitchedInput = isoDate(c.GpSwitchedDate)
 	rec.GpsDAEmailed = prettyDate(c.GpDAEmailed)
 	rec.GpsDAEmailedInput = isoDate(c.GpDAEmailed)
+	rec.GpsRemoved = func() bool {
+		v := strings.ToLower(strings.TrimSpace(c.Overrides["gps_removed"]))
+		return v == "true" || v == "yes" || v == "1"
+	}()
 	rec.GpsCourtOrder = c.GpCourtOrder
 	rec.Victim48 = prettyStamp(c.VictimNotify48)
 	rec.Victim48Input = isoDateTime(c.VictimNotify48)
@@ -1059,7 +1097,7 @@ func consoleRecord(c *compute.Client, allCases []*compute.Client, track time.Tim
 	// Newest first (ListAddedCheckIns is add_id DESC).
 	for _, a := range extras.AddedCheckIns {
 		rec.LoggedCheckIns = append(rec.LoggedCheckIns, ConsoleLoggedCI{
-			ID: a.ID, Date: shortStamp(a.Date), Type: dash(a.Type), Note: a.Note,
+			ID: a.ID, Date: stampWithTime(a.Date), Type: dash(a.Type), Note: a.Note,
 			Author: compute.FmtOfficer(a.Author),
 		})
 	}
@@ -1599,6 +1637,20 @@ func shortStamp(s string) string {
 		}
 	}
 	return dash(s)
+}
+
+// stampWithTime renders a check-in date, adding the clock when the stored value
+// carries one (manually logged check-ins do — "6/26/2026 14:30"; imported/date-
+// only ones don't). The ':' test means a plain date never grows a spurious
+// "12:00 PM". Unparseable values fall back to shortStamp.
+func stampWithTime(s string) string {
+	if dt, ok := compute.ParseDateTime(s); ok {
+		if strings.Contains(s, ":") {
+			return dt.Format("Jan 2, 2006 · 3:04 PM")
+		}
+		return dt.Format("Jan 2, 2006")
+	}
+	return shortStamp(s)
 }
 
 func sameDay(a, b time.Time) bool {

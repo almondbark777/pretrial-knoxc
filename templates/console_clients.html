@@ -95,7 +95,7 @@
     <div class="mb">
       <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="idn" id="qcIdn"><input type="hidden" name="next" value="/console/clients">
       <div class="fld"><label>Type</label><select name="type_of_check_in"><option>In-person</option><option>Phone</option><option>Virtual</option></select></div>
-      <div class="fld"><label>Date</label><input type="date" name="date" value="{{.AsOfInput}}" required></div>
+      <div class="fld" style="display:flex;gap:10px"><div style="flex:1"><label>Date</label><input type="date" name="date" value="{{.AsOfInput}}" required style="width:100%"></div><div style="flex:1"><label>Time <span class="muted" style="font-weight:400">(optional)</span></label><input type="time" name="time" style="width:100%"></div></div>
       <div class="fld"><label>Notes <span class="muted" style="font-weight:400">(fitment details, etc.)</span></label><textarea name="note" placeholder="Optional — fitment / observations"></textarea></div>
     </div>
     <div class="mf"><button type="button" class="btn ghost" onclick="document.getElementById('qcModal').classList.remove('show')">Cancel</button><button type="submit" class="btn">Save check-in</button></div>

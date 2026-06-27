@@ -40,7 +40,14 @@ func normInputDate(s string) string {
 	if mo < 1 || mo > 12 || d < 1 || d > 31 {
 		return s // not a real date — leave it for the flexible parsers to judge
 	}
-	return fmt.Sprintf("%d/%d/%d", mo, d, y)
+	out := fmt.Sprintf("%d/%d/%d", mo, d, y)
+	// Preserve a trailing clock time, so "2026-06-26 14:30" -> "6/26/2026 14:30".
+	// ParseDay ignores the time (still buckets to the right day everywhere it
+	// matters); ParseDateTime and the record's check-in list keep it.
+	if rest := strings.TrimSpace(s[len(m[0]):]); rest != "" {
+		out += " " + rest
+	}
+	return out
 }
 
 var (

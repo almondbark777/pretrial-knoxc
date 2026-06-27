@@ -219,7 +219,9 @@ func main() {
 	r.Get("/console/referrals", srv.ConsoleReferrals) // app-entered referral data (SharePoint-list style)
 	r.Get("/console/clients/new", srv.ConsoleIntake)  // static segment wins over {idn}
 	r.Get("/console/clients/{idn}", srv.ConsoleRecordPage)
+	r.Get("/console/clients/{idn}/photo/{id}", srv.DefendantPhoto) // serve a stored defendant/victim photo (report #10)
 	r.Get("/console/calendar", srv.ConsoleCalendar)
+	r.Get("/console/calendar/day", srv.ConsoleCalendarDay) // click-into-a-day drill-down
 	r.Get("/console/compliance", srv.ConsoleCompliance)
 	r.Get("/console/reports", srv.ConsoleReports)
 	r.Get("/console/admin", srv.ConsoleAdmin)
@@ -287,22 +289,27 @@ func main() {
 	// handler; CRUD routes are open to any allowed officer. Everything is audited.
 	r.Route("/admin", func(ar chi.Router) {
 		ar.Use(csrfGuard(a))
-		ar.Get("/delete", srv.DeleteConfirm)             // confirmation screen (supervisor)
-		ar.Post("/delete", srv.Delete)                   // perform delete (supervisor)
-		ar.Post("/restore", srv.Restore)                 // un-tombstone (supervisor)
-		ar.Post("/undo_last_delete", srv.UndoLastDelete) // one-click newest restore (supervisor)
-		ar.Get("/deleted", srv.Deleted)                  // tombstone list + restore (supervisor)
-		ar.Get("/audit", srv.Audit)                      // audit-log viewer (supervisor)
-		ar.Post("/override", srv.SetOverride)            // set field override (supervisor)
-		ar.Post("/override/clear", srv.ClearOverride)    // clear override (supervisor)
-		ar.Post("/waiver", srv.SetFeeWaiver)             // grant GPS fee waiver (supervisor)
-		ar.Post("/waiver/clear", srv.ClearFeeWaiver)     // remove app fee waiver (supervisor)
-		ar.Post("/import/preview", srv.ImportPreview)    // stage uploaded CSVs + dry-run (supervisor)
-		ar.Post("/import/apply", srv.ImportApply)        // commit a previewed upload (supervisor)
-		ar.Post("/import/discard", srv.ImportDiscard)    // drop a previewed upload (supervisor)
-		ar.Post("/caseload", srv.SaveCaseload)           // set A–Z caseload assignments (supervisor)
-		ar.Post("/user/save", srv.SaveUser)              // add/re-role a user (admin)
-		ar.Post("/user/remove", srv.RemoveUser)          // revoke a user (admin)
+		ar.Get("/delete", srv.DeleteConfirm)                         // confirmation screen (supervisor)
+		ar.Post("/delete", srv.Delete)                               // perform delete (supervisor)
+		ar.Post("/restore", srv.Restore)                             // un-tombstone (supervisor)
+		ar.Post("/undo_last_delete", srv.UndoLastDelete)             // one-click newest restore (supervisor)
+		ar.Get("/deleted", srv.Deleted)                              // tombstone list + restore (supervisor)
+		ar.Get("/audit", srv.Audit)                                  // audit-log viewer (supervisor)
+		ar.Post("/override", srv.SetOverride)                        // set field override (supervisor)
+		ar.Post("/override/clear", srv.ClearOverride)                // clear override (supervisor)
+		ar.Post("/waiver", srv.SetFeeWaiver)                         // grant GPS fee waiver (supervisor)
+		ar.Post("/waiver/clear", srv.ClearFeeWaiver)                 // remove app fee waiver (supervisor)
+		ar.Post("/not-behind", srv.SetNotBehind)                     // mark reviewed — not behind (officer)
+		ar.Post("/not-behind/clear", srv.ClearNotBehind)             // clear not-behind hold (officer)
+		ar.Post("/ptr-check/addressed", srv.TogglePtrCheckAddressed) // tick a PTR-check row addressed (officer)
+		ar.Post("/photo/add", srv.AddDefendantPhoto)                 // upload a defendant/victim photo (officer)
+		ar.Post("/photo/delete", srv.DeleteDefendantPhoto)           // delete a photo (officer)
+		ar.Post("/import/preview", srv.ImportPreview)                // stage uploaded CSVs + dry-run (supervisor)
+		ar.Post("/import/apply", srv.ImportApply)                    // commit a previewed upload (supervisor)
+		ar.Post("/import/discard", srv.ImportDiscard)                // drop a previewed upload (supervisor)
+		ar.Post("/caseload", srv.SaveCaseload)                       // set A–Z caseload assignments (supervisor)
+		ar.Post("/user/save", srv.SaveUser)                          // add/re-role a user (admin)
+		ar.Post("/user/remove", srv.RemoveUser)                      // revoke a user (admin)
 
 		// Data entry (any allowed officer): add a client, payments, check-ins.
 		// The classic add-client form is gone — the console intake wizard is the
@@ -631,6 +638,8 @@ func tmplFuncs() template.FuncMap {
 			switch {
 			case strings.HasPrefix(kind, "checkin"):
 				return "checkin"
+			case kind == "court":
+				return "court"
 			case kind == "payment" || kind == "ptr-fee":
 				return "payment"
 			case kind == "gps-install" || kind == "gps-switch":

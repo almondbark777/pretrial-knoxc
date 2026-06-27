@@ -5,12 +5,27 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"pretrial-knoxc/internal/auth"
 	"pretrial-knoxc/internal/compute"
 	"pretrial-knoxc/internal/db"
 )
+
+// clockRe matches a 24-hour HH:MM as emitted by an <input type=time>.
+var clockRe = regexp.MustCompile(`^([01]?\d|2[0-3]):[0-5]\d$`)
+
+// combineDateTime appends an optional check-in time to the picked date, so a
+// manually logged check-in carries the clock the officer entered. A blank or
+// malformed time leaves the date alone (still a valid date-only check-in).
+func combineDateTime(date, tm string) string {
+	date = strings.TrimSpace(date)
+	if tm = strings.TrimSpace(tm); tm != "" && clockRe.MatchString(tm) {
+		return date + " " + tm
+	}
+	return date
+}
 
 // Phase 10 — data entry. Add a defendant (a new client), and add payments /
 // check-ins to an existing one. Open to any allowed officer (audited); a
@@ -137,6 +152,7 @@ func (s *Server) UpdateGPS(w http.ResponseWriter, r *http.Request) {
 		"victim_2_idn":           r.FormValue("victim_2_idn"),
 		"victim_3":               r.FormValue("victim_3"),
 		"victim_3_idn":           r.FormValue("victim_3_idn"),
+		"gps_removed":            r.FormValue("gps_removed"),
 	}
 	err := db.SetGPSDetails(s.DB, idn, vals, auth.User(r))
 	s.afterWrite(w, r, back, err, "GPS details updated.")
@@ -287,7 +303,8 @@ func (s *Server) DeleteAddedPayment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) AddCheckIn(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	idn, back := profileBack(r)
-	err := db.AddCheckIn(s.DB, idn, r.FormValue("date"), r.FormValue("type_of_check_in"), r.FormValue("note"), auth.User(r))
+	date := combineDateTime(r.FormValue("date"), r.FormValue("time"))
+	err := db.AddCheckIn(s.DB, idn, date, r.FormValue("type_of_check_in"), r.FormValue("note"), auth.User(r))
 	s.afterWrite(w, r, back, err, "Check-in recorded.")
 }
 
@@ -298,7 +315,7 @@ func (s *Server) AddCheckIn(w http.ResponseWriter, r *http.Request) {
 // POST /admin/checkin/bulk
 func (s *Server) BulkAddCheckIn(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
-	date := r.FormValue("date")
+	date := combineDateTime(r.FormValue("date"), r.FormValue("time"))
 	ctype := r.FormValue("type_of_check_in")
 	note := r.FormValue("note")
 	by := auth.User(r)

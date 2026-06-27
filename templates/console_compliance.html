@@ -24,10 +24,21 @@
         <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td>
         <td class="num">{{money .Owed}}</td><td class="num">{{money .Paid}}</td>
         <td class="num risk-t">{{money .Amount}}</td>
-        <td>{{if .Waived}}<span class="chip neutral">waived</span>{{else}}<span class="chip risk"><span class="g">⚠</span> behind</span>{{end}}</td></tr>{{end}}</tbody>
+        <td>{{if .Waived}}<span class="chip neutral">waived</span>{{else}}<span class="chip risk"><span class="g">⚠</span> behind</span>{{end}}<form method="post" action="/admin/not-behind" style="display:inline" onclick="event.stopPropagation()"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{.IDN}}"><input type="hidden" name="next" value="/console/compliance"><button type="submit" class="btn ghost sm" title="Reviewed — this person is not actually behind" style="margin-left:8px">Not behind ✓</button></form></td></tr>{{end}}</tbody>
     </table>{{else}}<div class="emptybox"><div class="big">✓</div>All clear — nobody is behind on GPS.</div>{{end}}
   </div>
 </div>
+
+{{if .Reviewed}}<div class="panel" style="margin-bottom:18px">
+  <div class="h"><h2>Reviewed — not behind</h2><span class="muted" style="font-weight:400;font-size:12px;margin-left:8px">held off the Behind roster by an officer</span><span class="grow"></span><span class="count">{{len .Reviewed}}</span></div>
+  <div class="tscroll cv-auto"><table class="data">
+    <thead><tr><th scope="col">Client</th><th scope="col">Officer</th><th scope="col">Level</th><th scope="col">Action</th></tr></thead>
+    <tbody>{{range .Reviewed}}<tr>
+      <td><div class="namecell"><span class="av">{{initials .Name}}</span><span class="nm">{{.Name}}</span></div></td>
+      <td>{{.Officer}}</td><td>{{template "lvlchip" .Level}}</td>
+      <td><form method="post" action="/admin/not-behind/clear" style="display:inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="idn" value="{{.IDN}}"><input type="hidden" name="next" value="/console/compliance"><button type="submit" class="btn ghost sm">Undo — put back on roster</button></form></td></tr>{{end}}</tbody>
+  </table></div>
+</div>{{end}}
 
 <div class="panel">
   <div class="h"><h2>Missed Check-Ins this month</h2><span class="grow"></span><span class="count">{{len .Missed}}</span>
