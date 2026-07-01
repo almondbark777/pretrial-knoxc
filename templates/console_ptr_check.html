@@ -117,6 +117,8 @@
 .ptrck th:hover{color:var(--accent)}
 .ptrck tbody tr:hover{background:var(--panel-2)}
 .ptrck td.name{white-space:normal;min-width:170px;font-weight:600}
+.ptrck .addrcell{text-align:center;width:1%}
+.ptrck th[data-k="addr"]{text-align:center}
 
 .ptrck .badge{display:inline-block;padding:2px 8px;border-radius:var(--r-pill);font-size:11px;font-weight:700;line-height:1.5}
 .ptrck .b-both{background:var(--ok-bg);color:var(--ok-ink)}
@@ -296,12 +298,12 @@ function inWindow(p){
 }
 
 const COLS=[
+  {k:"addr",t:"Addressed"},
   {k:"idn",t:"IDN"},{k:"name",t:"Name"},{k:"cases",t:"Case #s"},
   {k:"presence",t:"Presence"},{k:"ref",t:"Referral date (PTR / System)"},
   {k:"level",t:"Level"},{k:"sup",t:"Supervision"},{k:"order",t:"Order from"},
   {k:"division",t:"Division (PTR)"},{k:"status",t:"Status (System)"},
-  {k:"digital",t:"Digital order (PTR)"},{k:"custody",t:"In custody"},
-  {k:"addr",t:"Addressed"}
+  {k:"digital",t:"Digital order (PTR)"},{k:"custody",t:"In custody"}
 ];
 
 function rows(){
@@ -374,6 +376,7 @@ function render(){
               <span class="${pd&&bd?'diff':''}">${bd?fmt(bd):'—'}<span class="s">System</span></span></div>`;
     };
     return `<tr>
+      <td class="addrcell"><input type="checkbox" class="addrck" data-idn="${esc(p.idn)}"${ADDR[p.idn]?" checked":""} title="Mark this row looked-at &amp; addressed"></td>
       <td>${esc(p.idn)}${p.idnDiff?'<span class="pill-mismatch" title="IDNs differ between files — matched on a shared case #">IDN≠</span>':''}</td>
       <td class="name">${esc(p.name)}</td>
       <td class="muted">${esc([...new Set([...(p.pRow?p.pRow.cases:[]),...(p.bRow?p.bRow.cases:[])])].slice(0,6).join(", "))}</td>
@@ -386,7 +389,6 @@ function render(){
       <td>${esc(p.bRow?p.bRow.status:"")||'<span class="muted">—</span>'}</td>
       <td>${p.pRow&&p.pRow.digital?'<span class="digi">Yes</span>':'<span class="muted">No</span>'}</td>
       <td>${p.custody==="T"?'<span class="cust">IN CUSTODY</span>':'<span class="muted">No</span>'}</td>
-      <td class="addrcell"><input type="checkbox" class="addrck" data-idn="${esc(p.idn)}"${ADDR[p.idn]?" checked":""} title="Mark this row looked-at &amp; addressed"></td>
     </tr>`;
   }).join("");
   // Persist an "addressed" tick per IDN (problem report #9). Optimistic: update
